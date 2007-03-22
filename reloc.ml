@@ -96,7 +96,7 @@ let filter f l =
 type symbol = {
   mutable sym_pos: int;
   sym_name: string;
-  value: int32;
+  mutable value: int32;
   mutable section: [ `Num of int | `Section of section ];
   stype: int;
   storage: int;
@@ -114,7 +114,7 @@ and section = {
   mutable sec_pos: int;
   sec_name: string;
   vsize: int32;
-  data: string;
+  mutable data: string;
   mutable relocs: reloc list;
   sec_opts: int32;
 }
@@ -232,6 +232,9 @@ module Symbol = struct
 end
 
 module Reloc = struct
+  let abs sec addr sym = 
+    sec.relocs <- { addr = addr; symbol = sym; rtype = 6 } :: sec.relocs
+
   let get symtbl ic base =
     let buf = read ic base 10 in
     { addr = int32 buf 0;
@@ -259,6 +262,10 @@ module Reloc = struct
 end
 
 module Section = struct
+  let create name flags = {
+    sec_pos = (-1); sec_name = name; data = ""; relocs = [];
+    vsize = 0l;  sec_opts = flags;
+  }
 
   let get strtbl symtbl ic base =
     let buf = read ic base 40 in
@@ -536,91 +543,75 @@ let str_to_buf b s =
   for i = 1 to 4 - ((String.length s) mod 4) do Buffer.add_char b '\000' done
 
 let make_reloctable x p =
-  let h = Hashtbl.create 16 in
+  let sect = Section.create ".dynrel" 0xc0300040l in
+  let data = Buffer.create 1024 in
+  let strings = Buffer.create 1024 in
+  let strsym = Symbol.intern sect 0l in
+
+  (* TODO: share symbol names *)
+  (* TODO: use a single table per section *)
   let syms = ref [] in
-  let new_syms = ref [] in
   let reloc sec rel =
     if p rel.symbol then (
+      (* kind *)
+      let kind = match rel.rtype with
+	| 0x06 -> 0x0002 (* absolute *)
+	| 0x14 -> 0x0001 (* relative *)
+	| k    -> 
+	    Printf.eprintf "Unsupported relocated kind %04x" k;
+	    exit 2
+      in
+      int32_to_buf data kind;
+
+      (* name *)
+      Reloc.abs sect (Int32.of_int (Buffer.length data)) strsym;
+      int32_to_buf data (Buffer.length strings);
+      Buffer.add_string strings rel.symbol.sym_name;
+      Buffer.add_char strings '\000';
+
+      (* target *)
       let target = Symbol.intern sec rel.addr in
-      if not (Hashtbl.mem h rel.symbol.sym_name)
-      then syms := rel.symbol :: !syms;
-      Hashtbl.add h rel.symbol.sym_name (target,rel.rtype);
-      new_syms := target :: !new_syms;
+      Reloc.abs sect (Int32.of_int (Buffer.length data)) target;
+      int32_to_buf data 0;
+      syms := target :: !syms;
       false
     ) else true
   in
   let section sec = sec.relocs <- filter (reloc sec) sec.relocs in
   List.iter section x.sections;
-
-  let data = Buffer.create 1024 in
   int32_to_buf data 0;
-  int32_to_buf data (List.length !syms);
-  let relocs = ref [] in
-  List.iter
-    (fun s ->
-       let rels = Hashtbl.find_all h s.sym_name in
-       int32_to_buf data (List.length rels);
-       str_to_buf data s.sym_name;
-       List.iter
-	 (fun (target,kind) ->
-	    relocs := { addr = Int32.of_int (Buffer.length data);
-			symbol = target;
-			rtype = 6 } :: !relocs;
-	    int32_to_buf data 0;
-	    int32_to_buf data (
-	      match kind with
-		| 6    -> 1 (* absolute *)
-		| 0x14 -> 0 (* relative *)
-		| _    -> 
-		    Printf.eprintf "Unsupported relocated kind %04x" kind;
-		    exit 2
-	    );
-	 )
-	 rels;
-    )
-    !syms;
 
-  let relsect = {
-    sec_pos = (-1);
-    sec_name = ".dynrel";
-    data = Buffer.contents data;
-    relocs = !relocs;
-    vsize = 0l;
-    sec_opts = 0xc0300040l;
-  } in
-  x.sections <- relsect :: x.sections;
+  strsym.value <- Int32.of_int (Buffer.length data);
+  sect.data <- Buffer.contents data ^ Buffer.contents strings;
+  x.sections <- sect :: x.sections;
   x.symbols <- 
-    (Symbol.export "dynreloc" relsect 0l) ::
-    !new_syms @ List.filter (fun x -> not (p x)) x.symbols
+    (Symbol.export "dynreloc" sect 0l) ::
+    strsym :: !syms @ List.filter (fun x -> not (p x)) x.symbols
 
 
 let make_symtable x p =
-  let exports = filter p x.symbols in
-
+  let sect = Section.create ".dynsym" 0xc0300040l in
   let data = Buffer.create 1024 in
-  int32_to_buf data (List.length exports);
+  let strings = Buffer.create 1024 in
+  let strsym = Symbol.intern sect 0l in
 
-  let relocs = ref [] in
+  let exports = filter p x.symbols in
+  int32_to_buf data (List.length exports);
   List.iter
     (fun s  ->
-       relocs := { addr = Int32.of_int (Buffer.length data);
-		   symbol = s;
-		   rtype = 6 } :: !relocs;
+       Reloc.abs sect (Int32.of_int (Buffer.length data)) s;
        int32_to_buf data 0;
-       str_to_buf data s.sym_name;
+
+       Reloc.abs sect (Int32.of_int (Buffer.length data)) strsym;
+       int32_to_buf data (Buffer.length strings);
+       Buffer.add_string strings s.sym_name;
+       Buffer.add_char strings '\000';
     )
     exports;
-
-  let relsect = {
-    sec_pos = (-1);
-    sec_name = ".dynsym";
-    data = Buffer.contents data;
-    relocs = !relocs;
-    vsize = 0l;
-    sec_opts = 0xc0300040l;
-  } in
-  x.sections <- relsect :: x.sections;
-  x.symbols <- (Symbol.export "dynsytbl" relsect 0l) :: x.symbols
+  strsym.value <- Int32.of_int (Buffer.length data);
+  sect.data <- Buffer.contents data ^ Buffer.contents strings;
+  x.sections <- sect :: x.sections;
+  x.symbols <- (Symbol.export "dynsytbl" sect 0l) :: strsym :: x.symbols
 
 let has_prefix pr s =
   String.length s > String.length pr && String.sub s 0 (String.length pr) = pr
@@ -638,5 +629,6 @@ let parse_obj s =
     Coff.dump coff
 
 let () =
-(*  parse_obj Sys.argv.(1);  *)
-  Lib.read Sys.argv.(1)
+  parse_obj Sys.argv.(1);  
+(*  Lib.read Sys.argv.(1) *)
+  ()

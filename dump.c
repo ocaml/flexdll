@@ -65,82 +65,47 @@ static void allow_write(char *begin, char *end) {
   }
 }
 
-/* Debugging functions */
-
-static void dump_reloctbl(uintnat *ptr) {
-  int i,j,n,m;
-  uintnat reloc;
-  char *name;
-  uintnat absolute;
-
-  if (!ptr) { printf("No relocation table\n"); return; }
-  printf("Dynamic relocation table found at %lx\n", ptr);
-  if ((uintnat) ptr % 4 != 0) { printf("Not aligned\n"); return; }
-
-  if (*ptr++) printf("(already relocated)\n");
-  n = *ptr++; 
-
-  for (i = 0; i < n; i++) {
-    m = *ptr++; 
-    name = (char*) ptr; ptr += 1 + strlen(name) / sizeof(uintnat);
-    for (j =0; j < m; j++) {
-      reloc = *ptr++;
-      absolute = *ptr++;
-      printf(" %s: %lx %s  (now:%lx)\n", name, reloc, (absolute ? "(*)" : ""),
-	     *((uintnat*) reloc)
-	     );
-    }
-  }
-}
-
-static void dump_symtbl(uintnat *ptr)
-{
-  int i,n;
-  uintnat addr;
-  char *name;
-
-  if (!ptr) { printf("No relocation table\n"); return; }
-  printf("Dynamic symbol table found at %lx\n", ptr);
-  if ((uintnat) ptr % 4 != 0) { printf("Not aligned!\n"); return; }
-
-  n = *ptr++;
-  for (i = 0; i < n; i++) { 
-    addr = *ptr++;
-    name = (char*) ptr; ptr += 1 + strlen(name) / sizeof(uintnat);
-    printf(" %s : %08lx\n", name, addr);
-  }
-}
-
-/* Perform relocation */
+/* Relocation tables */
 
 typedef void *resolver(void*, char*);
 
-void relocate(resolver f, void *data, uintnat *ptr) {
+#define RELOC_REL   0x0001
+#define RELOC_ABS   0x0002
+#define RELOC_DONE  0x0100
+
+typedef struct { uintnat kind; char *name; uintnat *addr; } reloc_entry;
+
+static void dump_reloctbl(reloc_entry *tbl) {
+  if (!tbl) { printf("No relocation table\n"); return; }
+  printf("Dynamic relocation table found at %lx\n", tbl);
+
+  for (; tbl->kind; tbl++)
+    printf(" %s: %08lx (kind:%04lx)  (now:%08lx)\n", 
+	   tbl->name,
+	   tbl->addr,
+	   tbl->kind,
+	   *((uintnat*) tbl->addr)
+	   );
+}
+
+void relocate(resolver f, void *data, reloc_entry *tbl) {
   int i,j,n,m;
   uintnat *reloc, s;
   char *name;
   uintnat absolute;
 
-  assert ((uintnat) ptr % 4 == 0);
-  assert (ptr);
-  if (*ptr) return;
-  *ptr++ = 1;
-
-  n = *ptr++; 
-  for (i = 0; i < n; i++) {
-    m = *ptr++; 
-    name = (char*) ptr; ptr += 1 + strlen(name) / sizeof(uintnat);
-    s = (uintnat) f(data,name);
-    /*    printf("%s -> 0x%08lx\n", name, s); */
-    if (NULL == (void*) s) { printf("Cannot resolve %s\n", name); exit(1); }
-    for (j =0; j < m; j++) {
-      reloc = (uintnat*) *ptr++;
-      absolute = *ptr++;
-
-      allow_write((char*)reloc,(char*)reloc + 4);
-      if (absolute) { *reloc += s; }
-      else { *reloc = s - (uintnat) reloc - 4; }
+  if (!tbl) return;
+  for (; tbl->kind; tbl++) {
+    if (tbl->kind & RELOC_DONE) continue;
+    s = (uintnat) f(data,tbl->name);
+    if (!s) { printf("Cannot resolve %s\n", tbl->name); exit(1); }
+    allow_write((char*)tbl->addr,(char*)tbl->addr);
+    switch (tbl->kind & 0xff) {
+    case RELOC_ABS: *(tbl->addr) = s; break;
+    case RELOC_REL: *(tbl->addr) = s - (uintnat) (tbl->addr) - 4; break;
+    default: assert(0);
     }
+    tbl->kind |= RELOC_DONE;
   }
 }
 
@@ -154,37 +119,40 @@ typedef struct {
   int sorted;  /* 1 if already sorted; 0 otherwise */
   dynsymbol *slots;
 } dynsymtable;
+typedef struct { uintnat size; dynsymbol entries[]; } symtbl;
 
+static void dump_symtbl(symtbl *tbl)
+{
+  int i;
+
+  if (!tbl) { printf("No relocation table\n"); return; }
+  printf("Dynamic symbol table found at %lx\n", tbl);
+
+  for (i = 0; i < tbl->size; i++)
+    printf(" %s : %08lx\n", tbl->entries[i].name, tbl->entries[i].addr);
+}
 
 int compare_dynsymbol(const void *s1, const void *s2) {
   return strcmp(((dynsymbol*) s1) -> name, ((dynsymbol*) s2) -> name);
 }
 
-void add_symbols(dynsymtable *table, uintnat *ptr) {
-  int i,used,size;
-  int nslots = *ptr++;
+void add_symbols(dynsymtable *table, symtbl *tbl) {
+  int i,needed,size;
 
-  assert ((uintnat) ptr % 4 == 0);
-  assert (ptr);
-
-  used = table->used;
+  if (!tbl) return;
+  needed = table->used + tbl->size;
   size = table->size;
-  if (used + nslots > size) {
-    while (used + nslots > size) size = size * 2 + 10;
+  if (needed > size) {
+    while (needed > size) size = size * 2 + 10;
     table->slots = realloc(table->slots, size * sizeof(dynsymbol));
     if (NULL == table->slots) {
       printf("Cannot allocate memory for symbol table\n");
       exit(1);
     }
   }
-
-  for (i = 0; i < nslots; i++) { 
-    dynsymbol *sym = &(table->slots[used++]);
-    sym->addr = (void*) *ptr++;
-    sym->name = (char*) ptr; ptr += 1 + strlen(sym->name) / sizeof(uintnat);
-  }
-
-  table->used = used;
+  memcpy(&table->slots[table->used], &tbl->entries, 
+	 tbl->size * sizeof(dynsymbol));
+  table->used = needed;
   table->size = size;
   table->sorted = 0;
 }
@@ -239,7 +207,7 @@ int main(int argc, char **argv)
 
     torun = find_symbol(symtbl, "_caml_torun");
     if (torun) {
-      printf("Now running...\n");
+      printf("Now running... %08lx\n",torun);
       torun();
     } else {
       printf("No entry point here\n");
