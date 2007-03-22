@@ -4,8 +4,14 @@ demo: dump b.dll c.dll
 reloc: reloc.ml
 	ocamlopt -o reloc reloc.ml
 
-dump: dump.c
-	cl /Fe"dump.exe" /MD dump.c
+dump: dynsyms.obj dump.obj
+	cl /Fe"dump.exe" /MD dynsyms.obj dump.obj
+
+dynsyms.obj: dynsyms.h dynsyms.c
+	cl /c /MD dynsyms.c
+
+dump.obj: dynsyms.h dump.c
+	cl /c /MD dump.c
 
 a2.obj: a.ml reloc
 	ocamlopt -c a.ml
