@@ -9,6 +9,7 @@ type symbol = {
   storage: int;
   auxn: int;
   auxs: string;
+  mutable alias_for: symbol option;
 }
 
 and reloc = {
@@ -144,11 +145,13 @@ module Symbol = struct
 
   let intern sec addr =
     { sym_pos = (-1); sym_name = gen_sym(); value = addr; 
-      section = `Section sec; storage = 3; stype = 0; auxn = 0; auxs = ""; }
+      section = `Section sec; storage = 3; stype = 0; auxn = 0; auxs = "";
+      alias_for = None }
 
   let export name sec addr = 
     { sym_pos = (-1); sym_name = name; value = addr;
-      section = `Section sec; storage = 2; stype = 0; auxn = 0; auxs = ""; }
+      section = `Section sec; storage = 2; stype = 0; auxn = 0; auxs = "";
+      alias_for = None }
 
 
   let get strtbl ic pos =
@@ -164,6 +167,7 @@ module Symbol = struct
       storage = int8 buf 16;
       auxn = auxn;
       auxs = read ic (pos + 18) (18 * auxn);
+      alias_for = None
     }
 
   let is_extern = function
@@ -293,7 +297,7 @@ module Section = struct
     in
 
     let data = read ic (filebase + int32_ buf 20) size in
-(*    if name = ".drectve" then dump ic (filebase + int32_ buf 20) size 16;  *)
+(*    if name = ".drectve" then dump ic (filebase + int32_ buf 20) size 16; *)
 
     { sec_pos = (-1);
       sec_name = name;
@@ -374,18 +378,34 @@ module Coff = struct
     in
     List.iter
       (fun s ->
+	 if s.storage = 105 then
+	   s.alias_for <- symtbl.(Int32.to_int (int32 s.auxs 0));
 	 match s.section with
 	   | `Num i when i > 0 && i <= Array.length sections ->
 	       assert (i <= Array.length sections);
 	       s.section <- `Section sections.(i - 1)
 	   | _ -> ())
       symbols;
+
     { machine = int16 buf 0;
       sections = Array.to_list sections;
       date = int32 buf 4;
       symbols = symbols;
       opts = int16 buf 18;
     }
+
+  let aliases x =
+    let a = ref [] in
+    List.iter
+      (fun s ->
+	 match s.alias_for with 
+	   | Some s' -> a := (s.sym_name,s'.sym_name) :: !a
+	   | None -> ()
+      )
+      x.symbols;
+    !a
+
+
 
   let dump x =
     Printf.printf "machine: 0x%x\n" x.machine;
@@ -684,11 +704,17 @@ let () =
       try find_file (fn ^ ".lib")
       with Not_found -> failwith ("Cannot find file " ^ fn) in
 
+  let aliases = Hashtbl.create 16 in
+
+  let rec normalize name =
+    try normalize (Hashtbl.find aliases name)
+    with Not_found -> name in
+
   let needed accu obj =
     List.fold_left
       (fun accu sym -> 
 	 if Symbol.is_extern sym
-	 then StrSet.add sym.sym_name accu
+	 then StrSet.add (normalize sym.sym_name) accu
 	 else accu
       )
       accu
@@ -696,6 +722,7 @@ let () =
   in
 
   let rec collect_exports_obj obj =
+    List.iter (fun (x,y) -> Hashtbl.add aliases x y) (Coff.aliases obj);
     (try
        let dirsec = 
 	 List.find (fun s -> s.sec_name = ".drectve") obj.sections in
@@ -717,6 +744,7 @@ let () =
 	List.iter (fun (_,obj) -> collect_exports_obj obj) objs;
 	List.iter
 	  (fun (s,_) -> 
+(*	     Printf.printf "I:%s\n" s; *)
 	     defined := StrSet.add s (StrSet.add ("__imp_" ^ s) !defined))
 	  imports
 
