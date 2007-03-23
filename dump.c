@@ -3,6 +3,8 @@
 
 typedef void torun();
 
+/* extern symtbl static_symtable; */
+
 int main(int argc, char **argv)
 {
   void *sym;
@@ -16,6 +18,8 @@ int main(int argc, char **argv)
   symtbl->sorted = 0;
   symtbl->slots = NULL;
 
+  /*  dump_symtbl(&static_symtable); */
+
   for (i = 1; i < argc; i++) {
     printf("opening %s\n", argv[i]);
     handle = dlopen(argv[i], 1);
@@ -23,12 +27,12 @@ int main(int argc, char **argv)
     if (NULL == handle) { printf("error: %s\n", dlerror()); exit(2); }
 
     dump_reloctbl(dlsym(handle, "dynreloc"));
-    dump_symtbl(dlsym(handle, "dynsytbl"));
+    dump_symtbl(dlsym(handle, "symtbl"));
 
     relocate(find_symbol, symtbl, dlsym(handle,"dynreloc"));
-    add_symbols(symtbl, dlsym(handle,"dynsytbl"));
+    add_symbols(symtbl, dlsym(handle,"symtbl"));
 
-    torun = find_symbol(symtbl, "_caml_torun");
+    torun = find_symbol(symtbl, "caml_torun");
     if (torun) {
       printf("Now running... %08lx\n",torun);
       torun();

@@ -105,7 +105,7 @@ void dump_symtbl(symtbl *tbl)
 {
   int i;
 
-  if (!tbl) { printf("No relocation table\n"); return; }
+  if (!tbl) { printf("No symbol table\n"); return; }
   printf("Dynamic symbol table found at %lx\n", tbl);
 
   for (i = 0; i < tbl->size; i++)

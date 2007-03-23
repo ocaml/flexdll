@@ -1,3 +1,5 @@
+CC = cl /nologo /MD
+
 demo: dump b.dll c.dll
 	./dump b.dll c.dll
 
@@ -5,24 +7,33 @@ reloc: reloc.ml
 	ocamlopt -o reloc reloc.ml
 
 dump: dynsyms.obj dump.obj
-	cl /Fe"dump.exe" /MD dynsyms.obj dump.obj
+	$(CC) /Fe"dump.exe" dynsyms.obj dump.obj
 
 dynsyms.obj: dynsyms.h dynsyms.c
-	cl /c /MD dynsyms.c
+	$(CC) /c dynsyms.c
 
 dump.obj: dynsyms.h dump.c
-	cl /c /MD dump.c
+	$(CC) /c dump.c
 
 a2.obj: a.ml reloc
 	ocamlopt -c a.ml
 	./reloc a.obj a2.obj
 
-b2.obj: b.c reloc
-	cl /c /MD b.c
+b.obj: b.c
+	$(CC) /c b.c
+
+c.obj: c.c
+	$(CC) /c c.c
+
+z.dll: b.obj c.obj reloc
+	./reloc b.obj c.obj
+	link /dll /out:result.dll tmpobj3.obj tmpobj2.obj tmpobj1.obj
+
+
+b2.obj: b.obj reloc
 	./reloc b.obj b2.obj
 
-c2.obj: c.c reloc
-	cl /c /MD c.c
+c2.obj: c.obj reloc
 	./reloc c.obj c2.obj
 
 

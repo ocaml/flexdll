@@ -9,7 +9,7 @@ type symbol = {
   storage: int;
   auxn: int;
   auxs: string;
-  mutable alias_for: symbol option;
+  mutable extra_info: [ `Alias of symbol | `Section of section | `None ];
 }
 
 and reloc = {
@@ -143,15 +143,21 @@ module Symbol = struct
   let counter = ref 0
   let gen_sym () = incr counter; Printf.sprintf "DREL$%i" !counter
 
+  let empty () = 
+    { sym_pos = (-1); sym_name = gen_sym(); value = 0l; 
+      section = `Num 0; storage = 0; stype = 0; auxn = 0; auxs = "";
+      extra_info = `None }
+
   let intern sec addr =
-    { sym_pos = (-1); sym_name = gen_sym(); value = addr; 
-      section = `Section sec; storage = 3; stype = 0; auxn = 0; auxs = "";
-      alias_for = None }
+    { (empty ()) with section = `Section sec; storage = 3 }
 
   let export name sec addr = 
-    { sym_pos = (-1); sym_name = name; value = addr;
-      section = `Section sec; storage = 2; stype = 0; auxn = 0; auxs = "";
-      alias_for = None }
+    { (empty ()) with sym_name = name; value = addr;
+	section = `Section sec; storage = 2 }
+
+  let extern name = 
+    { (empty ()) with sym_pos = (-1); sym_name = name; 
+	section = `Num 0; storage = 2 }
 
 
   let get strtbl ic pos =
@@ -167,7 +173,7 @@ module Symbol = struct
       storage = int8 buf 16;
       auxn = auxn;
       auxs = read ic (pos + 18) (18 * auxn);
-      alias_for = None
+      extra_info = `None;
     }
 
   let is_extern = function
@@ -207,6 +213,10 @@ module Symbol = struct
 	  Printf.printf "export %s @ 0x%08lx\n" sect s.value
       | { storage = 2; section = `Num 0; value = 0l } ->
 	  Printf.printf "extern\n"
+      | { storage = 3; value = 0l } ->
+	  Printf.printf "section %s, num %i, select %i\n" sect
+	    (int16 s.auxs 12)
+	    (int8 s.auxs 14)
       | { storage = 3 } ->
 	  Printf.printf "static %s @ 0x%08lx\n" sect s.value
       | { storage = 103 } ->
@@ -215,8 +225,8 @@ module Symbol = struct
 	  Printf.printf "weak ext\n"
       | _ ->
 	  Printf.printf 
-	    "value=0x%08lx, sect=%s, storage=%s, aux=%i\n"
-	    s.value sect storage s.auxn
+	    "value=0x%08lx, sect=%s, storage=%s, aux=%S\n"
+	    s.value sect storage s.auxs
 
   let put strtbl oc s =
     if String.length s.sym_name <= 8 
@@ -234,7 +244,17 @@ module Symbol = struct
     emit_int16 oc s.stype;
     emit_int8 oc s.storage;
     emit_int8 oc s.auxn;
-    output_string oc s.auxs
+    match s with
+      | { storage = 105; extra_info = `Alias s' } when s'.sym_pos >= 0 ->
+	  (* weak ext *)
+	  emit_int32 oc (Int32.of_int s'.sym_pos);
+	  output_string oc (String.sub s.auxs 4 (String.length s.auxs - 4))
+      | { storage = 3; value = 0l; extra_info = `Section s' } ->
+	  (* section def *)
+	  assert false
+      | _ ->
+	  if s.storage = 105 then assert (int16 s.auxs 12 = 0);
+	  output_string oc s.auxs
 end
 
 module Reloc = struct
@@ -342,6 +362,49 @@ module Section = struct
 end
 
 module Coff = struct
+  let empty () =
+    { machine = 0x14c; date = 0x4603de0el; 
+      sections = []; symbols = []; opts = 0 }
+
+  let parse_directives s =
+    let l = String.length s in
+    let rec aux0 i = if i = l then [] else match s.[i] with
+      | ' ' -> aux0 (i+1)
+      | '-' | '/' -> aux1 (i+1) (i+1)
+      | _ -> raise Exit
+    and aux1 i0 i = if i = l then (String.sub s i0 (i - i0), [])::[] 
+    else match s.[i] with
+      | 'a'..'z' | 'A'..'Z' -> aux1 i0 (i+1)
+      | ' ' -> (String.sub s i0 (i - i0), []) :: aux0 (i+1)
+      | ':' -> aux2 (String.sub s i0 (i - i0)) [] (i+1)
+      | _   -> raise Exit
+    and aux2 cmd args i = match s.[i] with
+      | '"' -> aux3 cmd args (i+1) (i+1)
+      | _   -> aux4 cmd args i i
+    and aux3 cmd args i0 i = match s.[i] with
+      | '"' -> aux5 cmd (String.sub s i0 (i - i0) :: args) (i+1)
+      | _   -> aux3 cmd args i0 (i+1)
+    and aux4 cmd args i0 i = 
+      if i = l then (cmd, String.sub s i0 (i - i0) :: args)::[] 
+      else match s.[i] with
+	| ' ' -> (cmd, String.sub s i0 (i - i0) :: args) :: aux0 (i+1)
+	| ',' -> aux2 cmd (String.sub s i0 (i - i0) :: args) (i+1)
+	| _   -> aux4 cmd args i0 (i+1)
+    and aux5 cmd args i = match s.[i] with
+      | ' ' -> (cmd,args) :: aux0 (i+1)
+      | ',' -> aux2 cmd args (i+1)
+      | _   -> raise Exit
+    in
+    try List.map (fun (cmd,args) -> (cmd,List.rev args)) (aux0 0)
+    with _ ->
+      Printf.eprintf "Cannot parse directive: %s\n" s;
+      exit 2
+ 
+  let directives obj =
+    try 
+      parse_directives 
+	((List.find (fun s -> s.sec_name = ".drectve") obj.sections).data)
+    with Not_found -> []
 
   let get ic base =
     let buf = read ic base 20 in    
@@ -363,7 +426,7 @@ module Coff = struct
     let symbols,symtbl = 
       let tbl = Array.create symcount None in
       let rec fill accu i =
-	if i = symcount then accu
+	if i = symcount then List.rev accu
 	else let s = Symbol.get strtbl ic (symtable + 18 * i) in
 	tbl.(i) <- Some s;
 	fill (s :: accu) (i + 1 + s.auxn) in
@@ -378,13 +441,30 @@ module Coff = struct
     in
     List.iter
       (fun s ->
-	 if s.storage = 105 then
-	   s.alias_for <- symtbl.(Int32.to_int (int32 s.auxs 0));
-	 match s.section with
-	   | `Num i when i > 0 && i <= Array.length sections ->
-	       assert (i <= Array.length sections);
-	       s.section <- `Section sections.(i - 1)
-	   | _ -> ())
+	 (match s with
+	    | { storage = 105; auxn = 1 } ->
+		(* weak ext *)
+		(match symtbl.(Int32.to_int (int32 s.auxs 0)) with
+		   | Some s -> s.extra_info <- `Alias s
+		   | None -> assert false)
+	    | { storage = 3; value = 0l; auxn = 1 } ->
+		(* section def *)
+		if int8 s.auxs 14 = 5 then
+		  let num = int16 s.auxs 12 in
+		  assert (num > 0);
+		  s.extra_info <- `Section sections.(num - 1)
+		else
+		  assert (int16 s.auxs 12 = 0)
+	    | { storage = 103 }
+	    | { auxn = 0 } -> ()
+	    | _ ->
+		Symbol.dump s;
+		assert false);
+	 (match s.section with
+	    | `Num i when i > 0 && i <= Array.length sections ->
+		assert (i <= Array.length sections);
+		s.section <- `Section sections.(i - 1)
+	    | _ -> ()))
       symbols;
 
     { machine = int16 buf 0;
@@ -398,9 +478,9 @@ module Coff = struct
     let a = ref [] in
     List.iter
       (fun s ->
-	 match s.alias_for with 
-	   | Some s' -> a := (s.sym_name,s'.sym_name) :: !a
-	   | None -> ()
+	 match s.extra_info with 
+	   | `Alias s' -> a := (s.sym_name,s'.sym_name) :: !a
+	   | _ -> ()
       )
       x.symbols;
     !a
@@ -562,7 +642,7 @@ let int32_to_buf b i =
   Buffer.add_char b (Char.chr ((i lsr 16) land 0xff));
   Buffer.add_char b (Char.chr ((i lsr 24) land 0xff))
 
-let make_reloctable x p =
+let add_reloctable x p sname =
   let sect = Section.create ".dynrel" 0xc0300040l in
   let data = Buffer.create 1024 in
   let strings = Buffer.create 1024 in
@@ -605,50 +685,69 @@ let make_reloctable x p =
   sect.data <- Buffer.contents data ^ Buffer.contents strings;
   x.sections <- sect :: x.sections;
   x.symbols <- 
-    (Symbol.export "dynreloc" sect 0l) ::
+    (Symbol.export sname sect 0l) ::
     strsym :: !syms @ List.filter (fun x -> not (p x)) x.symbols
 
 
-let make_symtable x p =
+let add_symtable obj exports symname =
   let sect = Section.create ".dynsym" 0xc0300040l in
   let data = Buffer.create 1024 in
   let strings = Buffer.create 1024 in
   let strsym = Symbol.intern sect 0l in
-
-  let exports = filter p x.symbols in
+  obj.symbols <- strsym :: (Symbol.export symname sect 0l) :: obj.symbols;
   int32_to_buf data (List.length exports);
   List.iter
     (fun s  ->
-       Reloc.abs sect (Int32.of_int (Buffer.length data)) s;
+       let sym = Symbol.extern s in
+       obj.symbols <- sym :: obj.symbols;
+       Reloc.abs sect (Int32.of_int (Buffer.length data)) sym;
        int32_to_buf data 0;
 
        Reloc.abs sect (Int32.of_int (Buffer.length data)) strsym;
        int32_to_buf data (Buffer.length strings);
-       Buffer.add_string strings s.sym_name;
+       Buffer.add_string strings s;
        Buffer.add_char strings '\000';
     )
     exports;
   strsym.value <- Int32.of_int (Buffer.length data);
   sect.data <- Buffer.contents data ^ Buffer.contents strings;
-  x.sections <- sect :: x.sections;
-  x.symbols <- (Symbol.export "dynsytbl" sect 0l) :: strsym :: x.symbols
+  obj.sections <- sect :: obj.sections
+
+let add_master_reloctable obj names symname =
+  let sect = Section.create ".dynrel" 0xc0300040l in
+  let data = Buffer.create 1024 in
+  obj.symbols <- (Symbol.export symname sect 0l) :: obj.symbols;
+  List.iter
+    (fun s  ->
+       let sym = Symbol.extern s in
+       obj.symbols <- sym :: obj.symbols;
+       Reloc.abs sect (Int32.of_int (Buffer.length data)) sym;
+       int32_to_buf data 0;
+    )
+    names;
+  int32_to_buf data 0;
+  sect.data <- Buffer.contents data;
+  obj.sections <- sect :: obj.sections
+
 
 let has_prefix pr s =
   String.length s > String.length pr && String.sub s 0 (String.length pr) = pr
 
-
+(*
 let parse_obj s = 
   let ic = open_in_bin s in
   let coff = Coff.get ic 0 in
   if Array.length Sys.argv > 2 then
     let oc = open_out_bin Sys.argv.(2) in
     make_symtable coff (fun s -> Symbol.is_export s && has_prefix "_caml" s.sym_name);
-    make_reloctable coff (fun s -> Symbol.is_extern s && has_prefix "_caml" s.sym_name);
+    add_reloctable coff (fun s -> Symbol.is_extern s && has_prefix "_caml" s.sym_name) "reloctbl";
     Coff.put oc coff
   else
     Coff.dump coff
+*)
 
 module StrSet = Set.Make(String)
+module StrMap = Map.Make(String)
 
 let parse_libpath s =
   let n = String.length s in
@@ -662,116 +761,198 @@ let parse_libpath s =
   in
   aux 0
 
-(* TODO: write a real lexer for directives (allow the -opt syntax) *)
-let parse_directives s =
-  let deflibs = ref [] in
-  let rec aux l =
-    let i = String.index_from s l '/' in
-    if String.uppercase (String.sub s (i+1) 11) = "DEFAULTLIB:" then (
-      let j = String.index_from s (i+12) ' ' in
-      let lib = String.sub s (i+12) (j-i-12) in
-      let lib = 
-	if lib.[0] = '"' && lib.[String.length lib - 1]  = '"'
-	then String.sub lib 1 (String.length lib - 2)
-	else lib in
-      deflibs := lib :: !deflibs;
-      aux j
-    ) else
-      aux (succ i)
+let libpath = parse_libpath (try Sys.getenv "LIB" with Not_found -> "")
+  
+let find_file fn =
+  if Sys.file_exists fn then fn
+  else 
+    Filename.concat
+      (List.find (fun s -> Sys.file_exists (Filename.concat s fn)) libpath)
+      fn
+
+let find_file fn =
+  (* todo: cache this function *)
+  try find_file fn
+  with Not_found ->
+    try find_file (fn ^ ".lib")
+    with Not_found -> failwith (Printf.sprintf "Cannot find file %S" fn)
+
+let collect_dllexports obj =
+  let dirs = Coff.directives obj in
+  List.map (function (_,x::_) -> x | _ -> assert false)
+    (List.find_all (fun (cmd,args) -> String.uppercase cmd = "EXPORT") dirs)
+
+let exports accu obj =
+  List.fold_left (fun accu sym -> StrSet.add sym.sym_name accu) accu
+    (List.filter Symbol.is_defin obj.symbols)
+
+let needed f accu obj =
+  let l = List.filter Symbol.is_extern obj.symbols in
+  List.fold_left (fun accu sym -> StrSet.add (f sym.sym_name) accu) accu l
+
+(*
+let build_exe files =
+  let exports =
+    List.fold_left
+      (fun accu fn ->
+	 let fn = find_file fn in
+	 match Lib.read fn with
+	   | `Obj obj -> exports accu obj
+	   | `Lib (objs,_) ->
+	       List.fold_left (fun accu (_,obj) -> exports accu obj) accu objs
+      )
+      StrSet.empty
+      files
   in
-  (try aux 0 with _ -> ());
-  !deflibs
-      
+  StrSet.iter (fun s -> Printf.printf "-> %s\n" s) exports;
+  create_symtable "symtable.obj" (StrSet.elements exports)
+*)
 
-let () =
-(*  parse_obj Sys.argv.(1);   *)
+let collect f l =
+  List.fold_left
+    (fun accu x ->
+       match f x with None -> accu | Some y -> y :: accu)
+    []
+    l
 
-  let libpath = parse_libpath (try Sys.getenv "LIB" with Not_found -> "") in
+let build_dll files =
+  (* fully resolve filenames, eliminate duplicates *)
+  let files = 
+    StrSet.elements (
+      List.fold_left (fun accu fn -> StrSet.add (find_file fn) accu)
+	StrSet.empty files
+    ) in
+  
+  (* load given files *)
+  let loaded_filenames : (string,unit) Hashtbl.t = Hashtbl.create 16 in
+  let files = List.map (fun fn -> fn, Lib.read fn) files in
+  List.iter (fun (fn,_) -> Hashtbl.add loaded_filenames fn ()) files;
+
+  let objs = 
+    collect (function (f,`Obj x) -> Some (f,x) | _ -> None) files in
+  let libs = 
+    collect (function (f,`Lib (x,[])) -> Some (f,x) | _ -> None) files in
+  let ilibs = 
+    collect 
+      (function (f,`Lib (x,imps)) when imps <> [] -> Some (f,x,imps) 
+	 | _ -> None) files in
+
   let defined = ref StrSet.empty in
-  let files = ref [] in
-  let loaded = ref StrSet.empty in
-
-  let find_file fn =
-    if Sys.file_exists fn then fn
-    else 
-      Filename.concat
-	(List.find (fun s -> Sys.file_exists (Filename.concat s fn)) libpath)
-	fn in
-
-  let find_file fn =
-    try find_file fn
-    with Not_found ->
-      try find_file (fn ^ ".lib")
-      with Not_found -> failwith ("Cannot find file " ^ fn) in
 
   let aliases = Hashtbl.create 16 in
-
   let rec normalize name =
-    try normalize (Hashtbl.find aliases name)
+    try 
+      let r = Hashtbl.find aliases name in
+      if r <> name then normalize r else r
     with Not_found -> name in
 
-  let needed accu obj =
-    List.fold_left
-      (fun accu sym -> 
-	 if Symbol.is_extern sym
-	 then StrSet.add (normalize sym.sym_name) accu
-	 else accu
-      )
-      accu
-      obj.symbols
-  in
-
-  let rec collect_exports_obj obj =
+  (* Collect all the available symbols, including those defined
+     in default libraries *)
+  let rec collect_defined_obj obj =
     List.iter (fun (x,y) -> Hashtbl.add aliases x y) (Coff.aliases obj);
-    (try
-       let dirsec = 
-	 List.find (fun s -> s.sec_name = ".drectve") obj.sections in
-       let deflibs = parse_directives dirsec.data in
-(*       List.iter (fun s -> Printf.printf "DEFLIB: %s\n" s) deflibs; *)
-       List.iter (add_file true) deflibs
-     with Not_found -> ());
-
+    let dirs = Coff.directives obj in
+    let all_args c =
+      List.map snd (
+	List.find_all (fun (cmd,args) -> String.uppercase cmd = c)
+	  dirs)
+    in
+    let deflibs = List.flatten (all_args "DEFAULTLIB") in
+    List.iter (fun fn -> 
+(*		 Printf.printf "default lib: %s\n" fn; *)
+		 let fn = find_file fn in
+		 if not (Hashtbl.mem loaded_filenames fn)
+		 then (Hashtbl.add loaded_filenames fn (); 
+		       collect_defined (Lib.read fn)))
+      deflibs;
     List.iter
       (fun sym -> 
 	 if Symbol.is_defin sym 
-	 then defined := StrSet.add sym.sym_name !defined
+	 then defined := StrSet.add sym.sym_name !defined;
       )
       obj.symbols 
-
-  and collect_exports = function
-    | `Obj obj -> collect_exports_obj obj
-    | `Lib (objs,imports) ->
-	List.iter (fun (_,obj) -> collect_exports_obj obj) objs;
+  and collect_defined = function
+    | `Obj obj -> collect_defined_obj obj
+    | `Lib (objs,imports) -> 
+	List.iter (fun (_,obj) -> collect_defined_obj obj) objs;
 	List.iter
 	  (fun (s,_) -> 
-(*	     Printf.printf "I:%s\n" s; *)
 	     defined := StrSet.add s (StrSet.add ("__imp_" ^ s) !defined))
 	  imports
+  in
+  List.iter (fun (_,x) -> collect_defined x) files;
 
-  and add_file default fn =
-    let fn = find_file fn in
-    if StrSet.mem fn !loaded then ()
-    else (loaded := StrSet.add fn !loaded;
-	  let x = Lib.read fn in
-	  files := (default, fn, x) :: !files;
-	  collect_exports x)
+
+  (* Determine which objects from the given libraries should be linked
+     in. First step: find the mapping (symbol -> object) for these
+     objects. *)
+  let defined_in = Hashtbl.create 16 in
+  let def_in_obj fn (objname,obj) = List.iter
+    (fun sym -> 
+       if Symbol.is_defin sym 
+       then Hashtbl.replace defined_in sym.sym_name (fn,objname,obj);
+    ) obj.symbols in
+  List.iter
+    (fun (fn,objs) -> List.iter (def_in_obj fn) objs)
+    libs;
+  
+  let needed obj = needed normalize StrSet.empty obj in
+  let imports obj = StrSet.diff (needed obj) !defined in
+  
+  (* Second step: transitive closure, starting from given objects *)
+  let libobjects = Hashtbl.create 16 in
+
+  let objcount = ref 0 in
+  let to_link = ref [] in
+  let reloctbls = ref [] in
+  let exported = ref StrSet.empty in
+  let record_obj dbg obj =
+    incr objcount;
+    let fn = Printf.sprintf "tmpobj%i.obj" !objcount in
+    Printf.printf "%s -> %s\n" dbg fn; flush stdout; 
+    to_link := fn :: !to_link;
+    let oc = open_out_bin fn in
+    Coff.put oc obj;
+    close_out oc;
   in
 
-  for i = 1 to Array.length Sys.argv - 1 do add_file false Sys.argv.(i) done;
-  let files = !files in
+  let rec link_obj fn obj = 
+    (* Extract a closed version of the object *)
+    let imps = imports obj in
+    let reloctbl = Symbol.gen_sym () in
+    reloctbls := reloctbl :: !reloctbls;
+    add_reloctable obj (fun s -> StrSet.mem s.sym_name imps) reloctbl;
+    record_obj fn obj;
+    Printf.printf "Link %s\n" fn;
+    StrSet.iter (fun s -> Printf.printf "  import %s\n" s) imps;
 
-  List.iter 
-    (fun (default,fn,x) ->
-       if not default then begin
-	 let needed = match x with
-	   | `Obj obj -> needed StrSet.empty obj
-	   | `Lib (objs,_) -> 
-	     List.fold_left (fun accu (_,obj) -> needed accu obj)
-	       StrSet.empty objs in
-	 let relocs = StrSet.diff needed !defined in
-	 StrSet.iter
-	   (fun s -> Printf.printf "%s: %s\n" fn s)
-	   relocs
-       end
-    )
-    files
+    (* Record exported symbols *)
+    exported := exports !exported obj;
+
+    (* Link library objects needed to resolve extern symbols used
+       in this object *)
+    StrSet.iter 
+      (fun s -> try link_libobj (Hashtbl.find defined_in s) with Not_found->())
+      (needed obj)
+  and link_libobj (fn,objname,obj) =
+    if Hashtbl.mem libobjects (fn,objname) then ()
+    else (Hashtbl.replace libobjects (fn,objname) obj; 
+	  link_obj (Printf.sprintf "%s/%s" fn objname) obj)
+  in
+  List.iter (fun (fn,obj) -> link_obj fn obj) objs;
+  let obj = Coff.empty () in
+  add_symtable obj (StrSet.elements !exported) "_symtbl";
+  add_master_reloctable obj !reloctbls "_reloctbl";
+  record_obj "startup" obj;
+
+  let cmd = 
+    Printf.sprintf "link /dll /export:symtbl /export:reloctbl /out:result.dll %s"
+      (String.concat " " (!to_link @ List.map (fun (fn,_,_) -> fn) ilibs))
+  in
+  Printf.printf "%s\n" cmd
+
+
+let () =
+  let files = ref [] in
+  for i = 1 to Array.length Sys.argv - 1 do files := Sys.argv.(i) :: !files
+  done;
+  build_dll !files
