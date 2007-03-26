@@ -149,7 +149,7 @@ module Symbol = struct
       extra_info = `None }
 
   let intern sec addr =
-    { (empty ()) with section = `Section sec; storage = 3 }
+    { (empty ()) with section = `Section sec; storage = 3; value = addr }
 
   let export name sec addr = 
     { (empty ()) with sym_name = name; value = addr;
@@ -642,13 +642,17 @@ let int32_to_buf b i =
   Buffer.add_char b (Char.chr ((i lsr 16) land 0xff));
   Buffer.add_char b (Char.chr ((i lsr 24) land 0xff))
 
+let drop_underscore s =
+  assert(s.[0] = '_');
+  String.sub s 1 (String.length s - 1)
+
 let add_reloctable x p sname =
   let sect = Section.create ".dynrel" 0xc0300040l in
   let data = Buffer.create 1024 in
   let strings = Buffer.create 1024 in
   let strsym = Symbol.intern sect 0l in
+  let str_pos = Hashtbl.create 16 in
 
-  (* TODO: share symbol names *)
   (* TODO: use a single symbol per section *)
   let syms = ref [] in
   let reloc sec rel =
@@ -664,10 +668,18 @@ let add_reloctable x p sname =
       int32_to_buf data kind;
 
       (* name *)
+      let name = drop_underscore (rel.symbol.sym_name) in
+      let pos =
+	try Hashtbl.find str_pos name
+	with Not_found ->
+	  let pos = Buffer.length strings in
+	  Hashtbl.add str_pos name pos;
+	  Buffer.add_string strings name;
+	  Buffer.add_char strings '\000';
+	  pos
+      in
       Reloc.abs sect (Int32.of_int (Buffer.length data)) strsym;
-      int32_to_buf data (Buffer.length strings);
-      Buffer.add_string strings rel.symbol.sym_name;
-      Buffer.add_char strings '\000';
+      int32_to_buf data pos;
 
       (* target *)
       let target = Symbol.intern sec rel.addr in
@@ -695,6 +707,7 @@ let add_symtable obj exports symname =
   let strings = Buffer.create 1024 in
   let strsym = Symbol.intern sect 0l in
   obj.symbols <- strsym :: (Symbol.export symname sect 0l) :: obj.symbols;
+  let exports = List.sort Pervasives.compare exports in
   int32_to_buf data (List.length exports);
   List.iter
     (fun s  ->
@@ -705,7 +718,7 @@ let add_symtable obj exports symname =
 
        Reloc.abs sect (Int32.of_int (Buffer.length data)) strsym;
        int32_to_buf data (Buffer.length strings);
-       Buffer.add_string strings s;
+       Buffer.add_string strings (drop_underscore s);
        Buffer.add_char strings '\000';
     )
     exports;
@@ -783,8 +796,12 @@ let collect_dllexports obj =
     (List.find_all (fun (cmd,args) -> String.uppercase cmd = "EXPORT") dirs)
 
 let exports accu obj =
-  List.fold_left (fun accu sym -> StrSet.add sym.sym_name accu) accu
-    (List.filter Symbol.is_defin obj.symbols)
+  List.fold_left 
+    (fun accu sym -> 
+       if Symbol.is_defin sym && sym.sym_name.[0] = '_' 
+       then StrSet.add sym.sym_name accu
+       else accu)
+    accu obj.symbols
 
 let needed f accu obj =
   let l = List.filter Symbol.is_extern obj.symbols in
@@ -815,7 +832,7 @@ let collect f l =
     []
     l
 
-let build_dll files =
+let build_dll link_exe output_file files =
   (* fully resolve filenames, eliminate duplicates *)
   let files = 
     StrSet.elements (
@@ -838,6 +855,7 @@ let build_dll files =
 	 | _ -> None) files in
 
   let defined = ref StrSet.empty in
+  if link_exe then defined := StrSet.add "_static_symtable" !defined;
 
   let aliases = Hashtbl.create 16 in
   let rec normalize name =
@@ -858,7 +876,6 @@ let build_dll files =
     in
     let deflibs = List.flatten (all_args "DEFAULTLIB") in
     List.iter (fun fn -> 
-(*		 Printf.printf "default lib: %s\n" fn; *)
 		 let fn = find_file fn in
 		 if not (Hashtbl.mem loaded_filenames fn)
 		 then (Hashtbl.add loaded_filenames fn (); 
@@ -899,60 +916,106 @@ let build_dll files =
   let imports obj = StrSet.diff (needed obj) !defined in
   
   (* Second step: transitive closure, starting from given objects *)
-  let libobjects = Hashtbl.create 16 in
 
+  let libobjects  = Hashtbl.create 16 in
   let objcount = ref 0 in
   let to_link = ref [] in
   let reloctbls = ref [] in
   let exported = ref StrSet.empty in
-  let record_obj dbg obj =
+
+  let record_obj obj =
     incr objcount;
     let fn = Printf.sprintf "tmpobj%i.obj" !objcount in
-    Printf.printf "%s -> %s\n" dbg fn; flush stdout; 
     to_link := fn :: !to_link;
     let oc = open_out_bin fn in
     Coff.put oc obj;
-    close_out oc;
-  in
+    close_out oc in
 
-  let rec link_obj fn obj = 
-    (* Extract a closed version of the object *)
-    let imps = imports obj in
+  let close_obj imps obj = 
+    if link_exe then (
+      Printf.eprintf "Cannot resolve symbols:\n";
+      StrSet.iter
+	(fun s -> Printf.eprintf " %s\n" s)
+	imps;
+      exit 1
+    );
     let reloctbl = Symbol.gen_sym () in
     reloctbls := reloctbl :: !reloctbls;
     add_reloctable obj (fun s -> StrSet.mem s.sym_name imps) reloctbl;
-    record_obj fn obj;
-    Printf.printf "Link %s\n" fn;
-    StrSet.iter (fun s -> Printf.printf "  import %s\n" s) imps;
+    record_obj obj in
 
-    (* Record exported symbols *)
+  let rec link_obj obj = 
     exported := exports !exported obj;
-
-    (* Link library objects needed to resolve extern symbols used
-       in this object *)
     StrSet.iter 
       (fun s -> try link_libobj (Hashtbl.find defined_in s) with Not_found->())
       (needed obj)
-  and link_libobj (fn,objname,obj) =
-    if Hashtbl.mem libobjects (fn,objname) then ()
-    else (Hashtbl.replace libobjects (fn,objname) obj; 
-	  link_obj (Printf.sprintf "%s/%s" fn objname) obj)
-  in
-  List.iter (fun (fn,obj) -> link_obj fn obj) objs;
+  and link_libobj (libname,objname,obj) =
+    if Hashtbl.mem libobjects (libname,objname) then ()
+    else (Hashtbl.replace libobjects (libname,objname) (obj,imports obj); 
+	  link_obj obj) in
+  List.iter 
+    (fun (fn,obj) -> 
+       let imps = imports obj in
+       if (StrSet.is_empty imps) then to_link := fn :: !to_link
+       else close_obj imps obj;
+       link_obj obj
+    ) objs;
+
+  let to_explode = Hashtbl.create 16 in
+  Hashtbl.iter
+    (fun (libname,objname) (obj,imps) ->
+       if not (StrSet.is_empty imps) then Hashtbl.replace to_explode libname ()
+    )
+    libobjects;
+  let libs = ref StrSet.empty in
+  Hashtbl.iter
+    (fun (libname,objname) (obj,imps) ->
+       if Hashtbl.mem to_explode libname then close_obj imps obj
+       else libs := StrSet.add libname !libs 
+    )
+    libobjects;
+  StrSet.iter (fun l -> 
+		 if not (Hashtbl.mem to_explode l) 
+		 then to_link := l :: !to_link) 
+    !libs;
   let obj = Coff.empty () in
-  add_symtable obj (StrSet.elements !exported) "_symtbl";
-  add_master_reloctable obj !reloctbls "_reloctbl";
-  record_obj "startup" obj;
+  add_symtable obj (StrSet.elements !exported) 
+    (if link_exe then "_static_symtable" else "_symtbl");
+  if not link_exe then add_master_reloctable obj !reloctbls "_reloctbl";
+  record_obj obj;
 
   let cmd = 
-    Printf.sprintf "link /dll /export:symtbl /export:reloctbl /out:result.dll %s"
-      (String.concat " " (!to_link @ List.map (fun (fn,_,_) -> fn) ilibs))
+    if link_exe
+    then
+      Printf.sprintf 
+	"link /out:%s %s"
+	output_file
+	(String.concat " " (!to_link @ List.map (fun (fn,_,_) -> fn) ilibs))
+    else
+      Printf.sprintf 
+	"link /dll /defaultlib:msvcrt /export:symtbl /export:reloctbl /out:%s %s"
+	output_file
+	(String.concat " " (!to_link @ List.map (fun (fn,_,_) -> fn) ilibs))
   in
-  Printf.printf "%s\n" cmd
+  Printf.printf "+ %s\n" cmd;
+  ignore (Sys.command cmd)
 
+
+let files = ref []
+let output_file = ref ""
+let exe_mode = ref false  
+let usage = "reloc -o <result.dll> file1.obj file2.obj ..."
+let specs = [
+  "-o", Arg.Set_string output_file, 
+  " choose the name of the output file";
+
+  "-exe", Arg.Set exe_mode,
+  " link an executable (not a dll)";
+]
 
 let () =
-  let files = ref [] in
-  for i = 1 to Array.length Sys.argv - 1 do files := Sys.argv.(i) :: !files
-  done;
-  build_dll !files
+  Arg.parse (Arg.align specs) (fun x -> files := x :: !files) usage;
+  if !output_file = "" then 
+    if !exe_mode then output_file := "result.exe"
+    else output_file := "result.dll";
+  build_dll !exe_mode !output_file !files

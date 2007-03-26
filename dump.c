@@ -3,7 +3,9 @@
 
 typedef void torun();
 
-/* extern symtbl static_symtable; */
+void api(char *msg){
+  printf("API: %s\n", msg);
+}
 
 int main(int argc, char **argv)
 {
@@ -11,33 +13,18 @@ int main(int argc, char **argv)
   void *handle;
   int i;
   torun *torun;
-  dynsymtable *symtbl = malloc(sizeof(dynsymtable));
 
-  symtbl->size = 0;
-  symtbl->used = 0;
-  symtbl->sorted = 0;
-  symtbl->slots = NULL;
-
-  /*  dump_symtbl(&static_symtable); */
-
+  dyn_debug = 0;
   for (i = 1; i < argc; i++) {
     printf("opening %s\n", argv[i]);
-    handle = dlopen(argv[i], 1);
+    handle = dyn_dlopen(argv[i], 1);
   
-    if (NULL == handle) { printf("error: %s\n", dlerror()); exit(2); }
+    if (NULL == handle) { printf("error: %s\n", dyn_dlerror()); exit(2); }
 
-    dump_reloctbl(dlsym(handle, "dynreloc"));
-    dump_symtbl(dlsym(handle, "symtbl"));
-
-    relocate(find_symbol, symtbl, dlsym(handle,"dynreloc"));
-    add_symbols(symtbl, dlsym(handle,"symtbl"));
-
-    torun = find_symbol(symtbl, "caml_torun");
+    torun = dyn_dlsym(handle, "caml_torun");
     if (torun) {
-      printf("Now running... %08lx\n",torun);
+      printf("Now running...\n",torun);
       torun();
-    } else {
-      printf("No entry point here\n");
     }
   }
 
