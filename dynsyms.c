@@ -7,6 +7,10 @@
 #include <assert.h>
 #include "dynsyms.h"
 
+#if defined(_CYGWIN_) || defined(_MINGW_)
+#define sprintf_s snprintf
+#endif
+
 typedef long intnat;
 typedef unsigned long uintnat;
 
@@ -15,6 +19,8 @@ typedef unsigned long uintnat;
 #define RELOC_DONE  0x0100
 
 typedef struct { uintnat kind; char *name; uintnat *addr; } reloc_entry;
+typedef struct { void *first; void *last; uintnat old; } nonwr;
+typedef struct { nonwr *nonwr; reloc_entry entries[]; } reloctbl;
 typedef struct { void *addr; char *name; } dynsymbol;
 typedef struct { uintnat size; dynsymbol entries[]; } symtbl;
 typedef struct dlunit { 
@@ -24,7 +30,7 @@ typedef struct dlunit {
   int count;
   struct dlunit *next,*prev;
 } dlunit;
-typedef void *resolver(void*, char*);
+typedef void *resolver(void*, const char*);
 
 static int error = 0;
 static char error_buffer[256];
@@ -68,26 +74,33 @@ char *ll_dlerror(void)
 
 /** Relocation tables **/
 
-void dump_reloctbl(reloc_entry *tbl) {
+void dump_reloctbl(reloctbl *tbl) {
+  reloc_entry *ptr;
+  nonwr *wr;
+
   if (!tbl) { printf("No relocation table\n"); return; }
   printf("Dynamic relocation table found at %lx\n", tbl);
 
-  for (; tbl->kind; tbl++)
+  for (wr = tbl->nonwr; wr->last != 0; wr++)
+    printf(" Non-writable relocation in zone %08lx -> %08lx\n",
+	   wr->first,
+	   wr->last);
+  
+  for (ptr = tbl->entries; ptr->kind; ptr++)
     printf(" %s: %08lx (kind:%04lx)  (now:%08lx)\n", 
-	   tbl->name,
-	   tbl->addr,
-	   tbl->kind,
-	   *((uintnat*) tbl->addr)
+	   ptr->name,
+	   ptr->addr,
+	   ptr->kind,
+	   *((uintnat*) ptr->addr)
 	   );
 }
 
-void dump_master_reloctbl(reloc_entry **ptr) {
+void dump_master_reloctbl(reloctbl **ptr) {
   while (*ptr) dump_reloctbl(*ptr++);
 }
 
-static void allow_write(char *begin, char *end) {
+static void allow_write(char *begin, char *end, uintnat new, uintnat *old) {
   static long int pagesize = 0;
-  long int old;
   int res;
   SYSTEM_INFO si;
 
@@ -97,40 +110,48 @@ static void allow_write(char *begin, char *end) {
   }
 
   begin -= (uintnat) begin % pagesize;
-  res = VirtualProtect(begin, end - begin, PAGE_EXECUTE_WRITECOPY, &old);
+  res = VirtualProtect(begin, end - begin, new, old);
   if (0 == res) {
     fprintf(stderr, "natdynlink: VirtualProtect failed (%s), begin = 0x%08lx, end = 0x%08lx\n", ll_dlerror(), begin, end);
     exit(2);
   }
+  /* printf("%08lx -> %08lx\n", *old, new); */
 }
 
-static void relocate(resolver f, void *data, reloc_entry *tbl) {
-  int i,j,n,m;
-  uintnat *reloc, s;
-  char *name;
-  uintnat absolute;
+static void relocate(resolver f, void *data, reloctbl *tbl) {
+  reloc_entry *ptr;
+  nonwr *wr;
+  uintnat s;
 
   if (!tbl) return;
-  for (; tbl->kind; tbl++) {
-    if (tbl->kind & RELOC_DONE) continue;
-    s = (uintnat) f(data,tbl->name);
+  if (dyn_debug) dump_reloctbl(tbl);
+
+  for (wr = tbl->nonwr; wr->last != 0; wr++)
+    allow_write(wr->first,wr->last + 4,PAGE_EXECUTE_WRITECOPY,&wr->old);
+  
+  for (ptr = tbl->entries; ptr->kind; ptr++) {
+    if (ptr->kind & RELOC_DONE) continue;
+    s = (uintnat) f(data,ptr->name);
     if (!s) { 
       error = 2;
       sprintf_s(error_buffer, sizeof(error_buffer),
-		"Cannot resolve %s", (char*) tbl->name);
+		"Cannot resolve %s", (char*) ptr->name);
       return;
     }
-    allow_write((char*)tbl->addr,(char*)tbl->addr + 4);
-    switch (tbl->kind & 0xff) {
-    case RELOC_ABS: *(tbl->addr) = s; break;
-    case RELOC_REL: *(tbl->addr) = s - (uintnat) (tbl->addr) - 4; break;
+    switch (ptr->kind & 0xff) {
+    case RELOC_ABS: *(ptr->addr) = s; break;
+    case RELOC_REL: *(ptr->addr) = s - (uintnat) (ptr->addr) - 4; break;
     default: assert(0);
     }
-    tbl->kind |= RELOC_DONE;
+    ptr->kind |= RELOC_DONE;
   }
+
+  /* Restore permissions. Should do it also in case of failure... */
+  for (wr = tbl->nonwr; wr->last != 0; wr++)
+    allow_write(wr->first,wr->last + 4,wr->old,&wr->old);
 }
 
-static void relocate_master(resolver f, void *data, reloc_entry **ptr) {
+static void relocate_master(resolver f, void *data, reloctbl **ptr) {
   while (0 == error && *ptr) relocate(f,data,*ptr++);
 }
 
@@ -160,12 +181,6 @@ static void *find_symbol(symtbl *tbl, const char *name) {
   s.name = (char*) name;
   sym = 
     bsearch(&s,&tbl->entries,tbl->size, sizeof(dynsymbol),&compare_dynsymbol);
-
-  /*  if (dyn_debug) { 
-    printf("Look for %s in:\n", name);
-    dump_symtbl(tbl);
-    printf("---> %08lx", sym);
-    } */
 
   return (NULL == sym ? NULL : sym -> addr);
 }
@@ -237,7 +252,7 @@ void *dyn_dlopen(const char *file, int mode) {
     unit->global = 0;
     push_unit(unit);
   }
-  if (mode & RTLD_GLOBAL) unit->global=1;
+  if (mode & DYN_RTLD_GLOBAL) unit->global=1;
 
   relocate_master(find_symbol_global, NULL, ll_dlsym(handle, "reloctbl"));
   if (error) { dyn_dlclose(unit); return NULL; }

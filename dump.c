@@ -14,6 +14,7 @@ int main(int argc, char **argv)
   int i;
   torun *torun;
 
+  printf("DUMP\n");
   dyn_debug = 0;
   for (i = 1; i < argc; i++) {
     printf("opening %s\n", argv[i]);

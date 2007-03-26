@@ -1,35 +1,53 @@
-CC = cl /nologo /MD
+#CC = cl /nologo /MD
+#O = obj
+#CHAIN = msvc
 
-demo: dump b.dll c.dll
-	./dump b.dll c.dll
+#CC = gcc -D_CYGWIN_
+#O = o
+#CHAIN=cygwin
 
-reloc: reloc.ml
-	ocamlopt -o reloc reloc.ml
+CC = gcc -D_MINGW_ -mno-cygwin
+O = o
+CHAIN = mingw
 
-dump: dynsyms.obj dump.obj reloc
-	./reloc -exe -o dump.exe dynsyms.obj dump.obj
+RELOC=./reloc.exe -chain $(CHAIN)
 
-dynsyms.obj: dynsyms.h dynsyms.c
-	$(CC) /c dynsyms.c
+.PHONY: dump
+dump: dump.exe
 
-dump.obj: dynsyms.h dump.c
-	$(CC) /c dump.c
+.PHONY: reloc
+reloc: reloc.exe
 
-b.obj: b.c
-	$(CC) /c b.c
+demo: dump.exe b.dll c.dll
+	./dump.exe b.dll c.dll
 
-c.obj: c.c
-	$(CC) /c c.c
+reloc.exe: reloc.ml coff.ml
+	ocamlopt -o reloc.exe coff.ml reloc.ml
 
-b.dll: b.obj reloc
-	./reloc -o b.dll b.obj
+dump.exe: dynsyms.$(O) dump.$(O) reloc.exe
+	$(RELOC) -exe -o dump.exe dynsyms.$(O) dump.$(O)
 
-c.dll: c.obj reloc
-	./reloc -o c.dll c.obj
+dynsyms.$(O): dynsyms.h dynsyms.c
+	$(CC) -c dynsyms.c
 
-bc.dll: b.obj c.obj reloc
-	./reloc -o bc.dll b.obj c.obj
+dump.$(O): dynsyms.h dump.c
+	$(CC) -c dump.c
+
+b.$(O): b.c
+	$(CC) -c b.c
+
+c.$(O): c.c
+	$(CC) -c c.c
+
+b.dll: b.$(O) reloc.exe
+	$(RELOC) -o b.dll b.$(O)
+
+c.dll: c.$(O) reloc.exe
+	$(RELOC) -o c.dll c.$(O)
+
+bc.dll: b.$(O) c.$(O) reloc.exe
+	$(RELOC) -o bc.dll b.$(O) c.$(O)
 
 
 clean:
-	rm -f *.obj *.exe *.cmx *.dll *.manifest *.exp *.lib *.cmi reloc reloc.exe *.o *~
+	rm -f *.obj *.o *.lib *.a *.exe *.cmx *.dll *.manifest *.exp *.cmi reloc reloc.exe *~
