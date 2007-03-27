@@ -26,7 +26,7 @@ int main(int argc, char **argv)
   
     if (NULL == handle) { printf("error: %s\n", flexdll_dlerror()); exit(2); }
 
-    torun = flexdll_dlsym(handle, "caml_torun");
+    torun = flexdll_dlsym(handle, "torun");
     if (torun) torun();
   }
   exit(0);

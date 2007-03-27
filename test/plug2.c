@@ -1,8 +1,10 @@
-__declspec(dllimport) extern void caml_f();
-__declspec(dllimport) extern int caml_y;
+extern void dump_x();
+extern int x;
 
-void caml_torun() {
-  caml_f();
-  caml_y = 100;
-  caml_f();
+void torun() {
+  api("plug2.torun();");
+
+  dump_x();
+  x = 100;
+  dump_x();
 }

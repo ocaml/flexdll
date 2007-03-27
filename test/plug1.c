@@ -1,4 +1,4 @@
-int caml_y = 3;
-void caml_f() { api("B"); printf("In b.c/f()  y=%i\n", caml_y); }
-int z = 3;
+int x = 3;
+void dump_x() { printf("x=%i\n", x); }
+void torun() { api("plug1.torun();"); }
 
