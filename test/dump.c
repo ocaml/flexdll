@@ -29,5 +29,5 @@ int main(int argc, char **argv)
     torun = flexdll_dlsym(handle, "caml_torun");
     if (torun) torun();
   }
-
+  exit(0);
 }

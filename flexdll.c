@@ -15,7 +15,7 @@
 #include <assert.h>
 #include "flexdll.h"
 
-#if !defined(_MINGW_) && !defined(_CYGWIN)
+#if !defined(_MINGW_) && !defined(_CYGWIN_)
 #define snprintf(buf,size,fmt,arg) _snprintf_s(buf,size,_TRUNCATE,fmt,arg)
 #endif
 
