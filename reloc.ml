@@ -1,6 +1,11 @@
 open Coff
 
 let toolchain = ref `MSVC
+let save_temps = ref false
+let show_exports = ref false
+let show_imports = ref false
+let temps = ref []
+let verbose = ref 0
 
 let int32_to_buf b i =
   Buffer.add_char b (Char.chr (i land 0xff));
@@ -13,7 +18,7 @@ let drop_underscore s =
   String.sub s 1 (String.length s - 1)
 
 let add_reloctable x p sname =
-  let sect = Section.create ".dynrel" 0xc0300040l in
+  let sect = Section.create ".reltbl" 0xc0300040l in
   let data = Buffer.create 1024 in
   let strings = Buffer.create 1024 in
   let nonwr = ref [] in
@@ -91,9 +96,23 @@ let add_reloctable x p sname =
     (Symbol.export sname sect 0l) ::
     strsym :: nonwrsym :: !syms @ List.filter (fun x -> not (p x)) x.symbols
 
+let add_import_table obj imports =
+  let sect = Section.create ".imptbl" 0xc0300040l in
+  obj.sections <- sect :: obj.sections;
+  sect.data <- String.create (4 * List.length imports);
+  ignore 
+    (List.fold_left 
+       (fun i s -> 
+	  let sym = Symbol.extern s in
+	  obj.symbols <- 
+	    sym :: Symbol.export ("__imp_" ^ s) sect (Int32.of_int i) ::
+	    obj.symbols;
+	  Reloc.abs sect (Int32.of_int i) sym; i + 4)
+       0 imports)
 
-let add_symtable obj exports symname =
-  let sect = Section.create ".dynsym" 0xc0300040l in
+
+let add_export_table obj exports symname =
+  let sect = Section.create ".exptbl" 0xc0300040l in
   let data = Buffer.create 1024 in
   let strings = Buffer.create 1024 in
   let strsym = Symbol.intern sect 0l in
@@ -118,7 +137,7 @@ let add_symtable obj exports symname =
   obj.sections <- sect :: obj.sections
 
 let add_master_reloctable obj names symname =
-  let sect = Section.create ".dynrel" 0xc0300040l in
+  let sect = Section.create ".mreltbl" 0xc0300040l in
   let data = Buffer.create 1024 in
   obj.symbols <- (Symbol.export symname sect 0l) :: obj.symbols;
   List.iter
@@ -136,6 +155,12 @@ let add_master_reloctable obj names symname =
 
 let has_prefix pr s =
   String.length s > String.length pr && String.sub s 0 (String.length pr) = pr
+
+let check_prefix pr s =
+  if has_prefix pr s then
+    Some (String.sub s (String.length pr) (String.length s - String.length pr))
+  else None
+    
 
 module StrSet = Set.Make(String)
 
@@ -217,7 +242,7 @@ let collect f l =
     []
     l
 
-let build_dll link_exe output_file files extra_args verbose =
+let build_dll link_exe output_file files extra_args =
   (* fully resolve filenames, eliminate duplicates *)
   let files = 
     StrSet.elements (
@@ -300,33 +325,44 @@ let build_dll link_exe output_file files extra_args verbose =
     (fun (fn,objs) -> List.iter (def_in_obj fn) objs)
     libs;
   
+  let imported = ref StrSet.empty in
   let needed obj = needed normalize StrSet.empty obj in
-  let imports obj = StrSet.diff (needed obj) !defined in
+  let imports obj = 
+    StrSet.filter
+      (fun s -> match check_prefix "__imp_" s with
+	 | Some s' -> imported := StrSet.add s' !imported; false
+	 | None -> true)
+      (StrSet.diff (needed obj) !defined) in
   
   (* Second step: transitive closure, starting from given objects *)
 
   let libobjects  = Hashtbl.create 16 in
-  let objcount = ref 0 in
   let to_link = ref [] in
   let reloctbls = ref [] in
   let exported = ref StrSet.empty in
 
   let record_obj obj =
-    incr objcount;
-    let fn = Printf.sprintf "tmpobj%i.obj" !objcount in
+    let fn = Filename.temp_file "dyndll" ".obj" in
     to_link := fn :: !to_link;
+    temps := fn :: !temps;
     let oc = open_out_bin fn in
     Coff.put oc obj;
     close_out oc in
 
-  let close_obj imps obj = 
+  let add_reloc name obj imps =
+    if !show_imports then (
+      Printf.printf "** Imported symbols for %s:\n" name;
+      StrSet.iter print_endline imps
+    );
+    let reloctbl = Symbol.gen_sym () in
+    reloctbls := reloctbl :: !reloctbls;
+    add_reloctable obj (fun s -> StrSet.mem s.sym_name imps) reloctbl in
+
+  let close_obj name imps obj = 
     if link_exe then
       failwith (Printf.sprintf "Cannot resolve symbols:\n %s\n"
 		  (String.concat "\n " (StrSet.elements imps)));
-
-    let reloctbl = Symbol.gen_sym () in
-    reloctbls := reloctbl :: !reloctbls;
-    add_reloctable obj (fun s -> StrSet.mem s.sym_name imps) reloctbl;
+    add_reloc name obj imps;
     record_obj obj in
 
   let rec link_obj obj = 
@@ -340,10 +376,10 @@ let build_dll link_exe output_file files extra_args verbose =
 	  link_obj obj) in
   List.iter 
     (fun (fn,obj) -> 
+       link_obj obj;
        let imps = imports obj in
        if (StrSet.is_empty imps) then to_link := fn :: !to_link
-       else close_obj imps obj;
-       link_obj obj
+       else close_obj fn imps obj;
     ) objs;
 
   let to_explode = Hashtbl.create 16 in
@@ -355,7 +391,8 @@ let build_dll link_exe output_file files extra_args verbose =
   let libs = ref StrSet.empty in
   Hashtbl.iter
     (fun (libname,objname) (obj,imps) ->
-       if Hashtbl.mem to_explode libname then close_obj imps obj
+       if Hashtbl.mem to_explode libname 
+       then close_obj (Printf.sprintf "%s(%s)" libname objname) imps obj
        else libs := StrSet.add libname !libs 
     )
     libobjects;
@@ -363,22 +400,40 @@ let build_dll link_exe output_file files extra_args verbose =
 		 if not (Hashtbl.mem to_explode l) 
 		 then to_link := l :: !to_link) 
     !libs;
+  if !show_exports then (
+    Printf.printf "** Exported symbols:\n";
+    StrSet.iter print_endline !exported;
+  );
+
+  (* Create the descriptor object *)
   let obj = Coff.empty () in
-  add_symtable obj (StrSet.elements !exported) 
+
+  if not (StrSet.is_empty !imported) then begin
+    add_import_table obj (StrSet.elements !imported);
+    add_reloc "descriptor object" obj !imported;
+  end;
+
+  add_export_table obj (StrSet.elements !exported) 
     (if link_exe then "_static_symtable" else "_symtbl");
   if not link_exe then add_master_reloctable obj !reloctbls "_reloctbl";
   record_obj obj;
 
+
   let files = !to_link @ List.map (fun (fn,_,_) -> fn) ilibs in
   let files = List.map Filename.quote files in
   let files = String.concat " " files in
-  let quiet = if verbose then "" else ">NUL" in
+  let quiet = if !verbose >= 2 then "" else ">NUL" in
   let cmd = 
     match !toolchain with
       | `MSVC ->
+	  let implib = Filename.temp_file "dyndll_implib" ".lib" in
+	  let impexp = Filename.chop_suffix implib ".lib" ^ ".exp" in
+	  temps := implib :: impexp :: !temps;
 	  Printf.sprintf 
-	    "link /nologo %s /out:%s %s %s%s"
+	    "link /nologo %s%s /implib:%s /out:%s %s %s%s"
+	    (if !verbose >= 3 then "/verbose " else "")
 	    (if link_exe then "" else "/dll /export:symtbl /export:reloctbl ")
+	    (Filename.quote implib)
 	    (Filename.quote output_file) files extra_args quiet
       | `CYGWIN ->
 	  Printf.sprintf
@@ -395,24 +450,23 @@ let build_dll link_exe output_file files extra_args verbose =
 	    files
 	    extra_args
   in
-  if verbose then Printf.printf "+ %s\n" cmd; flush stdout;
-  if Sys.command cmd <> 0 then
-    failwith "Error during linking\n"
+  if !verbose >= 1 then Printf.printf "+ %s\n" cmd; 
+  flush stdout;
+  if Sys.command cmd <> 0 then failwith "Error during linking\n"
 
 
 let files = ref []
 let output_file = ref ""
 let exe_mode = ref false  
 let extra_args = ref []
-let verbose = ref false
 let usage_msg = 
   "reloc -o <result.dll> file1.obj file2.obj ... -- <extra linker arguments>"
 let specs = [
   "-o", Arg.Set_string output_file, 
-  " choose the name of the output file";
+  " Choose the name of the output file";
 
   "-exe", Arg.Set exe_mode,
-  " link an executable (not a dll)";
+  " Link an executable (not a dll)";
 
   "-chain", Arg.Symbol (["msvc";"cygwin";"mingw"],
 			(function 
@@ -420,14 +474,31 @@ let specs = [
 			   | "cygwin" -> toolchain := `CYGWIN
 			   | "mingw" -> toolchain := `MINGW
 			   | _ -> assert false)),
-  " choose which linker to use";
+  " Choose which linker to use";
 
-  "-v", Arg.Set verbose,
-  " verbose mode";
+  "-save-temps", Arg.Set save_temps,
+  " Do not delete intermediate files";
+
+  "-v", Arg.Unit (fun () -> incr verbose),
+  " Increment verbosity (can be repeated)";
+
+  "-show-exports", Arg.Set show_exports,
+  " Show exported symbols";
+
+  "-show-imports", Arg.Set show_imports,
+  " Show imported symbols";
 
   "--", Arg.Rest (fun s -> extra_args := s :: !extra_args),
-  " introduce extra linker arguments";
+  " Introduce extra linker arguments";
 ]
+
+let safe_remove s =
+  try Sys.remove s
+  with Sys_error _ -> ()
+
+let clean () =
+  if not !save_temps 
+  then (List.iter safe_remove !temps; temps := [])
 
 let () =
   let specs = Arg.align specs in
@@ -474,9 +545,19 @@ let () =
 			   "-ladvapi32";
 			   "-lshell32" ]
     end;
-    List.iter print_endline !search_path;
+    if !verbose >= 3 then (
+      Printf.printf "** Search path:\n";
+      List.iter print_endline !search_path;
+    );
     build_dll !exe_mode !output_file !files 
-      (String.concat " " (List.rev !extra_args)) !verbose
-  with Failure s ->
-    Printf.eprintf "** Fatal error: %s\n" s;
-    exit 2
+      (String.concat " " (List.rev !extra_args));
+    clean ()
+  with 
+    | Failure s ->
+	Printf.eprintf "** Fatal error: %s\n" s;
+	clean ();
+	exit 2
+    | exn ->
+	Printf.eprintf "** Error: %s\n" (Printexc.to_string exn);
+	clean ();
+	exit 2

@@ -1,3 +1,5 @@
+__declspec(dllimport) extern void caml_f();
+
 extern int caml_y;
 
 void caml_torun() {

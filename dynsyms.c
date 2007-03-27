@@ -19,7 +19,7 @@ typedef unsigned long uintnat;
 #define RELOC_DONE  0x0100
 
 typedef struct { uintnat kind; char *name; uintnat *addr; } reloc_entry;
-typedef struct { void *first; void *last; uintnat old; } nonwr;
+typedef struct { char *first; char *last; uintnat old; } nonwr;
 typedef struct { nonwr *nonwr; reloc_entry entries[]; } reloctbl;
 typedef struct { void *addr; char *name; } dynsymbol;
 typedef struct { uintnat size; dynsymbol entries[]; } symtbl;

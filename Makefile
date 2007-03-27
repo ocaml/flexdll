@@ -1,14 +1,14 @@
-#CC = cl /nologo /MD
-#O = obj
-#CHAIN = msvc
+CC = cl /nologo /MD
+O = obj
+CHAIN = msvc
 
 #CC = gcc -D_CYGWIN_
 #O = o
 #CHAIN=cygwin
 
-CC = gcc -D_MINGW_ -mno-cygwin
-O = o
-CHAIN = mingw
+#CC = gcc -D_MINGW_ -mno-cygwin
+#O = o
+#CHAIN = mingw
 
 RELOC=./reloc.exe -chain $(CHAIN)
 
