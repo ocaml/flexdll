@@ -1,4 +1,3 @@
-extern void dump_x();
 extern int x;
 
 void torun() {

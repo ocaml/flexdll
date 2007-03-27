@@ -26,8 +26,22 @@ demo_cygwin: flexlink.exe flexdll_cygwin.o
 	(cd test && $(MAKE) clean demo CHAIN=cygwin CC="$(CYGCC)" O=o)
 
 demo_mingw: flexlink.exe flexdll_mingw.o
-	(cd test && $(MAKE) clean demo CHAIN=mingw CC="$(CYGCC)" O=o)
+	(cd test && $(MAKE) clean demo CHAIN=mingw CC="$(MINCC)" O=o)
 
 clean:
 	rm -f *.obj *.o *.lib *.a *.exe *.cmx *.dll *.manifest *.exp *.cmi *~
 	cd test && $(MAKE) clean
+
+PACKAGE = flexdll-alpha-`date +%Y%m%d`.tar.gz
+
+package:
+	rm -Rf flexdll
+	mkdir flexdll
+	mkdir flexdll/test
+	cp -a *.c *.ml *.h Makefile LICENSE README flexdll/
+	cp -aR test/Makefile test/*.c flexdll/test/
+	tar czf $(PACKAGE) flexdll
+	rm -Rf flexdll
+
+upload:
+	scp $(PACKAGE) frisch.fr:www/flexdll/
