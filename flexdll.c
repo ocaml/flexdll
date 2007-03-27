@@ -1,14 +1,22 @@
-/* Runtime support library for dynamically linking DLLs with
-   dynamic symbols */
+/*****************************************************************
+   FlexDLL
+   Alain Frisch
+
+   Copyright 2007 Institut National de Recherche en Informatique et 
+   en Automatique.
+
+******************************************************************/
+
+/* Runtime support library */
 
 #include <stdio.h>
 #include <string.h>
 #include <windows.h>
 #include <assert.h>
-#include "dynsyms.h"
+#include "flexdll.h"
 
-#if defined(_CYGWIN_) || defined(_MINGW_)
-#define sprintf_s snprintf
+#if !defined(_MINGW_) && !defined(_CYGWIN)
+#define snprintf(buf,size,fmt,arg) _snprintf_s(buf,size,_TRUNCATE,fmt,arg)
 #endif
 
 typedef long intnat;
@@ -35,7 +43,7 @@ typedef void *resolver(void*, const char*);
 static int error = 0;
 static char error_buffer[256];
 
-int dyn_debug = 0;
+int flexdll_debug = 0;
 
 /* Emulate a low-level dlopen-like interface */
 
@@ -124,7 +132,7 @@ static void relocate(resolver f, void *data, reloctbl *tbl) {
   uintnat s;
 
   if (!tbl) return;
-  if (dyn_debug) dump_reloctbl(tbl);
+  if (flexdll_debug) dump_reloctbl(tbl);
 
   for (wr = tbl->nonwr; wr->last != 0; wr++)
     allow_write(wr->first,wr->last + 4,PAGE_EXECUTE_WRITECOPY,&wr->old);
@@ -134,7 +142,7 @@ static void relocate(resolver f, void *data, reloctbl *tbl) {
     s = (uintnat) f(data,ptr->name);
     if (!s) { 
       error = 2;
-      sprintf_s(error_buffer, sizeof(error_buffer),
+      snprintf(error_buffer, sizeof(error_buffer),
 		"Cannot resolve %s", (char*) ptr->name);
       return;
     }
@@ -230,7 +238,7 @@ static void *find_symbol_global(void *data, const char *name) {
 }
 
 
-void *dyn_dlopen(const char *file, int mode) {
+void *flexdll_dlopen(const char *file, int mode) {
   void *handle;
   dlunit *unit;
 
@@ -247,20 +255,20 @@ void *dyn_dlopen(const char *file, int mode) {
     unit = malloc(sizeof(dlunit));
     unit->handle = handle;
     unit->symtbl = ll_dlsym(handle, "symtbl");
-    if (dyn_debug) { dump_symtbl(unit->symtbl); }
+    if (flexdll_debug) { dump_symtbl(unit->symtbl); }
     unit->count = 1;
     unit->global = 0;
     push_unit(unit);
   }
-  if (mode & DYN_RTLD_GLOBAL) unit->global=1;
+  if (mode & FLEXDLL_RTLD_GLOBAL) unit->global=1;
 
   relocate_master(find_symbol_global, NULL, ll_dlsym(handle, "reloctbl"));
-  if (error) { dyn_dlclose(unit); return NULL; }
+  if (error) { flexdll_dlclose(unit); return NULL; }
 
   return unit;
 }
 
-void dyn_dlclose(void *u) {
+void flexdll_dlclose(void *u) {
   dlunit *unit = u;
 
   if (NULL == u || u == &main_unit) return;
@@ -270,12 +278,12 @@ void dyn_dlclose(void *u) {
 }
 
 
-void *dyn_dlsym(void *u, const char *name) {
+void *flexdll_dlsym(void *u, const char *name) {
   if (NULL == u || u == &main_unit) return find_symbol_global(NULL, name);
   else return find_symbol(((dlunit*)u)->symtbl,name);
 }
 
-char *dyn_dlerror() {
+char *flexdll_dlerror() {
   switch (error) {
   case 0: return NULL;
   case 1: error = 0; return ll_dlerror();

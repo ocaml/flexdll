@@ -6,6 +6,9 @@ let show_exports = ref false
 let show_imports = ref false
 let temps = ref []
 let verbose = ref 0
+let search_path = ref []
+let default_libs = ref []
+
 
 let int32_to_buf b i =
   Buffer.add_char b (Char.chr (i land 0xff));
@@ -17,7 +20,73 @@ let drop_underscore s =
   assert(s.[0] = '_');
   String.sub s 1 (String.length s - 1)
 
-let add_reloctable x p sname =
+let has_prefix pr s =
+  String.length s > String.length pr && String.sub s 0 (String.length pr) = pr
+
+let check_prefix pr s =
+  if has_prefix pr s then
+    Some (String.sub s (String.length pr) (String.length s - String.length pr))
+  else None
+
+let parse_libpath s =
+  let n = String.length s in
+  let rec aux l = 
+    if l >= n then []
+    else 
+      try
+	let i = String.index_from s l ';' in
+	String.sub s l (i - l) :: aux (succ i)
+      with Not_found -> [ String.sub s l (n - l) ]
+  in
+  aux 0
+
+let getcmd cmd =
+  if (Sys.command (cmd ^ " > tmp_getcmd") < 0) 
+  then failwith ("Cannot run " ^ cmd);
+  let ic = open_in "tmp_getcmd" in
+  let s = input_line ic in
+  close_in ic;
+  Sys.remove "tmp_getcmd";
+  s
+
+let find_file fn =
+  if Sys.file_exists fn then fn
+  else 
+    Filename.concat
+      (List.find (fun s -> Sys.file_exists (Filename.concat s fn)) 
+	 !search_path)
+      fn
+      
+let find_file =
+  let memo = Hashtbl.create 16 in
+  fun fn ->
+    try Hashtbl.find memo fn
+    with Not_found ->
+      let fn = 
+	if String.length fn > 2 && String.sub fn 0 2 = "-l" then
+	  "lib" ^ (String.sub fn 2 (String.length fn - 2))
+	else fn in
+      let r =
+	try find_file fn
+	with Not_found ->
+	  try find_file (fn ^ ".lib")
+	  with Not_found -> 
+	    try find_file (fn ^ ".a")
+	    with Not_found -> 
+	      failwith (Printf.sprintf "Cannot find file %S" fn)
+      in
+      Hashtbl.add memo fn r;
+      r
+
+module StrSet = Set.Make(String)
+    
+(* Put all the relocations on the symbols defined by a predicate
+   into a relocation table. A relocation table describes how to
+   patch some addresses with the value of some external symbols (given
+   by their name). It also lists segments that are normally write-protected
+   and that must be de-protected to enable the patching process. *)
+
+let add_reloc_table x p sname =
   let sect = Section.create ".reltbl" 0xc0300040l in
   let data = Buffer.create 1024 in
   let strings = Buffer.create 1024 in
@@ -96,6 +165,9 @@ let add_reloctable x p sname =
     (Symbol.export sname sect 0l) ::
     strsym :: nonwrsym :: !syms @ List.filter (fun x -> not (p x)) x.symbols
 
+
+(* Create a table for import symbols __imp_XXX *)
+
 let add_import_table obj imports =
   let sect = Section.create ".imptbl" 0xc0300040l in
   obj.sections <- sect :: obj.sections;
@@ -111,6 +183,8 @@ let add_import_table obj imports =
        0 imports)
 
 
+(* Create a table that lists exported symbols (adress,name) *)
+
 let add_export_table obj exports symname =
   let sect = Section.create ".exptbl" 0xc0300040l in
   let data = Buffer.create 1024 in
@@ -118,6 +192,7 @@ let add_export_table obj exports symname =
   let strsym = Symbol.intern sect 0l in
   obj.symbols <- strsym :: (Symbol.export symname sect 0l) :: obj.symbols;
   let exports = List.sort Pervasives.compare exports in
+  (* The runtime library assume the names are sorted! *)
   int32_to_buf data (List.length exports);
   List.iter
     (fun s  ->
@@ -136,7 +211,10 @@ let add_export_table obj exports symname =
   sect.data <- Buffer.contents data ^ Buffer.contents strings;
   obj.sections <- sect :: obj.sections
 
-let add_master_reloctable obj names symname =
+(* A master relocation table points to all the relocation tables
+   in the DLL *)
+
+let add_master_reloc_table obj names symname =
   let sect = Section.create ".mreltbl" 0xc0300040l in
   let data = Buffer.create 1024 in
   obj.symbols <- (Symbol.export symname sect 0l) :: obj.symbols;
@@ -153,70 +231,6 @@ let add_master_reloctable obj names symname =
   obj.sections <- sect :: obj.sections
 
 
-let has_prefix pr s =
-  String.length s > String.length pr && String.sub s 0 (String.length pr) = pr
-
-let check_prefix pr s =
-  if has_prefix pr s then
-    Some (String.sub s (String.length pr) (String.length s - String.length pr))
-  else None
-    
-
-module StrSet = Set.Make(String)
-
-let parse_libpath s =
-  let n = String.length s in
-  let rec aux l = 
-    if l >= n then []
-    else 
-      try
-	let i = String.index_from s l ';' in
-	String.sub s l (i - l) :: aux (succ i)
-      with Not_found -> [ String.sub s l (n - l) ]
-  in
-  aux 0
-
-let search_path = ref []
-let default_libs = ref []
-
-let getcmd cmd =
-  if (Sys.command (cmd ^ " > tmp_getcmd") < 0) 
-  then failwith "Cannot run " ^ cmd
-  else 
-    let ic = open_in "tmp_getcmd" in
-    let s = input_line ic in
-    close_in ic;
-    Sys.remove "tmp_getcmd";
-    s
-
-let find_file fn =
-  if Sys.file_exists fn then fn
-  else 
-    Filename.concat
-      (List.find (fun s -> Sys.file_exists (Filename.concat s fn)) 
-	 !search_path)
-      fn
-
-let find_file =
-  let memo = Hashtbl.create 16 in
-  fun fn ->
-    try Hashtbl.find memo fn
-    with Not_found ->
-      let fn = 
-	if String.length fn > 2 && String.sub fn 0 2 = "-l" then
-	  "lib" ^ (String.sub fn 2 (String.length fn - 2))
-	else fn in
-      let r =
-	try find_file fn
-	with Not_found ->
-	  try find_file (fn ^ ".lib")
-	  with Not_found -> 
-	    try find_file (fn ^ ".a")
-	    with Not_found -> 
-	      failwith (Printf.sprintf "Cannot find file %S" fn)
-      in
-      Hashtbl.add memo fn r;
-      r
 
 let collect_dllexports obj =
   let dirs = Coff.directives obj in
@@ -356,7 +370,7 @@ let build_dll link_exe output_file files extra_args =
     );
     let reloctbl = Symbol.gen_sym () in
     reloctbls := reloctbl :: !reloctbls;
-    add_reloctable obj (fun s -> StrSet.mem s.sym_name imps) reloctbl in
+    add_reloc_table obj (fun s -> StrSet.mem s.sym_name imps) reloctbl in
 
   let close_obj name imps obj = 
     if link_exe then
@@ -415,40 +429,39 @@ let build_dll link_exe output_file files extra_args =
 
   add_export_table obj (StrSet.elements !exported) 
     (if link_exe then "_static_symtable" else "_symtbl");
-  if not link_exe then add_master_reloctable obj !reloctbls "_reloctbl";
+  if not link_exe then add_master_reloc_table obj !reloctbls "_reloctbl";
   record_obj obj;
 
 
   let files = !to_link @ List.map (fun (fn,_,_) -> fn) ilibs in
   let files = List.map Filename.quote files in
   let files = String.concat " " files in
-  let quiet = if !verbose >= 2 then "" else ">NUL" in
-  let cmd = 
-    match !toolchain with
-      | `MSVC ->
-	  let implib = Filename.temp_file "dyndll_implib" ".lib" in
-	  let impexp = Filename.chop_suffix implib ".lib" ^ ".exp" in
-	  temps := implib :: impexp :: !temps;
-	  Printf.sprintf 
-	    "link /nologo %s%s /implib:%s /out:%s %s %s%s"
-	    (if !verbose >= 3 then "/verbose " else "")
-	    (if link_exe then "" else "/dll /export:symtbl /export:reloctbl ")
-	    (Filename.quote implib)
-	    (Filename.quote output_file) files extra_args quiet
-      | `CYGWIN ->
-	  Printf.sprintf
-	    "gcc %s -L. -o %s %s %s"
-	    (if link_exe then "" else "-shared ")
-	    (Filename.quote output_file)
-	    files
-	    extra_args
-      | `MINGW ->
-	  Printf.sprintf
-	    "gcc -mno-cygwin %s -L. -o %s %s %s"
-	    (if link_exe then "" else "-shared ")
-	    (Filename.quote output_file)
-	    files
-	    extra_args
+  let quiet = if !verbose >= 1 then "" else ">NUL" in
+  let cmd = match !toolchain with
+    | `MSVC ->
+	let implib = Filename.temp_file "dyndll_implib" ".lib" in
+	let impexp = Filename.chop_suffix implib ".lib" ^ ".exp" in
+	temps := implib :: impexp :: !temps;
+	Printf.sprintf 
+	  "link /nologo %s%s /implib:%s /out:%s %s %s%s"
+	  (if !verbose >= 2 then "/verbose " else "")
+	  (if link_exe then "" else "/dll /export:symtbl /export:reloctbl ")
+	  (Filename.quote implib)
+	  (Filename.quote output_file) files extra_args quiet
+    | `CYGWIN ->
+	Printf.sprintf
+	  "gcc %s -L. -o %s %s %s"
+	  (if link_exe then "" else "-shared ")
+	  (Filename.quote output_file)
+	  files
+	  extra_args
+    | `MINGW ->
+	Printf.sprintf
+	  "gcc -mno-cygwin %s -L. -o %s %s %s"
+	  (if link_exe then "" else "-shared ")
+	  (Filename.quote output_file)
+	  files
+	  extra_args
   in
   if !verbose >= 1 then Printf.printf "+ %s\n" cmd; 
   flush stdout;
@@ -500,64 +513,50 @@ let clean () =
   if not !save_temps 
   then (List.iter safe_remove !temps; temps := [])
 
+let setup_toolchain () = match !toolchain with
+  | `CYGWIN -> 
+      let cygroot = getcmd "cygpath -m /"
+      and gcclib = getcmd "gcc -print-libgcc-file-name | cygpath -m -f -" in
+      search_path := [ Filename.concat cygroot "lib";
+		       Filename.concat cygroot "lib/w32api";
+		       Filename.dirname gcclib ];
+      default_libs := ["-lkernel32"; "-luser32"; "-ladvapi32";
+		       "-lshell32"; "-lcygwin"; "-lgcc"]
+  | `MSVC ->
+      search_path := parse_libpath (try Sys.getenv "LIB" with Not_found -> "")
+  | `MINGW ->
+      let cygroot = getcmd "cygpath -m /"
+      and gcclib = 
+	getcmd "gcc -mno-cygwin -print-libgcc-file-name | cygpath -m -f -" in
+      search_path := [ Filename.concat cygroot "lib";
+		       Filename.concat cygroot "lib/mingw";
+		       Filename.concat cygroot "lib/w32api";
+		       Filename.dirname gcclib ];
+      default_libs := 
+	["-lmingw32"; "-lgcc"; "-lmoldname"; "-lmingwex"; "-lmsvcrt"; 
+	 "-luser32"; "-lkernel32"; "-ladvapi32"; "-lshell32" ]
+
 let () =
+  at_exit clean;
   let specs = Arg.align specs in
   Arg.parse specs (fun x -> files := x :: !files) usage_msg;
   if !output_file = "" then 
     (Printf.eprintf "Please specify an output file\n"; 
      exit 1);
   try
-    begin match !toolchain with
-      | `CYGWIN -> 
-	  let cygroot = 
-	    getcmd "cygpath -m /"
-	  and gcclib = 
-	    getcmd "gcc -print-libgcc-file-name | cygpath -m -f -" in
-	  search_path := [ Filename.concat cygroot "lib";
-			   Filename.concat cygroot "lib/w32api";
-			   Filename.dirname gcclib ];
-	  default_libs := ["-lkernel32";
-			   "-luser32";
-			   "-ladvapi32";
-			   "-lshell32";
-			   "-lcygwin";
-			   "-lgcc"]
-      | `MSVC ->
-	  search_path := 
-	    parse_libpath 
-	      (try Sys.getenv "LIB" with Not_found -> "")
-      | `MINGW ->
-	  let cygroot = 
-	    getcmd "cygpath -m /"
-	  and gcclib = 
-	    getcmd "gcc -print-libgcc-file-name | cygpath -m -f -" in
-	  search_path := [ Filename.concat cygroot "lib";
-			   Filename.concat cygroot "lib/mingw";
-			   Filename.concat cygroot "lib/w32api";
-			   Filename.dirname gcclib ];
-	  default_libs := ["-lmingw32";
-			   "-lgcc";
-			   "-lmoldname";
-			   "-lmingwex";
-			   "-lmsvcrt";
-			   "-luser32";
-			   "-lkernel32";
-			   "-ladvapi32";
-			   "-lshell32" ]
-    end;
-    if !verbose >= 3 then (
+    setup_toolchain ();
+    if !verbose >= 2 then (
       Printf.printf "** Search path:\n";
       List.iter print_endline !search_path;
+      Printf.printf "** Default libraries:\n";
+      List.iter print_endline !default_libs;
     );
     build_dll !exe_mode !output_file !files 
       (String.concat " " (List.rev !extra_args));
-    clean ()
   with 
     | Failure s ->
 	Printf.eprintf "** Fatal error: %s\n" s;
-	clean ();
 	exit 2
     | exn ->
 	Printf.eprintf "** Error: %s\n" (Printexc.to_string exn);
-	clean ();
 	exit 2
