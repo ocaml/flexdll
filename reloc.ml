@@ -292,7 +292,11 @@ let build_dll link_exe output_file files extra_args =
   (* Collect all the available symbols, including those defined
      in default libraries *)
   let rec collect_defined_obj obj =
-    List.iter (fun (x,y) -> Hashtbl.add aliases x y) (Coff.aliases obj);
+    List.iter (fun (x,y) -> 
+		 if !verbose >= 2 then
+		   Printf.printf "alias %s -> %s\n"
+		     x y;
+		 Hashtbl.add aliases x y) (Coff.aliases obj);
     let dirs = Coff.directives obj in
     let all_args c =
       List.map snd (
@@ -303,8 +307,7 @@ let build_dll link_exe output_file files extra_args =
     List.iter (fun fn -> 
 		 let fn = find_file fn in
 		 if not (Hashtbl.mem loaded_filenames fn)
-		 then (Hashtbl.add loaded_filenames fn (); 
-		       collect_defined (Lib.read fn)))
+		 then (Hashtbl.add loaded_filenames fn (); collect_file fn))
       deflibs;
     List.iter
       (fun sym -> 
@@ -312,20 +315,23 @@ let build_dll link_exe output_file files extra_args =
 	 then defined := StrSet.add sym.sym_name !defined;
       )
       obj.symbols 
+  and collect_file fn =
+    if !verbose >= 1 then Printf.printf "** open: %s\n" fn;
+    collect_defined (Lib.read fn)
+
   and collect_defined = function
     | `Obj obj -> collect_defined_obj obj
     | `Lib (objs,imports) -> 
 	List.iter (fun (_,obj) -> collect_defined_obj obj) objs;
 	List.iter
 	  (fun (s,_) -> 
+	     if !verbose >= 2 then
+	       Printf.printf "import symbol %s\n" s;
 	     defined := StrSet.add s (StrSet.add ("__imp_" ^ s) !defined))
 	  imports
   in
   List.iter (fun (_,x) -> collect_defined x) files;
-
-  List.iter
-    (fun fn -> collect_defined (Lib.read (find_file fn)))
-    !default_libs;
+  List.iter (fun fn -> collect_file (find_file fn)) !default_libs;
 
   (* Determine which objects from the given libraries should be linked
      in. First step: find the mapping (symbol -> object) for these

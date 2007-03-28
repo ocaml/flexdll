@@ -450,7 +450,7 @@ module Coff = struct
 	    | { storage = 105; auxn = 1 } ->
 		(* weak ext *)
 		(match symtbl.(Int32.to_int (int32 s.auxs 0)) with
-		   | Some s -> s.extra_info <- `Alias s
+		   | Some s' -> s.extra_info <- `Alias s'
 		   | None -> assert false)
 	    | { storage = 3; value = 0l; auxn = 1 } ->
 		(* section def *)
