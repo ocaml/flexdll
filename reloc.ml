@@ -4,6 +4,7 @@ let toolchain = ref `MSVC
 let save_temps = ref false
 let show_exports = ref false
 let show_imports = ref false
+let dry_mode = ref false
 let temps = ref []
 let verbose = ref 0
 let search_path = ref []
@@ -463,9 +464,10 @@ let build_dll link_exe output_file files extra_args =
 	  files
 	  extra_args
   in
-  if !verbose >= 1 then Printf.printf "+ %s\n" cmd; 
+  if !verbose >= 1 || !dry_mode then Printf.printf "+ %s\n" cmd; 
   flush stdout;
-  if Sys.command cmd <> 0 then failwith "Error during linking\n"
+  if not !dry_mode then 
+    (if Sys.command cmd <> 0 then failwith "Error during linking\n")
 
 
 let files = ref []
@@ -473,7 +475,7 @@ let output_file = ref ""
 let exe_mode = ref false  
 let extra_args = ref []
 let usage_msg = 
-  "reloc -o <result.dll> file1.obj file2.obj ... -- <extra linker arguments>"
+  "flexlink -o <result.dll> file1.obj file2.obj ... -- <extra linker arguments>"
 let specs = [
   "-o", Arg.Set_string output_file, 
   " Choose the name of the output file";
@@ -500,6 +502,9 @@ let specs = [
 
   "-show-imports", Arg.Set show_imports,
   " Show imported symbols";
+
+  "-dry", Arg.Set dry_mode,
+  " Show the linker command line, do not actually run it";
 
   "--", Arg.Rest (fun s -> extra_args := s :: !extra_args),
   " Introduce extra linker arguments";

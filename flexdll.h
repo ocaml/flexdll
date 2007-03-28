@@ -13,13 +13,14 @@
 #define FLEXDLL_H
 
 #define FLEXDLL_RTLD_GLOBAL 0x0001
-#define FLEXDLL_RTLD_LOCAL  0x0002
+#define FLEXDLL_RTLD_LOCAL  0x0000
 
 void *flexdll_dlopen(const char *, int);
 void *flexdll_dlsym(void *, const char *);
 void flexdll_dlclose(void *);
 char *flexdll_dlerror(void);
 
-extern int flexdll_debug;
+void flexdll_dump_exports(void *);
+void flexdll_dump_relocations(void *);
 
 #endif

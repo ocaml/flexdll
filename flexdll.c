@@ -15,10 +15,6 @@
 #include <assert.h>
 #include "flexdll.h"
 
-#if !defined(_MINGW_) && !defined(_CYGWIN_)
-#define snprintf(buf,size,fmt,arg) _snprintf_s(buf,size,_TRUNCATE,fmt,arg)
-#endif
-
 typedef long intnat;
 typedef unsigned long uintnat;
 
@@ -43,8 +39,6 @@ typedef void *resolver(void*, const char*);
 static int error = 0;
 static char error_buffer[256];
 
-int flexdll_debug = 0;
-
 /* Emulate a low-level dlopen-like interface */
 
 static void *ll_dlopen(const char *libname) {
@@ -65,7 +59,7 @@ static void *ll_dlsym(void *handle, char *name) {
   return (void *) GetProcAddress((HMODULE) handle, name); 
 }
 
-char *ll_dlerror(void)
+static char *ll_dlerror(void)
 {
   DWORD msglen =
     FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
@@ -82,7 +76,7 @@ char *ll_dlerror(void)
 
 /** Relocation tables **/
 
-void dump_reloctbl(reloctbl *tbl) {
+static void dump_reloctbl(reloctbl *tbl) {
   reloc_entry *ptr;
   nonwr *wr;
 
@@ -95,15 +89,16 @@ void dump_reloctbl(reloctbl *tbl) {
 	   wr->last);
   
   for (ptr = tbl->entries; ptr->kind; ptr++)
-    printf(" %s: %08lx (kind:%04lx)  (now:%08lx)\n", 
-	   ptr->name,
+    printf(" %08lx (kind:%04lx) (now:%08lx)  %s\n", 
 	   ptr->addr,
 	   ptr->kind,
-	   *((uintnat*) ptr->addr)
+	   *((uintnat*) ptr->addr),
+	   ptr->name
 	   );
 }
 
-void dump_master_reloctbl(reloctbl **ptr) {
+static void dump_master_reloctbl(reloctbl **ptr) {
+  if (!ptr) return;
   while (*ptr) dump_reloctbl(*ptr++);
 }
 
@@ -126,13 +121,22 @@ static void allow_write(char *begin, char *end, uintnat new, uintnat *old) {
   /* printf("%08lx -> %08lx\n", *old, new); */
 }
 
+/* Avoid the use of snprintf */
+static void cannot_resolve_msg(char *name) {
+  static char msg[] = "Cannot resolve ";
+  static int l = sizeof(msg) - 1;
+  int n = strlen(name);
+  memcpy(error_buffer,msg,l);
+  memcpy(error_buffer+l,name,min(n,sizeof(error_buffer) - l - 1));
+  error_buffer[l+n] = 0;
+}
+
 static void relocate(resolver f, void *data, reloctbl *tbl) {
   reloc_entry *ptr;
   nonwr *wr;
   uintnat s;
 
   if (!tbl) return;
-  if (flexdll_debug) dump_reloctbl(tbl);
 
   for (wr = tbl->nonwr; wr->last != 0; wr++)
     allow_write(wr->first,wr->last + 4,PAGE_EXECUTE_WRITECOPY,&wr->old);
@@ -142,8 +146,7 @@ static void relocate(resolver f, void *data, reloctbl *tbl) {
     s = (uintnat) f(data,ptr->name);
     if (!s) { 
       error = 2;
-      snprintf(error_buffer, sizeof(error_buffer),
-		"Cannot resolve %s", (char*) ptr->name);
+      cannot_resolve_msg(ptr->name);
       return;
     }
     switch (ptr->kind & 0xff) {
@@ -170,10 +173,10 @@ static void dump_symtbl(symtbl *tbl)
   int i;
 
   if (!tbl) { printf("No symbol table\n"); return; }
-  printf("Dynamic symbol table found at %lx\n", tbl);
+  printf("Dynamic symbol at %lx\n", tbl);
 
   for (i = 0; i < tbl->size; i++)
-    printf(" %s : %08lx\n", tbl->entries[i].name, tbl->entries[i].addr);
+    printf(" %08lx: %s\n", tbl->entries[i].addr, tbl->entries[i].name);
 }
 
 static int compare_dynsymbol(const void *s1, const void *s2) {
@@ -223,8 +226,7 @@ static void *find_symbol_global(void *data, const char *name) {
   sym = find_symbol(&static_symtable, name);
   if (sym) return sym;
 
-  unit = units;
-  while (unit) {
+  for (unit = units; unit; unit = unit->next) {
     if (unit->global) {
       sym = find_symbol(unit->symtbl, name);
       if (sym) {
@@ -232,7 +234,6 @@ static void *find_symbol_global(void *data, const char *name) {
 	return sym;
       }
     }
-    unit = unit->next;
   }
   return NULL;
 }
@@ -255,7 +256,6 @@ void *flexdll_dlopen(const char *file, int mode) {
     unit = malloc(sizeof(dlunit));
     unit->handle = handle;
     unit->symtbl = ll_dlsym(handle, "symtbl");
-    if (flexdll_debug) { dump_symtbl(unit->symtbl); }
     unit->count = 1;
     unit->global = 0;
     push_unit(unit);
@@ -279,7 +279,8 @@ void flexdll_dlclose(void *u) {
 
 
 void *flexdll_dlsym(void *u, const char *name) {
-  if (NULL == u || u == &main_unit) return find_symbol_global(NULL, name);
+  if (u == &main_unit) return find_symbol_global(NULL,name);
+  else if (NULL == u) return find_symbol(&static_symtable,name);
   else return find_symbol(((dlunit*)u)->symtbl,name);
 }
 
@@ -290,4 +291,20 @@ char *flexdll_dlerror() {
   case 2: error = 0; return error_buffer;
   }
   return NULL;
+}
+
+void flexdll_dump_exports(void *u) {
+  dlunit *unit = u;
+  if (NULL == u) { dump_symtbl(&static_symtable); }
+  else if (u == &main_unit) {
+    dump_symtbl(&static_symtable);
+    for (unit = units; unit; unit = unit->next)
+      if (unit->global) { dump_symtbl(unit->symtbl); }
+  }
+  else { dump_symtbl(unit->symtbl); }
+}
+
+void flexdll_dump_relocations(void *u) {
+  if (NULL == u || u == &main_unit) return;
+  dump_master_reloctbl(ll_dlsym(((dlunit*)u) -> handle, "reloctbl"));
 }

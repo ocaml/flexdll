@@ -1,8 +1,8 @@
 # Compilers
 
 MSVCC = cl /nologo /MD
-CYGCC = gcc -D_CYGWIN_ 
-MINCC = gcc -D_MINGW_ -mno-cygwin
+CYGCC = gcc 
+MINCC = gcc -mno-cygwin
 OCAMLOPT = ocamlopt
 
 all: flexlink.exe flexdll_msvc.obj flexdll_cygwin.o flexdll_mingw.o
@@ -32,7 +32,8 @@ clean:
 	rm -f *.obj *.o *.lib *.a *.exe *.cmx *.dll *.manifest *.exp *.cmi *~
 	cd test && $(MAKE) clean
 
-PACKAGE = flexdll-alpha-`date +%Y%m%d`.tar.gz
+#PACKAGE = flexdll-alpha-`date +%Y%m%d`.tar.gz
+PACKAGE = flexdll-alpha.tar.gz
 
 package:
 	rm -Rf flexdll

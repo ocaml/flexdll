@@ -23,9 +23,12 @@ int main(int argc, char **argv)
   int i;
   torun *torun;
 
-  flexdll_debug = 0;
+  flexdll_dump_exports(NULL);
   for (i = 1; i < argc; i++) {
-    handle = flexdll_dlopen(argv[i], 1);
+    printf("** Loading %s\n", argv[i]);
+    handle = flexdll_dlopen(argv[i], FLEXDLL_RTLD_GLOBAL);
+    flexdll_dump_exports(handle);
+    flexdll_dump_relocations(handle);
   
     if (NULL == handle) { printf("error: %s\n", flexdll_dlerror()); exit(2); }
 
