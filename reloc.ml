@@ -11,6 +11,9 @@ let search_path = ref []
 let dirs = ref [] 
 let default_libs = ref []
 let merge_manifest = ref false
+let add_flexdll_obj = ref true
+
+let mk_dirs_opt pr = String.concat " " (List.map (fun s -> pr ^ s) !dirs)
 
 let safe_remove s =
   try Sys.remove s
@@ -384,10 +387,14 @@ let build_dll link_exe output_file files extra_args =
     reloctbls := reloctbl :: !reloctbls;
     add_reloc_table obj (fun s -> StrSet.mem s.sym_name imps) reloctbl in
 
-  let close_obj name imps obj = 
+  let error_imports name imps =
     if link_exe then
-      failwith (Printf.sprintf "Cannot resolve symbols:\n %s\n"
-		  (String.concat "\n " (StrSet.elements imps)));
+      failwith (Printf.sprintf "Cannot resolve symbols for %s:\n %s\n"
+		  name
+		  (String.concat "\n " (StrSet.elements imps))) in
+
+  let close_obj name imps obj = 
+    error_imports name imps;
     add_reloc name obj imps;
     record_obj obj in
 
@@ -411,7 +418,10 @@ let build_dll link_exe output_file files extra_args =
   let to_explode = Hashtbl.create 16 in
   Hashtbl.iter
     (fun (libname,objname) (obj,imps) ->
-       if not (StrSet.is_empty imps) then Hashtbl.replace to_explode libname ()
+       if not (StrSet.is_empty imps) then (
+	 error_imports (Printf.sprintf "%s(%s)" libname objname) imps;
+	 Hashtbl.replace to_explode libname ()
+       )
     )
     libobjects;
   let libs = ref StrSet.empty in
@@ -450,8 +460,6 @@ let build_dll link_exe output_file files extra_args =
   let files = String.concat " " files in
   let quiet = if !verbose >= 1 then "" else ">NUL" in
 
-  let dirs pr = String.concat " " (List.map (fun s -> pr ^ s) !dirs) in
-
   let cmd = match !toolchain with
     | `MSVC ->
 	let implib = Filename.temp_file "dyndll_implib" ".lib" in
@@ -461,14 +469,14 @@ let build_dll link_exe output_file files extra_args =
 	  "link /nologo %s%s %s /implib:%s /out:%s %s %s%s"
 	  (if !verbose >= 2 then "/verbose " else "")
 	  (if link_exe then "" else "/dll /export:symtbl /export:reloctbl ")
-	  (dirs "/libpath:")
+	  (mk_dirs_opt "/libpath:")
 	  (Filename.quote implib)
 	  (Filename.quote output_file) files extra_args quiet
     | `CYGWIN ->
 	Printf.sprintf
 	  "gcc %s -L. %s -o %s %s %s"
 	  (if link_exe then "" else "-shared ")
-	  (dirs "-I")
+	  (mk_dirs_opt "-I")
 	  (Filename.quote output_file)
 	  files
 	  extra_args
@@ -476,7 +484,7 @@ let build_dll link_exe output_file files extra_args =
 	Printf.sprintf
 	  "gcc -mno-cygwin %s -L. %s -o %s %s %s"
 	  (if link_exe then "" else "-shared ")
-	  (dirs "-I")
+	  (mk_dirs_opt "-I")
 	  (Filename.quote output_file)
 	  files
 	  extra_args
@@ -516,6 +524,9 @@ let specs = [
 
   "-exe", Arg.Set exe_mode,
   " Link an executable (not a dll)";
+
+  "-noflexdllobj", Arg.Clear add_flexdll_obj,
+  " Do not add the flexdll runtime object";
 
   "-I", Arg.String (fun dir -> dirs := dir :: !dirs),
   " Add a directory where to search for files";
@@ -580,6 +591,29 @@ let setup_toolchain () = match !toolchain with
 	["-lmingw32"; "-lgcc"; "-lmoldname"; "-lmingwex"; "-lmsvcrt"; 
 	 "-luser32"; "-lkernel32"; "-ladvapi32"; "-lshell32" ]
 
+let compile_if_needed file =
+  if Filename.check_suffix file ".c" then begin
+    let tmp_obj = Filename.temp_file "dyndll" ".obj" in
+    temps := tmp_obj :: !temps;
+    let cmd = match !toolchain with
+      | `MSVC ->
+	  Printf.sprintf 
+	    "cl /c /MD /nologo /Fo%s %s %s"
+	    (Filename.quote tmp_obj)
+	    (mk_dirs_opt "/I:")
+	    file
+    | `CYGWIN ->
+	assert false
+    | `MINGW ->
+	assert false
+    in
+    if !verbose >= 1 || !dry_mode then Printf.printf "+ %s\n" cmd; 
+    flush stdout;
+    if (Sys.command cmd <> 0) then failwith "Error while compiling";
+    tmp_obj
+  end else
+    file
+
 let () =
   at_exit clean;
   let specs = Arg.align specs in
@@ -595,7 +629,18 @@ let () =
       Printf.printf "** Default libraries:\n";
       List.iter print_endline !default_libs;
     );
-    build_dll !exe_mode !output_file !files 
+    let files = List.map compile_if_needed !files in
+    let files =
+      if !add_flexdll_obj && !exe_mode then
+	Filename.concat (Filename.dirname Sys.executable_name)
+	  (match !toolchain with
+	     | `MSVC -> "flexdll_msvc.obj"
+	     | `CYGWIN -> "flexdll_cygwin.o"
+	     | `MINGW -> "flexdll_mingw.o"
+	  )
+	  :: files
+      else files in
+    build_dll !exe_mode !output_file files 
       (String.concat " " (List.rev !extra_args));
   with 
     | Failure s ->

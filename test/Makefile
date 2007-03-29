@@ -17,7 +17,7 @@ demo: dump.exe plug1.dll plug2.dll
 	./dump.exe plug1.dll plug2.dll
 
 dump.exe: dump.$(O)
-	$(FLEXLINK) -exe -o dump.exe ../flexdll_$(CHAIN).$(O) dump.$(O)
+	$(FLEXLINK) -exe -o dump.exe dump.$(O)
 
 dump.$(O): dump.c
 	$(CC) -I.. -c dump.c

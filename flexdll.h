@@ -14,6 +14,7 @@
 
 #define FLEXDLL_RTLD_GLOBAL 0x0001
 #define FLEXDLL_RTLD_LOCAL  0x0000
+#define FLEXDLL_RTLD_NOEXEC 0x0002
 
 void *flexdll_dlopen(const char *, int);
 void *flexdll_dlsym(void *, const char *);

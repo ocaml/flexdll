@@ -41,9 +41,10 @@ static char error_buffer[256];
 
 /* Emulate a low-level dlopen-like interface */
 
-static void *ll_dlopen(const char *libname) {
+static void *ll_dlopen(const char *libname, int for_execution) {
   HMODULE m;
-  m = LoadLibraryEx(libname, NULL, 0);
+  m = LoadLibraryEx(libname, NULL, 
+  		    for_execution ? 0 : DONT_RESOLVE_DLL_REFERENCES);
   /* Under Win 95/98/ME, LoadLibraryEx can fail in cases where LoadLibrary
      would succeed.  Just try again with LoadLibrary for good measure. */
   if (m == NULL) m = LoadLibrary(libname);
@@ -242,11 +243,12 @@ static void *find_symbol_global(void *data, const char *name) {
 void *flexdll_dlopen(const char *file, int mode) {
   void *handle;
   dlunit *unit;
-
+  int exec = (mode & FLEXDLL_RTLD_NOEXEC ? 0 : 1);
+  
   error = 0;
   if (!file) return &main_unit;
 
-  handle = ll_dlopen(file);
+  handle = ll_dlopen(file, exec);
   if (!handle) { error = 1; return NULL; }
 
   unit = units;
@@ -262,8 +264,10 @@ void *flexdll_dlopen(const char *file, int mode) {
   }
   if (mode & FLEXDLL_RTLD_GLOBAL) unit->global=1;
 
-  relocate_master(find_symbol_global, NULL, ll_dlsym(handle, "reloctbl"));
-  if (error) { flexdll_dlclose(unit); return NULL; }
+  if (exec) {
+    relocate_master(find_symbol_global, NULL, ll_dlsym(handle, "reloctbl"));
+    if (error) { flexdll_dlclose(unit); return NULL; }
+  }
 
   return unit;
 }
