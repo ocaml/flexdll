@@ -8,7 +8,7 @@ type symbol = {
   stype: int;
   storage: int;
   auxn: int;
-  auxs: string;
+  mutable auxs: string;
   mutable extra_info: [ `Alias of symbol | `Section of section | `None ];
 }
 
@@ -306,10 +306,8 @@ module Section = struct
       else strz buf 0 ~max:8 '\000'
     in
     assert( int32 buf 12 = 0l );
-    assert( int32 buf 28 = 0l );
-    assert( int16 buf 34 = 0 );
 
-    if (int32 buf 26 &&& 0x01000000l <> 0l) 
+    if (int32 buf 36 &&& 0x01000000l <> 0l) 
     then (Printf.printf "More relocs!\n"; assert false);
 
 
@@ -444,6 +442,12 @@ module Coff = struct
       Array.init (int16 buf 2)
 	(fun i -> Section.get base strtbl symtbl ic (sectable + 40 * i))
     in
+
+
+    (* remove .bf/.ef/.lf symbols *)
+    let symbols =
+      List.filter (function { storage = 101 } -> false | _ -> true)
+	symbols in
     List.iter
       (fun s ->
 	 (match s with
@@ -462,9 +466,9 @@ module Coff = struct
 		  assert (int16 s.auxs 12 = 0)
 	    | { storage = 103 }
 	    | { auxn = 0 } -> ()
-	    | { storage = 2; stype = 0x20; auxn = 1; auxs = auxs } when
-		is_zero auxs ->
-		()
+	    | { storage = 2; stype = 0x20; auxn = 1; auxs = auxs } ->
+		(* Remove extra information for function symbols *)
+		s.auxs <- String.make (String.length s.auxs) '\000'
 	    | _ ->
 		Symbol.dump s;
 		Printf.printf "aux=%S\n" s.auxs;
