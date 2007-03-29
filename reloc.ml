@@ -8,8 +8,13 @@ let dry_mode = ref false
 let temps = ref []
 let verbose = ref 0
 let search_path = ref []
+let dirs = ref [] 
 let default_libs = ref []
+let merge_manifest = ref false
 
+let safe_remove s =
+  try Sys.remove s
+  with Sys_error _ -> ()
 
 let int32_to_buf b i =
   Buffer.add_char b (Char.chr (i land 0xff));
@@ -316,7 +321,7 @@ let build_dll link_exe output_file files extra_args =
       )
       obj.symbols 
   and collect_file fn =
-    if !verbose >= 1 then Printf.printf "** open: %s\n" fn;
+    if !verbose >= 2 then Printf.printf "** open: %s\n" fn;
     collect_defined (Lib.read fn)
 
   and collect_defined = function
@@ -444,36 +449,59 @@ let build_dll link_exe output_file files extra_args =
   let files = List.map Filename.quote files in
   let files = String.concat " " files in
   let quiet = if !verbose >= 1 then "" else ">NUL" in
+
+  let dirs pr = String.concat " " (List.map (fun s -> pr ^ s) !dirs) in
+
   let cmd = match !toolchain with
     | `MSVC ->
 	let implib = Filename.temp_file "dyndll_implib" ".lib" in
 	let impexp = Filename.chop_suffix implib ".lib" ^ ".exp" in
 	temps := implib :: impexp :: !temps;
 	Printf.sprintf 
-	  "link /nologo %s%s /implib:%s /out:%s %s %s%s"
+	  "link /nologo %s%s %s /implib:%s /out:%s %s %s%s"
 	  (if !verbose >= 2 then "/verbose " else "")
 	  (if link_exe then "" else "/dll /export:symtbl /export:reloctbl ")
+	  (dirs "/libpath:")
 	  (Filename.quote implib)
 	  (Filename.quote output_file) files extra_args quiet
     | `CYGWIN ->
 	Printf.sprintf
-	  "gcc %s -L. -o %s %s %s"
+	  "gcc %s -L. %s -o %s %s %s"
 	  (if link_exe then "" else "-shared ")
+	  (dirs "-I")
 	  (Filename.quote output_file)
 	  files
 	  extra_args
     | `MINGW ->
 	Printf.sprintf
-	  "gcc -mno-cygwin %s -L. -o %s %s %s"
+	  "gcc -mno-cygwin %s -L. %s -o %s %s %s"
 	  (if link_exe then "" else "-shared ")
+	  (dirs "-I")
 	  (Filename.quote output_file)
 	  files
 	  extra_args
   in
   if !verbose >= 1 || !dry_mode then Printf.printf "+ %s\n" cmd; 
   flush stdout;
-  if not !dry_mode then 
-    (if Sys.command cmd <> 0 then failwith "Error during linking\n")
+  if not !dry_mode then begin
+    let manifest_file = output_file ^ ".manifest" in
+    safe_remove manifest_file;
+    (if Sys.command cmd <> 0 then failwith "Error during linking\n");
+
+    if Sys.file_exists manifest_file then begin
+      let mcmd =
+	Printf.sprintf "mt -nologo -outputresource:%s -manifest %s" 
+	  (Filename.quote (if link_exe then output_file
+			   else output_file ^ ";#2"))
+	  (Filename.quote manifest_file)
+      in
+      if !verbose >= 1 then Printf.printf "+ %s\n" mcmd; 
+      flush stdout;
+      if Sys.command mcmd <> 0 then 
+	failwith "Error while merging the manifest";
+      safe_remove manifest_file;
+    end
+  end
 
 
 let files = ref []
@@ -488,6 +516,9 @@ let specs = [
 
   "-exe", Arg.Set exe_mode,
   " Link an executable (not a dll)";
+
+  "-I", Arg.String (fun dir -> dirs := dir :: !dirs),
+  " Add a directory where to search for files";
 
   "-chain", Arg.Symbol (["msvc";"cygwin";"mingw"],
 			(function 
@@ -512,13 +543,12 @@ let specs = [
   "-dry", Arg.Set dry_mode,
   " Show the linker command line, do not actually run it";
 
+  "-merge-manifest", Arg.Set merge_manifest,
+  " Merge manifest to the dll or exe";
+
   "--", Arg.Rest (fun s -> extra_args := s :: !extra_args),
   " Introduce extra linker arguments";
 ]
-
-let safe_remove s =
-  try Sys.remove s
-  with Sys_error _ -> ()
 
 let clean () =
   if not !save_temps 
@@ -528,21 +558,24 @@ let setup_toolchain () = match !toolchain with
   | `CYGWIN -> 
       let cygroot = getcmd "cygpath -m /"
       and gcclib = getcmd "gcc -print-libgcc-file-name | cygpath -m -f -" in
-      search_path := [ Filename.concat cygroot "lib";
-		       Filename.concat cygroot "lib/w32api";
-		       Filename.dirname gcclib ];
+      search_path := !dirs @
+	[ Filename.concat cygroot "lib";
+	  Filename.concat cygroot "lib/w32api";
+	  Filename.dirname gcclib ];
       default_libs := ["-lkernel32"; "-luser32"; "-ladvapi32";
 		       "-lshell32"; "-lcygwin"; "-lgcc"]
   | `MSVC ->
-      search_path := parse_libpath (try Sys.getenv "LIB" with Not_found -> "")
+      search_path := !dirs @
+	parse_libpath (try Sys.getenv "LIB" with Not_found -> "")
   | `MINGW ->
       let cygroot = getcmd "cygpath -m /"
       and gcclib = 
 	getcmd "gcc -mno-cygwin -print-libgcc-file-name | cygpath -m -f -" in
-      search_path := [ Filename.concat cygroot "lib";
-		       Filename.concat cygroot "lib/mingw";
-		       Filename.concat cygroot "lib/w32api";
-		       Filename.dirname gcclib ];
+      search_path := !dirs @
+	[ Filename.concat cygroot "lib";
+	  Filename.concat cygroot "lib/mingw";
+	  Filename.concat cygroot "lib/w32api";
+	  Filename.dirname gcclib ];
       default_libs := 
 	["-lmingw32"; "-lgcc"; "-lmoldname"; "-lmingwex"; "-lmsvcrt"; 
 	 "-luser32"; "-lkernel32"; "-ladvapi32"; "-lshell32" ]

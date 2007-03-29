@@ -1,16 +1,16 @@
-#CC = cl /nologo /MD 
+#CC = cl /MD 
 #O = obj
 #CHAIN = msvc
 
-#CC = gcc -D_CYGWIN_
+#CC = gcc
 #O = o
 #CHAIN=cygwin
 
-#CC = gcc -D_MINGW_ -mno-cygwin
+#CC = gcc -mno-cygwin
 #O = o
 #CHAIN = mingw
 
-FLEXLINK = ../flexlink.exe -chain $(CHAIN)
+FLEXLINK = ../flexlink.exe -chain $(CHAIN) -merge-manifest
 
 .PHONY: demo
 demo: dump.exe plug1.dll plug2.dll
@@ -39,4 +39,4 @@ plug12.dll: plug1.$(O) plug2.$(O)
 
 
 clean:
-	rm -f *.o *.obj *.dll *.exe *~
+	rm -f *.o *.obj *.dll *.exe *~ *.manifest

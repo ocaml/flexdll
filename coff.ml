@@ -458,12 +458,9 @@ module Coff = struct
 		   | None -> assert false)
 	    | { storage = 3; value = 0l; auxn = 1 } ->
 		(* section def *)
-		if int8 s.auxs 14 = 5 then
-		  let num = int16 s.auxs 12 in
-		  assert (num > 0);
+		let num = int16 s.auxs 12 in
+		if num > 0 then
 		  s.extra_info <- `Section sections.(num - 1)
-		else
-		  assert (int16 s.auxs 12 = 0)
 	    | { storage = 103 }
 	    | { auxn = 0 } -> ()
 	    | { storage = 2; stype = 0x20; auxn = 1; auxs = auxs } ->
