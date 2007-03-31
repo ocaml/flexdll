@@ -151,7 +151,7 @@ static void relocate(resolver f, void *data, reloctbl *tbl) {
       return;
     }
     switch (ptr->kind & 0xff) {
-    case RELOC_ABS: *(ptr->addr) = s; break;
+    case RELOC_ABS: *(ptr->addr) += s; break;
     case RELOC_REL: *(ptr->addr) = s - (uintnat) (ptr->addr) - 4; break;
     default: assert(0);
     }

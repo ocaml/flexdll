@@ -466,7 +466,7 @@ let build_dll link_exe output_file files extra_args =
 	let impexp = Filename.chop_suffix implib ".lib" ^ ".exp" in
 	temps := implib :: impexp :: !temps;
 	Printf.sprintf 
-	  "link /nologo %s%s %s /implib:%s /out:%s %s %s%s"
+	  "link /nologo %s%s %s /implib:%s /out:%s /defaultlib:msvcrt.lib %s %s%s"
 	  (if !verbose >= 2 then "/verbose " else "")
 	  (if link_exe then "" else "/dll /export:symtbl /export:reloctbl ")
 	  (mk_dirs_opt "/libpath:")
