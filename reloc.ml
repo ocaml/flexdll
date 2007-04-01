@@ -289,11 +289,6 @@ let build_dll link_exe output_file files exts extra_args =
     collect (function (f,`Obj x) -> Some (f,x) | _ -> None) files in
   let libs = 
     collect (function (f,`Lib (x,[])) -> Some (f,x) | _ -> None) files in
-(*  let ilibs = 
-    collect 
-      (function (f,`Lib (x,imps)) when imps <> [] -> Some (f,x,imps) 
-	 | _ -> None) files in
-*)
 
   let defined = ref StrSet.empty in
   if link_exe then defined := StrSet.add "_static_symtable" !defined;
