@@ -455,7 +455,7 @@ let build_dll link_exe output_file files extra_args =
   record_obj obj;
 
 
-  let files = !to_link @ List.map (fun (fn,_,_) -> fn) ilibs in
+  let files = List.rev !to_link @ List.map (fun (fn,_,_) -> fn) ilibs in
   let files = List.map Filename.quote files in
   let files = String.concat " " files in
   let quiet = if !verbose >= 1 then "" else ">NUL" in
