@@ -272,11 +272,13 @@ let collect f l =
 
 let build_dll link_exe output_file files exts extra_args =
   (* fully resolve filenames, eliminate duplicates *)
-  let files = 
-    StrSet.elements (
-      List.fold_left (fun accu fn -> StrSet.add (find_file fn) accu)
-	StrSet.empty files
-    ) in
+  let _,files = 
+    List.fold_left (fun (seen,accu) fn ->
+		      let fn = find_file fn in
+		      if StrSet.mem fn seen then (seen, accu)
+		      else (StrSet.add fn seen, fn :: accu)
+		   ) (StrSet.empty,[]) files in
+  let files = List.rev files in
   
   (* load given files *)
   let loaded_filenames : (string,unit) Hashtbl.t = Hashtbl.create 16 in
@@ -287,10 +289,11 @@ let build_dll link_exe output_file files exts extra_args =
     collect (function (f,`Obj x) -> Some (f,x) | _ -> None) files in
   let libs = 
     collect (function (f,`Lib (x,[])) -> Some (f,x) | _ -> None) files in
-  let ilibs = 
+(*  let ilibs = 
     collect 
       (function (f,`Lib (x,imps)) when imps <> [] -> Some (f,x,imps) 
 	 | _ -> None) files in
+*)
 
   let defined = ref StrSet.empty in
   if link_exe then defined := StrSet.add "_static_symtable" !defined;
@@ -372,17 +375,17 @@ let build_dll link_exe output_file files exts extra_args =
   (* Second step: transitive closure, starting from given objects *)
 
   let libobjects  = Hashtbl.create 16 in
-  let to_link = ref [] in
   let reloctbls = ref [] in
   let exported = ref StrSet.empty in
 
   let record_obj obj =
     let fn = Filename.temp_file "dyndll" ".obj" in
-    to_link := fn :: !to_link;
     temps := fn :: !temps;
     let oc = open_out_bin fn in
     Coff.put oc obj;
-    close_out oc in
+    close_out oc;
+    fn
+  in
 
   let add_reloc name obj imps =
     if !show_imports then (
@@ -413,12 +416,14 @@ let build_dll link_exe output_file files exts extra_args =
     if Hashtbl.mem libobjects (libname,objname) then ()
     else (Hashtbl.replace libobjects (libname,objname) (obj,imports obj); 
 	  link_obj obj) in
+
+  let redirect = Hashtbl.create 16 in
   List.iter 
     (fun (fn,obj) -> 
        link_obj obj;
        let imps = imports obj in
-       if (StrSet.is_empty imps) then to_link := fn :: !to_link
-       else close_obj fn imps obj;
+       if (StrSet.is_empty imps) then ()
+       else Hashtbl.replace redirect fn (close_obj fn imps obj);
     ) objs;
 
   let to_explode = Hashtbl.create 16 in
@@ -430,18 +435,13 @@ let build_dll link_exe output_file files exts extra_args =
        )
     )
     libobjects;
-  let libs = ref StrSet.empty in
   Hashtbl.iter
     (fun (libname,objname) (obj,imps) ->
        if Hashtbl.mem to_explode libname 
-       then close_obj (Printf.sprintf "%s(%s)" libname objname) imps obj
-       else libs := StrSet.add libname !libs 
+       then Hashtbl.add redirect libname 
+	 (close_obj (Printf.sprintf "%s(%s)" libname objname) imps obj)
     )
     libobjects;
-  StrSet.iter (fun l -> 
-		 if not (Hashtbl.mem to_explode l) 
-		 then to_link := l :: !to_link) 
-    !libs;
   if !show_exports then (
     Printf.printf "** Exported symbols:\n";
     StrSet.iter print_endline !exported;
@@ -458,10 +458,17 @@ let build_dll link_exe output_file files exts extra_args =
   add_export_table obj (StrSet.elements !exported) 
     (if link_exe then "_static_symtable" else "_symtbl");
   if not link_exe then add_master_reloc_table obj !reloctbls "_reloctbl";
-  record_obj obj;
+  let descr = record_obj obj in
 
-
-  let files = List.rev !to_link @ List.map (fun (fn,_,_) -> fn) ilibs 
+  let files = 
+    descr ::
+    List.flatten
+      (List.map
+	 (fun (fn,_) ->
+	    let all = Hashtbl.find_all redirect fn in
+	    if all = [] then [fn] else all)
+	 files
+      )
     @ exts in
   let files = List.map Filename.quote files in
   let files = String.concat " " files in
@@ -599,7 +606,8 @@ let setup_toolchain () = match !toolchain with
 
 let compile_if_needed file =
   if Filename.check_suffix file ".c" then begin
-    let tmp_obj = Filename.temp_file "dyndll" ".obj" in
+    let tmp_obj = Filename.temp_file "dyndll" 
+      (if !toolchain = `MSVC then ".obj" else ".o") in
     temps := tmp_obj :: !temps;
     let cmd = match !toolchain with
       | `MSVC ->
@@ -608,10 +616,14 @@ let compile_if_needed file =
 	    (Filename.quote tmp_obj)
 	    (mk_dirs_opt "/I:")
 	    file
-    | `CYGWIN ->
-	assert false
-    | `MINGW ->
-	assert false
+      | `CYGWIN ->
+	  assert false
+      | `MINGW ->
+	  Printf.sprintf
+	    "gcc -c -o %s %s %s"
+	    (Filename.quote tmp_obj)
+	    (mk_dirs_opt "-I")
+	    file
     in
     if !verbose >= 1 || !dry_mode then Printf.printf "+ %s\n" cmd; 
     flush stdout;
@@ -646,7 +658,7 @@ let () =
       Printf.printf "** Default libraries:\n";
       List.iter print_endline !default_libs;
     );
-    let files = List.map compile_if_needed !files in
+    let files = List.rev (List.map compile_if_needed !files) in
     let files =
       if !add_flexdll_obj && !exe_mode then
 	Filename.concat (Filename.dirname Sys.executable_name)

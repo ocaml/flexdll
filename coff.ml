@@ -256,7 +256,7 @@ module Symbol = struct
 	  (* weak ext *)
 	  emit_int32 oc (Int32.of_int s'.sym_pos);
 	  output_string oc (String.sub s.auxs 4 (String.length s.auxs - 4))
-      | { storage = 3; value = 0l; extra_info = `Section s' } ->
+      | { storage = 3; extra_info = `Section s' } ->
 	  (* section def *)
 	  assert false
       | _ ->
@@ -268,9 +268,9 @@ module Reloc = struct
   let abs sec addr sym = 
     sec.relocs <- { addr = addr; symbol = sym; rtype = 6 } :: sec.relocs
 
-  let get symtbl ic base =
+  let get symtbl va ic base =
     let buf = read ic base 10 in
-    { addr = int32 buf 0;
+    { addr = Int32.sub (int32 buf 00) va;
       symbol = (try match symtbl.(int32_ buf 4) with Some s -> s 
 		  | None -> assert false
 		with exn -> assert false);
@@ -305,7 +305,7 @@ module Section = struct
       then strtbl (int_of_string (strz buf 1 ~max:7 '\000'))
       else strz buf 0 ~max:8 '\000'
     in
-    assert( int32 buf 12 = 0l );
+    let va = int32 buf 12 in
 
     if (int32 buf 36 &&& 0x01000000l <> 0l) 
     then (Printf.printf "More relocs!\n"; assert false);
@@ -315,7 +315,7 @@ module Section = struct
       let base = filebase + int32_ buf 24 in
       let r = ref [] in
       for i = 0 to (int16 buf 32) - 1 do
-	r := Reloc.get symtbl ic (base + 10 * i) :: !r
+	r := Reloc.get symtbl va ic (base + 10 * i) :: !r
       done;
       !r
     in
@@ -456,7 +456,7 @@ module Coff = struct
 		(match symtbl.(Int32.to_int (int32 s.auxs 0)) with
 		   | Some s' -> s.extra_info <- `Alias s'
 		   | None -> assert false)
-	    | { storage = 3; value = 0l; auxn = 1 } ->
+	    | { storage = 3; auxn = 1 } ->
 		(* section def *)
 		let num = int16 s.auxs 12 in
 		if num > 0 then
