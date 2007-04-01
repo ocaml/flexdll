@@ -12,6 +12,11 @@ let dirs = ref []
 let default_libs = ref []
 let merge_manifest = ref false
 let add_flexdll_obj = ref true
+let files = ref []
+let exts = ref []
+let output_file = ref ""
+let exe_mode = ref false  
+let extra_args = ref []
 
 let mk_dirs_opt pr = String.concat " " (List.map (fun s -> pr ^ s) !dirs)
 
@@ -265,7 +270,7 @@ let collect f l =
     []
     l
 
-let build_dll link_exe output_file files extra_args =
+let build_dll link_exe output_file files exts extra_args =
   (* fully resolve filenames, eliminate duplicates *)
   let files = 
     StrSet.elements (
@@ -340,6 +345,7 @@ let build_dll link_exe output_file files extra_args =
   in
   List.iter (fun (_,x) -> collect_defined x) files;
   List.iter (fun fn -> collect_file (find_file fn)) !default_libs;
+  List.iter (fun fn -> collect_file (find_file fn)) exts;
 
   (* Determine which objects from the given libraries should be linked
      in. First step: find the mapping (symbol -> object) for these
@@ -455,7 +461,8 @@ let build_dll link_exe output_file files extra_args =
   record_obj obj;
 
 
-  let files = List.rev !to_link @ List.map (fun (fn,_,_) -> fn) ilibs in
+  let files = List.rev !to_link @ List.map (fun (fn,_,_) -> fn) ilibs 
+    @ exts in
   let files = List.map Filename.quote files in
   let files = String.concat " " files in
   let quiet = if !verbose >= 1 then "" else ">NUL" in
@@ -512,10 +519,6 @@ let build_dll link_exe output_file files extra_args =
   end
 
 
-let files = ref []
-let output_file = ref ""
-let exe_mode = ref false  
-let extra_args = ref []
 let usage_msg = 
   "flexlink -o <result.dll> file1.obj file2.obj ... -- <extra linker arguments>"
 let specs = [
@@ -538,6 +541,9 @@ let specs = [
 			   | "mingw" -> toolchain := `MINGW
 			   | _ -> assert false)),
   " Choose which linker to use";
+
+  "-defaultlib", Arg.String (fun s -> exts := s :: !exts),
+  " External object (no export, no import)";
 
   "-save-temps", Arg.Set save_temps,
   " Do not delete intermediate files";
@@ -617,7 +623,18 @@ let compile_if_needed file =
 let () =
   at_exit clean;
   let specs = Arg.align specs in
-  Arg.parse specs (fun x -> files := x :: !files) usage_msg;
+
+  (* Hack to collect the -lXXX arguments first *)
+  for i = 1 to Array.length Sys.argv - 1 do
+    let s = Sys.argv.(i) in
+    if String.length s > 2 && String.sub s 0 2 = "-l" &&
+      Sys.argv.(i-1) <> "-defaultlib"
+    then (
+      files := s :: !files;
+      Sys.argv.(i) <- ""
+    )
+  done;
+  Arg.parse specs (fun x -> if x <> "" then files := x :: !files) usage_msg;
   if !output_file = "" then 
     (Printf.eprintf "Please specify an output file\n"; 
      exit 1);
@@ -640,7 +657,7 @@ let () =
 	  )
 	  :: files
       else files in
-    build_dll !exe_mode !output_file files 
+    build_dll !exe_mode !output_file files !exts
       (String.concat " " (List.rev !extra_args));
   with 
     | Failure s ->
