@@ -220,16 +220,16 @@ module Symbol = struct
 	  Printf.printf "export %s @ 0x%08lx\n" sect s.value
       | { storage = 2; section = `Num 0; value = 0l } ->
 	  Printf.printf "extern\n"
-      | { storage = 3; value = 0l } ->
+      | { storage = 3; value = 0l; auxn = 1 } ->
 	  Printf.printf "section %s, num %i, select %i\n" sect
 	    (int16 s.auxs 12)
 	    (int8 s.auxs 14)
       | { storage = 3 } ->
-	  Printf.printf "static %s @ 0x%08lx\n" sect s.value
+	  Printf.printf "static %s @ 0x%08lx\n" sect s.value 
       | { storage = 103 } ->
 	  Printf.printf "filename %s\n" (strz s.auxs 0 '\000')
       | { storage = 105 } ->
-	  Printf.printf "weak ext\n"
+	  Printf.printf "weak ext\n" 
       | _ ->
 	  Printf.printf 
 	    "value=0x%08lx, sect=%s, storage=%s, aux=%S\n"
@@ -321,7 +321,8 @@ module Section = struct
     in
 
     let data = read ic (filebase + int32_ buf 20) size in
-(*    if name = ".drectve" then dump ic (filebase + int32_ buf 20) size 16; *)
+(*    Printf.printf "SECTION %s\n" name;
+    dump ic (filebase + int32_ buf 20) size 16; *)
 
     { sec_pos = (-1);
       sec_name = name;
@@ -409,8 +410,8 @@ module Coff = struct
 	((List.find (fun s -> s.sec_name = ".drectve") obj.sections).data)
     with Not_found -> []
 
-  let get ic base =
-    let buf = read ic base 20 in    
+  let get ic ofs base =
+    let buf = read ic ofs 20 in    
     let opthdr = int16 buf 16 in
 
     let symtable = base + int32_ buf 8 in
@@ -419,10 +420,13 @@ module Coff = struct
     (* the string table *)
     let strtbl = 
       let pos = symtable + 18 * symcount in
-      let len = int32_ (read ic pos 4) 0 in
-      let data = read ic pos len in
-      fun i -> strz data i '\000'
+      if pos = 0 then fun i -> assert false
+      else
+	let len = int32_ (read ic pos 4) 0 in
+	let data = read ic pos len in
+	fun i -> strz data i '\000'
     in
+
 
     (* the symbol table *)
     let symbols,symtbl = 
@@ -436,12 +440,11 @@ module Coff = struct
     in
 
     (* the sections *)
-    let sectable = base + 20 + opthdr in
+    let sectable = ofs + 20 + opthdr in
     let sections =
       Array.init (int16 buf 2)
 	(fun i -> Section.get base strtbl symtbl ic (sectable + 40 * i))
     in
-
 
     (* remove .bf/.ef/.lf symbols *)
     let symbols =
@@ -500,8 +503,9 @@ module Coff = struct
     Printf.printf "machine: 0x%x\n" x.machine;
     Printf.printf "date:    0x%lx\n" x.date;
     Printf.printf "opts:    0x%x\n" x.opts;
-    List.iter Symbol.dump x.symbols;
-    List.iter Section.dump x.sections
+    List.iter Symbol.dump x.symbols; 
+    List.iter Section.dump x.sections;
+    ()
 
   let put oc x =
     emit_int16 oc x.machine;
@@ -589,7 +593,7 @@ module Lib = struct
       let pos = pos_in ic in
       if (size > 18) && (read ic pos 4 = "\000\000\255\255") 
       then imports := Import.read ic pos size :: !imports
-      else objects := (name, Coff.get ic pos) :: !objects
+      else objects := (name, Coff.get ic pos pos) :: !objects
     in
     let rec read_member () =
       let buf = read ic (pos_in ic) 60 in
@@ -611,14 +615,31 @@ module Lib = struct
     (try read_member () with End_of_file -> ());
     !objects,!imports
 
+  let is_lib ic = 
+    in_channel_length ic > String.length magic_lib
+    && read ic 0 (String.length magic_lib) = magic_lib 
+
+  let obj_ofs ic = 
+    try 
+      let b = read ic 0x3c 4 in
+      let ofs = int32_ b 0 in
+      if read ic ofs 4 = "PE\000\000" then ofs + 4
+      else 0
+    with exn ->
+      0
+
+  let is_dll filename =
+    let ic = open_in_bin filename in
+    let ofs = obj_ofs ic in
+    close_in ic;
+    ofs > 0
+
   let read filename =
     let ic = open_in_bin filename in
     try
       let r = 
-	if in_channel_length ic > String.length magic_lib
-	  && read ic 0 (String.length magic_lib) = magic_lib 
-	then `Lib (read_lib ic)
-	else `Obj (Coff.get ic 0) in
+	if is_lib ic then `Lib (read_lib ic)
+	else let ofs = obj_ofs ic in `Obj (Coff.get ic ofs 0) in
       close_in ic;
       r
     with exn ->

@@ -17,6 +17,7 @@ let exts = ref []
 let output_file = ref ""
 let exe_mode = ref false  
 let extra_args = ref []
+let dump = ref false
 
 let mk_dirs_opt pr = String.concat " " (List.map (fun s -> pr ^ s) !dirs)
 
@@ -270,6 +271,40 @@ let collect f l =
     []
     l
 
+let cmd_verbose cmd =
+  if !verbose >= 1 then Printf.printf "+ %s\n" cmd; 
+  Sys.command cmd
+
+
+let parse_dll_exports fn =
+  let ic = open_in fn in
+  let exps = ref [] in
+  try
+    while input_line ic <> "[Ordinal/Name Pointer] Table" do () done;
+    while true do
+      let s = input_line ic in
+      let r = String.index s ']' in
+      let sym = String.sub s (r+2) (String.length s - r - 2) in
+      exps := ("_" ^ sym,0) :: !exps;
+    done;
+    assert false
+  with Not_found | End_of_file ->
+    close_in ic;
+    !exps
+
+
+let dll_exports fn = match !toolchain with
+  | `MSVC ->
+      failwith "Creation of import library not supported on the MSVC toolchain"
+  | `CYGWIN | `MINGW ->
+      let dmp = Filename.temp_file "dyndll" ".dmp" in
+      temps := dmp :: !temps;
+      if cmd_verbose (Printf.sprintf "objdump -p %s > %s" fn dmp) <> 0 
+      then failwith "Error while extracting exports from a DLL";
+      parse_dll_exports dmp
+			
+
+
 let build_dll link_exe output_file files exts extra_args =
   (* fully resolve filenames, eliminate duplicates *)
   let _,files = 
@@ -282,7 +317,12 @@ let build_dll link_exe output_file files exts extra_args =
   
   (* load given files *)
   let loaded_filenames : (string,unit) Hashtbl.t = Hashtbl.create 16 in
-  let files = List.map (fun fn -> fn, Lib.read fn) files in
+  let files = List.map (fun fn -> 
+			  if Lib.is_dll fn then 
+			    fn,`Lib ([], dll_exports fn)
+			  else
+			    fn, Lib.read fn) files in
+
   List.iter (fun (fn,_) -> Hashtbl.add loaded_filenames fn ()) files;
 
   let objs = 
@@ -562,6 +602,9 @@ let specs = [
   "-dry", Arg.Set dry_mode,
   " Show the linker command line, do not actually run it";
 
+  "-dump", Arg.Set dump,
+  " Only dump the content of object files";
+
   "-merge-manifest", Arg.Set merge_manifest,
   " Merge manifest to the dll or exe";
 
@@ -642,7 +685,7 @@ let () =
     )
   done;
   Arg.parse specs (fun x -> if x <> "" then files := x :: !files) usage_msg;
-  if !output_file = "" then 
+  if !output_file = "" && not !dump then 
     (Printf.eprintf "Please specify an output file\n"; 
      exit 1);
   try
@@ -664,8 +707,30 @@ let () =
 	  )
 	  :: files
       else files in
-    build_dll !exe_mode !output_file files !exts
-      (String.concat " " (List.rev !extra_args));
+
+    if !dump then (
+      List.iter
+	(fun fn -> 
+	   let fn = find_file fn in
+	   Printf.printf "*** %s:\n" fn;
+	   print_endline fn;
+	   match Lib.read fn with
+	     | `Lib (objs,imports) ->
+		 List.iter 
+		   (fun (n,o) ->
+		      Printf.printf "** %s(%s):" fn n;
+		      Coff.dump o
+		   )
+		   objs
+	     | `Obj o ->
+		 Coff.dump o
+	)
+	files
+    )
+    else (
+      build_dll !exe_mode !output_file files !exts
+	(String.concat " " (List.rev !extra_args))
+    )
   with 
     | Failure s ->
 	Printf.eprintf "** Fatal error: %s\n" s;
