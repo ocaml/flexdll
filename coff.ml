@@ -412,7 +412,6 @@ module Coff = struct
   let get ic base =
     let buf = read ic base 20 in    
     let opthdr = int16 buf 16 in
-    assert(opthdr = 0);
 
     let symtable = base + int32_ buf 8 in
     let symcount = int32_ buf 12 in
