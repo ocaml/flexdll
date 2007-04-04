@@ -22,12 +22,13 @@ and section = {
   mutable sec_pos: int;
   sec_name: string;
   vsize: int32;
-  mutable data: string;
+  mutable data: [ `String of string | `Uninit of int ];
   mutable relocs: reloc list;
   sec_opts: int32;
 }
 
 type coff = {
+  obj_name: string;
   machine: int;
   date: int32;
   mutable sections: section list;
@@ -68,10 +69,13 @@ let mk_int32 a b c d =
   a ++ b ++ c ++ d
 
 let read ic pos len =
-  seek_in ic pos;
-  let buf = String.create len in
-  really_input ic buf 0 len;
-  buf
+  if len = 0 then ""
+  else (
+    seek_in ic pos;
+    let buf = String.create len in
+    really_input ic buf 0 len;
+    buf
+  )
 
 let int32 buf loc =
   mk_int32 
@@ -293,7 +297,7 @@ end
 
 module Section = struct
   let create name flags = {
-    sec_pos = (-1); sec_name = name; data = ""; relocs = [];
+    sec_pos = (-1); sec_name = name; data = `String ""; relocs = [];
     vsize = 0l;  sec_opts = flags;
   }
 
@@ -305,6 +309,7 @@ module Section = struct
       then strtbl (int_of_string (strz buf 1 ~max:7 '\000'))
       else strz buf 0 ~max:8 '\000'
     in
+(*    Printf.printf "SECTION %s, data at 0x%08lx, size %i, vsize = %i\n" name (int32 buf 20) size (int32_ buf 8); *)
     let va = int32 buf 12 in
 
     if (int32 buf 36 &&& 0x01000000l <> 0l) 
@@ -320,9 +325,10 @@ module Section = struct
       !r
     in
 
-    let data = read ic (filebase + int32_ buf 20) size in
-(*    Printf.printf "SECTION %s\n" name;
-    dump ic (filebase + int32_ buf 20) size 16; *)
+    let data = 
+      if int32_ buf 20 = 0 then `Uninit size
+      else `String (read ic (filebase + int32_ buf 20) size) in
+(*    dump ic (filebase + int32_ buf 20) size 16; *)
 
     { sec_pos = (-1);
       sec_name = name;
@@ -348,9 +354,13 @@ module Section = struct
     output_string oc name; emit_zero oc (8 - String.length name);
     emit_int32 oc 0l;
     emit_int32 oc 0l;
-    emit_int32 oc (Int32.of_int (String.length x.data));
-
-    let send_data = delayed_ptr oc (fun () -> output_string oc x.data)
+    let send_data = match x.data with
+      | `String s ->
+	  emit_int32 oc (Int32.of_int (String.length s));
+	  delayed_ptr oc (fun () -> output_string oc s)
+      | `Uninit len ->
+	  emit_int32 oc (Int32.of_int len);
+	  emit_int32 oc 0l; (fun () -> ())
     in
 
     let send_reloc =
@@ -368,7 +378,8 @@ end
 
 module Coff = struct
   let empty () =
-    { machine = 0x14c; date = 0x4603de0el; 
+    { obj_name = "generated";
+      machine = 0x14c; date = 0x4603de0el; 
       sections = []; symbols = []; opts = 0 }
 
   let parse_directives s =
@@ -406,11 +417,13 @@ module Coff = struct
  
   let directives obj =
     try 
-      parse_directives 
-	((List.find (fun s -> s.sec_name = ".drectve") obj.sections).data)
+      let sec = List.find (fun s -> s.sec_name = ".drectve") obj.sections in
+      match sec.data with
+	| `String s -> parse_directives s
+	| `Uninit _ -> []
     with Not_found -> []
 
-  let get ic ofs base =
+  let get ic ofs base name =
     let buf = read ic ofs 20 in    
     let opthdr = int16 buf 16 in
 
@@ -479,7 +492,8 @@ module Coff = struct
 	    | _ -> ()))
       symbols;
 
-    { machine = int16 buf 0;
+    { obj_name = name;
+      machine = int16 buf 0;
       sections = Array.to_list sections;
       date = int32 buf 4;
       symbols = symbols;
@@ -585,7 +599,7 @@ end
 module Lib = struct
   let magic_lib = "!<arch>\n"
 
-  let read_lib ic =
+  let read_lib ic libname =
     let strtbl = ref "" in
     let imports = ref [] and objects = ref [] in
     let obj size name = 
@@ -593,7 +607,9 @@ module Lib = struct
       let pos = pos_in ic in
       if (size > 18) && (read ic pos 4 = "\000\000\255\255") 
       then imports := Import.read ic pos size :: !imports
-      else objects := (name, Coff.get ic pos pos) :: !objects
+      else objects := (name, 
+		       Coff.get ic pos pos 
+			 (Printf.sprintf "%s(%s)" libname name)) :: !objects
     in
     let rec read_member () =
       let buf = read ic (pos_in ic) 60 in
@@ -638,8 +654,8 @@ module Lib = struct
     let ic = open_in_bin filename in
     try
       let r = 
-	if is_lib ic then `Lib (read_lib ic)
-	else let ofs = obj_ofs ic in `Obj (Coff.get ic ofs 0) in
+	if is_lib ic then `Lib (read_lib ic filename)
+	else let ofs = obj_ofs ic in `Obj (Coff.get ic ofs 0 filename) in
       close_in ic;
       r
     with exn ->

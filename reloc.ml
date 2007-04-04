@@ -198,7 +198,7 @@ let add_reloc_table x p sname =
     !nonwr;
   int32_to_buf data 0;
   int32_to_buf data 0;
-  sect.data <- Buffer.contents data;
+  sect.data <- `String (Buffer.contents data);
   x.sections <- sect :: x.sections;
   x.symbols <- 
     (Symbol.export sname sect 0l) ::
@@ -210,7 +210,7 @@ let add_reloc_table x p sname =
 let add_import_table obj imports =
   let sect = Section.create ".imptbl" 0xc0300040l in
   obj.sections <- sect :: obj.sections;
-  sect.data <- String.create (4 * List.length imports);
+  sect.data <- `String (String.create (4 * List.length imports);
   ignore 
     (List.fold_left 
        (fun i s -> 
@@ -247,7 +247,7 @@ let add_export_table obj exports symname =
     )
     exports;
   strsym.value <- Int32.of_int (Buffer.length data);
-  sect.data <- Buffer.contents data ^ Buffer.contents strings;
+  sect.data <- `String (Buffer.contents data ^ Buffer.contents strings);
   obj.sections <- sect :: obj.sections
 
 (* A master relocation table points to all the relocation tables
@@ -266,7 +266,7 @@ let add_master_reloc_table obj names symname =
     )
     names;
   int32_to_buf data 0;
-  sect.data <- Buffer.contents data;
+  sect.data <- `String (Buffer.contents data);
   obj.sections <- sect :: obj.sections
 
 

@@ -41,6 +41,34 @@ static char error_buffer[256];
 
 /* Emulate a low-level dlopen-like interface */
 
+#ifdef __CYGWIN32__
+
+/* Under Cygwin, use the dlopen interface to allow POSIX paths */
+
+#include <dlfcn.h>
+
+static void *ll_dlopen(const char *libname, int for_execution) {
+  return dlopen(libname, RTLD_NOW | RTLD_GLOBAL);
+  /* Could use RTLD_LAZY if for_execution == 0, but needs testing */
+}
+
+static void ll_dlclose(void * handle)
+{
+  dlclose(handle);
+}
+
+static void * ll_dlsym(void * handle, char * name)
+{
+  return dlsym(handle, name);
+}
+
+static char * ll_dlerror(void)
+{
+  return dlerror();
+}
+
+#else
+
 static void *ll_dlopen(const char *libname, int for_execution) {
   HMODULE m;
   m = LoadLibraryEx(libname, NULL, 
@@ -74,6 +102,7 @@ static char *ll_dlerror(void)
   else return error_buffer;
 }
 
+#endif
 
 /** Relocation tables **/
 
