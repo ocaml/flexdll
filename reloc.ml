@@ -55,23 +55,50 @@ let parse_libpath s =
   in
   aux 0
 
-let getcmd cmd =
+let get_output cmd =
   if (Sys.command (cmd ^ " > tmp_getcmd") < 0) 
   then failwith ("Cannot run " ^ cmd);
   let ic = open_in "tmp_getcmd" in
-  let s = input_line ic in
+  let r = ref [] in
+  (try while true do r := input_line ic :: !r done with End_of_file -> ());
   close_in ic;
   Sys.remove "tmp_getcmd";
-  s
+  List.rev !r
 
-let find_file fn =
-  if Sys.file_exists fn then fn
-  else 
-    Filename.concat
-      (List.find (fun s -> Sys.file_exists (Filename.concat s fn)) 
-	 !search_path)
-      fn
-      
+let get_output1 cmd = List.hd (get_output cmd)
+
+let cygpath l =
+  get_output (Printf.sprintf "cygpath -m %s" (String.concat " " l))
+  
+let gcclib () =
+  Filename.dirname (get_output1 "gcc -print-libgcc-file-name")
+
+let file_exists fn =
+  if Sys.file_exists fn then Some fn
+  else if Sys.file_exists (fn ^ ".lnk") then 
+    Some (get_output1 (Printf.sprintf "cygpath -m %s" fn))
+  else None
+
+let rec find_file_in = function
+  | [] -> None
+  | fn::rest ->
+      match file_exists fn with
+	| Some x -> Some x
+	| None -> find_file_in rest
+
+let find_file fn = 
+  let l =
+    List.flatten
+      (List.map
+	 (fun dir -> 
+	    let fn = Filename.concat dir fn in
+	    [ fn; fn ^ ".lib"; fn ^ ".a" ]
+	 ) (""::!search_path)) in
+  match find_file_in l with
+    | Some x -> Some x
+    | None -> find_file_in (cygpath l)
+
+
 let find_file =
   let memo = Hashtbl.create 16 in
   fun fn ->
@@ -81,13 +108,10 @@ let find_file =
 	if String.length fn > 2 && String.sub fn 0 2 = "-l" then
 	  "lib" ^ (String.sub fn 2 (String.length fn - 2))
 	else fn in
-      let r =
-	try find_file fn
-	with Not_found ->
-	  try find_file (fn ^ ".lib")
-	  with Not_found -> 
-	    try find_file (fn ^ ".a")
-	    with Not_found -> 
+      let r = 
+	match find_file fn with
+	  | Some fn -> fn
+	  | None ->
 	      failwith (Printf.sprintf "Cannot find file %S" fn)
       in
       Hashtbl.add memo fn r;
@@ -618,26 +642,23 @@ let clean () =
 
 let setup_toolchain () = match !toolchain with
   | `CYGWIN -> 
-      let cygroot = getcmd "cygpath -m /"
-      and gcclib = getcmd "gcc -print-libgcc-file-name | cygpath -m -f -" in
-      search_path := !dirs @
-	[ Filename.concat cygroot "lib";
-	  Filename.concat cygroot "lib/w32api";
-	  Filename.dirname gcclib ];
+      search_path := 
+	!dirs @
+	  [ "/lib";
+	    "/lib/w32api";
+	    gcclib () ];
       default_libs := ["-lkernel32"; "-luser32"; "-ladvapi32";
 		       "-lshell32"; "-lcygwin"; "-lgcc"]
   | `MSVC ->
       search_path := !dirs @
 	parse_libpath (try Sys.getenv "LIB" with Not_found -> "")
   | `MINGW ->
-      let cygroot = getcmd "cygpath -m /"
-      and gcclib = 
-	getcmd "gcc -mno-cygwin -print-libgcc-file-name | cygpath -m -f -" in
-      search_path := !dirs @
-	[ Filename.concat cygroot "lib";
-	  Filename.concat cygroot "lib/mingw";
-	  Filename.concat cygroot "lib/w32api";
-	  Filename.dirname gcclib ];
+      search_path :=
+	!dirs @
+	  [ "/lib";
+	    "/lib/mingw";
+	    "/lib/w32api";
+	    gcclib () ];
       default_libs := 
 	["-lmingw32"; "-lgcc"; "-lmoldname"; "-lmingwex"; "-lmsvcrt"; 
 	 "-luser32"; "-lkernel32"; "-ladvapi32"; "-lshell32" ]
@@ -655,10 +676,14 @@ let compile_if_needed file =
 	    (mk_dirs_opt "/I:")
 	    file
       | `CYGWIN ->
-	  assert false
-      | `MINGW ->
 	  Printf.sprintf
 	    "gcc -c -o %s %s %s"
+	    (Filename.quote tmp_obj)
+	    (mk_dirs_opt "-I")
+	    file
+      | `MINGW ->
+	  Printf.sprintf
+	    "gcc -mno-cygwin -c -o %s %s %s"
 	    (Filename.quote tmp_obj)
 	    (mk_dirs_opt "-I")
 	    file
