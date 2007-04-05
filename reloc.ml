@@ -437,6 +437,17 @@ let build_dll link_exe output_file files exts extra_args =
   let reloctbls = ref [] in
   let exported = ref StrSet.empty in
 
+  (* re-export symbols imported from implibs *)
+  List.iter 
+    (function 
+       | (_,`Lib (_,l)) -> 
+	   exported := List.fold_left 
+	     (fun accu (s,_) -> 
+		if s.[0] = '_' then StrSet.add s accu
+		else accu
+	     ) !exported l
+       | _ -> ()) files;
+
   let record_obj obj =
     let fn = Filename.temp_file "dyndll" ".obj" in
     temps := fn :: !temps;
