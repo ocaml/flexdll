@@ -210,7 +210,7 @@ let add_reloc_table x p sname =
 let add_import_table obj imports =
   let sect = Section.create ".imptbl" 0xc0300040l in
   obj.sections <- sect :: obj.sections;
-  sect.data <- `String (String.create (4 * List.length imports));
+  sect.data <- `String (String.make (4 * List.length imports) '\000');
   ignore 
     (List.fold_left 
        (fun i s -> 
