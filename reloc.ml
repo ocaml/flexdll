@@ -19,7 +19,7 @@ let exe_mode = ref false
 let extra_args = ref []
 let dump = ref false
 
-let mk_dirs_opt pr = String.concat " " (List.map (fun s -> pr ^ s) !dirs)
+let mk_dirs_opt pr = String.concat " " (List.map (fun s -> pr ^ (Filename.quote s)) !dirs)
 
 let safe_remove s =
   try Sys.remove s
@@ -754,10 +754,15 @@ let () =
 	     | `Lib (objs,imports) ->
 		 List.iter 
 		   (fun (n,o) ->
-		      Printf.printf "** %s(%s):" fn n;
+		      Printf.printf "** %s(%s):\n" fn n;
 		      Coff.dump o
 		   )
-		   objs
+		   objs;
+		 List.iter
+		   (fun (s,i) ->
+		      Printf.printf "** import: %s (%i)\n" s i
+		   )
+		   imports
 	     | `Obj o ->
 		 Coff.dump o
 	)
