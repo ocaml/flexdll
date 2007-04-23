@@ -5,7 +5,8 @@ CYGCC = gcc
 MINCC = gcc -mno-cygwin
 OCAMLOPT = ocamlopt
 
-all: flexlink.exe flexdll_msvc.obj flexdll_cygwin.o flexdll_mingw.o
+all: flexlink.exe flexdll_msvc.obj flexdll_cygwin.o flexdll_mingw.o \
+	flexdll_initer_mingw.o flexdll_initer_cygwin.o flexdll_msvc_cygwin.obj
 
 flexlink.exe: reloc.ml coff.ml
 	$(OCAMLOPT) -o flexlink.exe coff.ml reloc.ml
@@ -18,6 +19,15 @@ flexdll_cygwin.o: flexdll.h flexdll.c
 
 flexdll_mingw.o: flexdll.h flexdll.c
 	$(MINCC) -c -o flexdll_mingw.o flexdll.c
+
+flexdll_initer_mingw.o: flexdll_initer.cpp
+	$(MINCC) -c -o flexdll_initer_mingw.o flexdll_initer.cpp
+
+flexdll_initer_cygwin.o: flexdll_initer.cpp
+	$(CYGCC) -c -o flexdll_initer_cygwin.o flexdll_initer.cpp
+
+flexdll_msvc_cygwin.obj: flexdll_initer.cpp
+	$(MSVCC) -c /Fo"flexdll_initer_msvc.obj" flexdll_initer.cpp
 
 demo_msvc: flexlink.exe flexdll_msvc.obj
 	(cd test && $(MAKE) clean demo CHAIN=msvc CC="$(MSVCC)" O=obj)

@@ -268,14 +268,26 @@ static void *find_symbol_global(void *data, const char *name) {
   return NULL;
 }
 
+void flexdll_relocate(void *tbl) {
+  relocate_master(find_symbol_global, NULL, tbl);
+}
 
 void *flexdll_dlopen(const char *file, int mode) {
+  static int inited  = 0;
   void *handle;
   dlunit *unit;
+
   int exec = (mode & FLEXDLL_RTLD_NOEXEC ? 0 : 1);
   
   error = 0;
   if (!file) return &main_unit;
+
+  if (!inited) {
+    char s[256];
+    sprintf(s,"FLEXDLL=%08lx",&flexdll_relocate);
+    putenv(s);
+    inited = 1;
+  }
 
   handle = ll_dlopen(file, exec);
   if (!handle) { error = 1; return NULL; }
@@ -294,7 +306,7 @@ void *flexdll_dlopen(const char *file, int mode) {
   if (mode & FLEXDLL_RTLD_GLOBAL) unit->global=1;
 
   if (exec) {
-    relocate_master(find_symbol_global, NULL, ll_dlsym(handle, "reloctbl"));
+    flexdll_relocate(ll_dlsym(handle, "reloctbl"));
     if (error) { flexdll_dlclose(unit); return NULL; }
   }
 

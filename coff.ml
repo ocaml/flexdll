@@ -447,7 +447,8 @@ module Coff = struct
       let rec fill accu i =
 	if i = symcount then List.rev accu
 	else let s = Symbol.get strtbl ic (symtable + 18 * i) in
-	tbl.(i) <- Some s;
+	(try tbl.(i) <- Some s
+	 with Invalid_argument _ -> assert false);
 	fill (s :: accu) (i + 1 + s.auxn) in
       fill [] 0, tbl
     in
@@ -468,17 +469,22 @@ module Coff = struct
 	 (match s with
 	    | { storage = 105; auxn = 1 } ->
 		(* weak ext *)
-		(match symtbl.(Int32.to_int (int32 s.auxs 0)) with
+		(try match symtbl.(Int32.to_int (int32 s.auxs 0)) with
 		   | Some s' -> s.extra_info <- `Alias s'
-		   | None -> assert false)
-	    | { storage = 3; auxn = 1 } ->
+		   | None -> assert false
+		 with Invalid_argument _ -> assert false);
+	    | { storage = 3; stype = 0; auxn = 1 } ->
 		(* section def *)
 		let num = int16 s.auxs 12 in
 		if num > 0 then
-		  s.extra_info <- `Section sections.(num - 1)
+		  (try s.extra_info <- `Section sections.(num - 1)
+		   with Invalid_argument _ -> 
+		     Printf.eprintf "** section %i / %i (%s)\n" num
+		       (Array.length sections) s.sym_name;
+		     assert false);
 	    | { storage = 103 }
 	    | { auxn = 0 } -> ()
-	    | { storage = 2; stype = 0x20; auxn = 1; auxs = auxs } ->
+	    | { storage = (2|3); stype = 0x20; auxn = 1; auxs = auxs } ->
 		(* Remove extra information for function symbols *)
 		s.auxs <- String.make (String.length s.auxs) '\000'
 	    | _ ->
@@ -488,7 +494,8 @@ module Coff = struct
 	 (match s.section with
 	    | `Num i when i > 0 && i <= Array.length sections ->
 		assert (i <= Array.length sections);
-		s.section <- `Section sections.(i - 1)
+		(try s.section <- `Section sections.(i - 1)
+		 with Invalid_argument _ -> assert false);
 	    | _ -> ()))
       symbols;
 

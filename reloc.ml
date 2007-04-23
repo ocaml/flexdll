@@ -18,6 +18,7 @@ let output_file = ref ""
 let exe_mode = ref false  
 let extra_args = ref []
 let dump = ref false
+let defexports = ref []
 
 let mk_dirs_opt pr = String.concat " " (List.map (fun s -> pr ^ (Filename.quote s)) !dirs)
 
@@ -32,7 +33,10 @@ let int32_to_buf b i =
   Buffer.add_char b (Char.chr ((i lsr 24) land 0xff))
 
 let drop_underscore s =
-  assert(s.[0] = '_');
+  if s.[0] <> '_' then
+    failwith (Printf.sprintf 
+		"Symbol %s doesn't start with underscore"
+		s);
   String.sub s 1 (String.length s - 1)
 
 let has_prefix pr s =
@@ -355,7 +359,8 @@ let build_dll link_exe output_file files exts extra_args =
     collect (function (f,`Lib (x,[])) -> Some (f,x) | _ -> None) files in
 
   let defined = ref StrSet.empty in
-  if link_exe then defined := StrSet.add "_static_symtable" !defined;
+  if link_exe then defined := StrSet.add "_static_symtable" !defined
+  else defined := StrSet.add "_reloctbl" !defined;
 
   let aliases = Hashtbl.create 16 in
   let rec normalize name =
@@ -437,6 +442,8 @@ let build_dll link_exe output_file files exts extra_args =
   let reloctbls = ref [] in
   let exported = ref StrSet.empty in
 
+  List.iter (fun s -> exported := StrSet.add ("_" ^ s) !exported) !defexports;
+
   (* re-export symbols imported from implibs *)
   List.iter 
     (function 
@@ -458,7 +465,7 @@ let build_dll link_exe output_file files exts extra_args =
   in
 
   let add_reloc name obj imps =
-    if !show_imports then (
+    if !show_imports && not (StrSet.is_empty imps) then (
       Printf.printf "** Imported symbols for %s:\n" name;
       StrSet.iter print_endline imps
     );
@@ -643,6 +650,9 @@ let specs = [
   "-merge-manifest", Arg.Set merge_manifest,
   " Merge manifest to the dll or exe";
 
+  "-export", Arg.String (fun s -> defexports := s :: !defexports),
+  " Explicitly export a symbol";
+
   "--", Arg.Rest (fun s -> extra_args := s :: !extra_args),
   " Introduce extra linker arguments";
 ]
@@ -775,6 +785,9 @@ let () =
   with 
     | Failure s ->
 	Printf.eprintf "** Fatal error: %s\n" s;
+	exit 2
+    | Invalid_argument s ->
+	Printf.eprintf "** Fatal error: invalid argument (%s)\n" s;
 	exit 2
     | exn ->
 	Printf.eprintf "** Error: %s\n" (Printexc.to_string exn);
