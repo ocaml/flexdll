@@ -206,7 +206,8 @@ let add_reloc_table x p sname =
   x.sections <- sect :: x.sections;
   x.symbols <- 
     (Symbol.export sname sect 0l) ::
-    strsym :: nonwrsym :: !syms @ List.filter (fun x -> not (p x)) x.symbols
+    strsym :: nonwrsym :: List.filter (fun x -> not (p x)) x.symbols
+    @ !syms
 
 
 (* Create a table for import symbols __imp_XXX *)
@@ -744,15 +745,22 @@ let () =
     );
     let files = List.rev (List.map compile_if_needed !files) in
     let files =
-      if !add_flexdll_obj && !exe_mode then
-	Filename.concat (Filename.dirname Sys.executable_name)
-	  (match !toolchain with
-	     | `MSVC -> "flexdll_msvc.obj"
-	     | `CYGWIN -> "flexdll_cygwin.o"
-	     | `MINGW -> "flexdll_mingw.o"
-	  )
+      if !add_flexdll_obj then
+	let f x = Filename.concat (Filename.dirname Sys.executable_name) x in
+	if !exe_mode then
+	  f (match !toolchain with
+	       | `MSVC -> "flexdll_msvc.obj"
+	       | `CYGWIN -> "flexdll_cygwin.o"
+	       | `MINGW -> "flexdll_mingw.o"
+	    )
 	  :: files
-      else files in
+	else 
+	  match !toolchain with
+	    | `MSVC -> f "flexdll_initer_msvc.obj" :: files
+	    | `CYGWIN -> files @ [ f "flexdll_initer_cygwin.o" ]
+	    | `MINGW -> files @ [ f "flexdll_initer_mingw.o" ]
+      else
+	files in
 
     if !dump then (
       List.iter
