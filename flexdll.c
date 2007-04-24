@@ -270,6 +270,10 @@ static void *find_symbol_global(void *data, const char *name) {
 
 void flexdll_relocate(void *tbl) {
   relocate_master(find_symbol_global, NULL, tbl);
+  if (error) { 
+    fprintf(stderr,"flexdll error: %s\n",flexdll_dlerror());
+    exit(1);
+  }
 }
 
 void *flexdll_dlopen(const char *file, int mode) {
@@ -306,7 +310,7 @@ void *flexdll_dlopen(const char *file, int mode) {
   if (mode & FLEXDLL_RTLD_GLOBAL) unit->global=1;
 
   if (exec) {
-    flexdll_relocate(ll_dlsym(handle, "reloctbl"));
+    relocate_master(find_symbol_global, NULL,ll_dlsym(handle, "reloctbl")); 
     if (error) { flexdll_dlclose(unit); return NULL; }
   }
 

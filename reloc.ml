@@ -32,12 +32,15 @@ let int32_to_buf b i =
   Buffer.add_char b (Char.chr ((i lsr 16) land 0xff));
   Buffer.add_char b (Char.chr ((i lsr 24) land 0xff))
 
+let exportable s = s <> "" && (s.[0] = '_'  || s.[0] = '?')
+
 let drop_underscore s =
-  if s.[0] <> '_' then
-    failwith (Printf.sprintf 
-		"Symbol %s doesn't start with underscore"
-		s);
-  String.sub s 1 (String.length s - 1)
+  assert (s <> "");
+  match s.[0] with
+    | '_' -> String.sub s 1 (String.length s - 1)
+    | '?' -> s
+    | _ -> Printf.sprintf "Symbol %s doesn't start with _ or ?" s
+
 
 let has_prefix pr s =
   String.length s > String.length pr && String.sub s 0 (String.length pr) = pr
@@ -284,7 +287,7 @@ let collect_dllexports obj =
 let exports accu obj =
   List.fold_left 
     (fun accu sym -> 
-       if Symbol.is_defin sym && sym.sym_name.[0] = '_' 
+       if Symbol.is_defin sym && exportable sym.sym_name
        then StrSet.add sym.sym_name accu
        else accu)
     accu obj.symbols
@@ -451,7 +454,7 @@ let build_dll link_exe output_file files exts extra_args =
        | (_,`Lib (_,l)) -> 
 	   exported := List.fold_left 
 	     (fun accu (s,_) -> 
-		if s.[0] = '_' then StrSet.add s accu
+		if exportable s then StrSet.add s accu
 		else accu
 	     ) !exported l
        | _ -> ()) files;
