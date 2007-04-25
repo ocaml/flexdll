@@ -366,7 +366,7 @@ let build_dll link_exe output_file files exts extra_args =
   let defined = ref StrSet.empty in
   let add_def s = defined := StrSet.add s !defined in
   if link_exe then add_def "_static_symtable"
-  else (add_def "_reloctbl"; add_def "_DllMainCRTStartup@12");
+  else add_def "_reloctbl"; (*add_def "_DllMainCRTStartup@12";*)
 
   let aliases = Hashtbl.create 16 in
   let rec normalize name =
@@ -694,7 +694,9 @@ let setup_toolchain () = match !toolchain with
 	    gcclib () ];
       default_libs := 
 	["-lmingw32"; "-lgcc"; "-lmoldname"; "-lmingwex"; "-lmsvcrt"; 
-	 "-luser32"; "-lkernel32"; "-ladvapi32"; "-lshell32" ]
+	 "-luser32"; "-lkernel32"; "-ladvapi32"; "-lshell32" ];
+      if !exe_mode then	default_libs := "crt2.o" :: !default_libs
+      else default_libs := "dllcrt2.o" :: !default_libs
 
 let compile_if_needed file =
   if Filename.check_suffix file ".c" then begin
@@ -744,7 +746,7 @@ let () =
   done;
   Arg.parse specs (fun x -> if x <> "" then files := x :: !files) usage_msg;
   if !output_file = "" && not !dump then 
-    (Printf.eprintf "Please specify an output file\n"; 
+    (Printf.eprintf "Please specify an output file (-help to get some usage information)\n"; 
      exit 1);
   try
     setup_toolchain ();
