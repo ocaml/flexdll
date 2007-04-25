@@ -268,16 +268,14 @@ static void *find_symbol_global(void *data, const char *name) {
   return NULL;
 }
 
-void flexdll_relocate(void *tbl) {
+int flexdll_relocate(void *tbl) {
   relocate_master(find_symbol_global, NULL, tbl);
-  if (error) { 
-    fprintf(stderr,"flexdll error: %s\n",flexdll_dlerror());
-    exit(1);
-  }
+  if (error) return 0;
+  return 1;
 }
 
 void *flexdll_dlopen(const char *file, int mode) {
-  static int inited  = 0;
+  static int inited = 0;
   void *handle;
   dlunit *unit;
 
@@ -288,13 +286,13 @@ void *flexdll_dlopen(const char *file, int mode) {
 
   if (!inited) {
     char s[256];
-    sprintf(s,"FLEXDLL=%08lx",&flexdll_relocate);
+    sprintf(s,"FLEXDLL_RELOCATE=%08lx",&flexdll_relocate);
     putenv(s);
     inited = 1;
   }
 
   handle = ll_dlopen(file, exec);
-  if (!handle) { error = 1; return NULL; }
+  if (!handle) { if (!error) error = 1; return NULL; }
 
   unit = units;
   while ((NULL != unit) && (unit->handle != handle)) unit = unit->next;
@@ -310,7 +308,9 @@ void *flexdll_dlopen(const char *file, int mode) {
   if (mode & FLEXDLL_RTLD_GLOBAL) unit->global=1;
 
   if (exec) {
-    relocate_master(find_symbol_global, NULL,ll_dlsym(handle, "reloctbl")); 
+    /* Relocation has already been done if the flexdll's DLL entry point
+       is used */
+    flexdll_relocate(ll_dlsym(handle, "reloctbl")); 
     if (error) { flexdll_dlclose(unit); return NULL; }
   }
 

@@ -20,14 +20,14 @@ flexdll_cygwin.o: flexdll.h flexdll.c
 flexdll_mingw.o: flexdll.h flexdll.c
 	$(MINCC) -c -o flexdll_mingw.o flexdll.c
 
-flexdll_initer_mingw.o: flexdll_initer.cpp
-	$(MINCC) -c -o flexdll_initer_mingw.o flexdll_initer.cpp
+flexdll_initer_mingw.o: flexdll_initer.c
+	$(MINCC) -c -o flexdll_initer_mingw.o flexdll_initer.c
 
-flexdll_initer_cygwin.o: flexdll_initer.cpp
-	$(CYGCC) -c -o flexdll_initer_cygwin.o flexdll_initer.cpp
+flexdll_initer_cygwin.o: flexdll_initer.c
+	$(CYGCC) -c -o flexdll_initer_cygwin.o flexdll_initer.c
 
-flexdll_initer_msvc.obj: flexdll_initer.cpp
-	$(MSVCC) -c /Fo"flexdll_initer_msvc.obj" flexdll_initer.cpp
+flexdll_initer_msvc.obj: flexdll_initer.c
+	$(MSVCC) -c /Fo"flexdll_initer_msvc.obj" flexdll_initer.c
 
 demo_msvc: flexlink.exe flexdll_msvc.obj
 	(cd test && $(MAKE) clean demo CHAIN=msvc CC="$(MSVCC)" O=obj)
@@ -49,7 +49,7 @@ package:
 	rm -Rf flexdll
 	mkdir flexdll
 	mkdir flexdll/test
-	cp -a *.c *.ml *.h Makefile LICENSE README flexdll/
+	cp -a *.c *.ml *.h *.cpp Makefile LICENSE README flexdll/
 	cp -aR test/Makefile test/*.c flexdll/test/
 	tar czf $(PACKAGE) flexdll
 	rm -Rf flexdll

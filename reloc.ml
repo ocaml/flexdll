@@ -363,8 +363,9 @@ let build_dll link_exe output_file files exts extra_args =
     collect (function (f,`Lib (x,[])) -> Some (f,x) | _ -> None) files in
 
   let defined = ref StrSet.empty in
-  if link_exe then defined := StrSet.add "_static_symtable" !defined
-  else defined := StrSet.add "_reloctbl" !defined;
+  let add_def s = defined := StrSet.add s !defined in
+  if link_exe then add_def "_static_symtable"
+  else (add_def "_reloctbl"; add_def "_DllMainCRTStartup@12");
 
   let aliases = Hashtbl.create 16 in
   let rec normalize name =
@@ -561,16 +562,16 @@ let build_dll link_exe output_file files exts extra_args =
 	let impexp = Filename.chop_suffix implib ".lib" ^ ".exp" in
 	temps := implib :: impexp :: !temps;
 	Printf.sprintf 
-	  "link /nologo %s%s %s /implib:%s /out:%s /defaultlib:msvcrt.lib %s %s%s"
+	  "link /nologo %s%s%s /implib:%s /out:%s /defaultlib:msvcrt.lib %s %s%s"
 	  (if !verbose >= 2 then "/verbose " else "")
-	  (if link_exe then "" else "/dll /export:symtbl /export:reloctbl ")
+	  (if link_exe then "" else "/dll /export:symtbl /export:reloctbl /entry:FlexDLLiniter@12 ")
 	  (mk_dirs_opt "/libpath:")
 	  (Filename.quote implib)
 	  (Filename.quote output_file) files extra_args quiet
     | `CYGWIN ->
 	Printf.sprintf
 	  "gcc %s -L. %s -o %s %s %s"
-	  (if link_exe then "" else "-shared ")
+	  (if link_exe then "" else "-shared -Wl,-e_FlexDLLiniter@12")
 	  (mk_dirs_opt "-I")
 	  (Filename.quote output_file)
 	  files
@@ -578,7 +579,7 @@ let build_dll link_exe output_file files exts extra_args =
     | `MINGW ->
 	Printf.sprintf
 	  "gcc -mno-cygwin %s -L. %s -o %s %s %s"
-	  (if link_exe then "" else "-shared ")
+	  (if link_exe then "" else "-shared -Wl,-e_FlexDLLiniter@12 ")
 	  (mk_dirs_opt "-I")
 	  (Filename.quote output_file)
 	  files
