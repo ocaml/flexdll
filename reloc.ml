@@ -19,6 +19,7 @@ let exe_mode = ref false
 let extra_args = ref []
 let dump = ref false
 let defexports = ref []
+let noentry = ref false
 
 let mk_dirs_opt pr = String.concat " " (List.map (fun s -> pr ^ (Filename.quote s)) !dirs)
 
@@ -562,24 +563,27 @@ let build_dll link_exe output_file files exts extra_args =
 	let impexp = Filename.chop_suffix implib ".lib" ^ ".exp" in
 	temps := implib :: impexp :: !temps;
 	Printf.sprintf 
-	  "link /nologo %s%s%s /implib:%s /out:%s /defaultlib:msvcrt.lib %s %s%s"
+	  "link /nologo %s%s%s%s /implib:%s /out:%s /defaultlib:msvcrt.lib %s %s%s"
 	  (if !verbose >= 2 then "/verbose " else "")
-	  (if link_exe then "" else "/dll /export:symtbl /export:reloctbl /entry:FlexDLLiniter@12 ")
+	  (if link_exe then "" else "/dll /export:symtbl /export:reloctbl ")
+	  (if link_exe || !noentry then "/noentry" else "/entry:FlexDLLiniter@12 ")
 	  (mk_dirs_opt "/libpath:")
 	  (Filename.quote implib)
 	  (Filename.quote output_file) files extra_args quiet
     | `CYGWIN ->
 	Printf.sprintf
-	  "gcc %s -L. %s -o %s %s %s"
-	  (if link_exe then "" else "-shared -Wl,-e_FlexDLLiniter@12")
+	  "gcc %s%s -L. %s -o %s %s %s"
+	  (if link_exe then "" else "-shared ")
+	  (if link_exe then "" else if !noentry then "-Wl,-e0" else "-Wl,-e_FlexDLLiniter@12 ")
 	  (mk_dirs_opt "-I")
 	  (Filename.quote output_file)
 	  files
 	  extra_args
     | `MINGW ->
 	Printf.sprintf
-	  "gcc -mno-cygwin %s -L. %s -o %s %s %s"
-	  (if link_exe then "" else "-shared -Wl,-e_FlexDLLiniter@12 ")
+	  "gcc -mno-cygwin %s%s -L. %s -o %s %s %s"
+	  (if link_exe then "" else "-shared ")
+	  (if link_exe then "" else if !noentry then "-Wl,-e0" else "-Wl,-e_FlexDLLiniter@12 ")
 	  (mk_dirs_opt "-I")
 	  (Filename.quote output_file)
 	  files
@@ -618,7 +622,10 @@ let specs = [
   " Link an executable (not a dll)";
 
   "-noflexdllobj", Arg.Clear add_flexdll_obj,
-  " Do not add the flexdll runtime object";
+  " Do not add the Flexdll runtime object (for exe)";
+
+  "-noentry", Arg.Set noentry,
+  " Do not use the Flexdll entry point (for dll)";
 
   "-I", Arg.String (fun dir -> dirs := dir :: !dirs),
   " Add a directory where to search for files";
@@ -748,24 +755,19 @@ let () =
       List.iter print_endline !default_libs;
     );
     let files = List.rev (List.map compile_if_needed !files) in
+    let f x = Filename.concat (Filename.dirname Sys.executable_name) x in
+    let tc = match !toolchain with
+      | `MSVC -> "msvc.obj"
+      | `CYGWIN -> "cygwin.o"
+      | `MINGW -> "mingw.o" in
     let files =
-      if !add_flexdll_obj then
-	let f x = Filename.concat (Filename.dirname Sys.executable_name) x in
-	if !exe_mode then
-	  f (match !toolchain with
-	       | `MSVC -> "flexdll_msvc.obj"
-	       | `CYGWIN -> "flexdll_cygwin.o"
-	       | `MINGW -> "flexdll_mingw.o"
-	    )
-	  :: files
-	else 
-	  match !toolchain with
-	    | `MSVC -> f "flexdll_initer_msvc.obj" :: files
-	    | `CYGWIN -> files @ [ f "flexdll_initer_cygwin.o" ]
-	    | `MINGW -> files @ [ f "flexdll_initer_mingw.o" ]
-      else
-	files in
-
+      if !exe_mode then
+	if !add_flexdll_obj then f ("flexdll_" ^ tc) :: files
+	else files
+      else 
+	if !noentry then files
+	else f ("flexdll_initer_" ^ tc) :: files
+    in
     if !dump then (
       List.iter
 	(fun fn -> 
