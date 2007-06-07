@@ -566,7 +566,7 @@ let build_dll link_exe output_file files exts extra_args =
 	  "link /nologo %s%s%s%s /implib:%s /out:%s /defaultlib:msvcrt.lib %s %s%s"
 	  (if !verbose >= 2 then "/verbose " else "")
 	  (if link_exe then "" else "/dll /export:symtbl /export:reloctbl ")
-	  (if link_exe || !noentry then "/noentry" else "/entry:FlexDLLiniter@12 ")
+	  (if link_exe then "" else if !noentry then "/noentry " else "/entry:FlexDLLiniter@12 ")
 	  (mk_dirs_opt "/libpath:")
 	  (Filename.quote implib)
 	  (Filename.quote output_file) files extra_args quiet
@@ -574,7 +574,7 @@ let build_dll link_exe output_file files exts extra_args =
 	Printf.sprintf
 	  "gcc %s%s -L. %s -o %s %s %s"
 	  (if link_exe then "" else "-shared ")
-	  (if link_exe then "" else if !noentry then "-Wl,-e0" else "-Wl,-e_FlexDLLiniter@12 ")
+	  (if link_exe then "" else if !noentry then "-Wl,-e0 " else "-Wl,-e_FlexDLLiniter@12 ")
 	  (mk_dirs_opt "-I")
 	  (Filename.quote output_file)
 	  files
@@ -583,7 +583,7 @@ let build_dll link_exe output_file files exts extra_args =
 	Printf.sprintf
 	  "gcc -mno-cygwin %s%s -L. %s -o %s %s %s"
 	  (if link_exe then "" else "-shared ")
-	  (if link_exe then "" else if !noentry then "-Wl,-e0" else "-Wl,-e_FlexDLLiniter@12 ")
+	  (if link_exe then "" else if !noentry then "-Wl,-e0 " else "-Wl,-e_FlexDLLiniter@12 ")
 	  (mk_dirs_opt "-I")
 	  (Filename.quote output_file)
 	  files
