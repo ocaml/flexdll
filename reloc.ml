@@ -27,6 +27,28 @@ let safe_remove s =
   try Sys.remove s
   with Sys_error _ -> ()
 
+(* Build @responsefile to work around Windows limitations on 
+   command-line length *)
+let build_diversion lst =
+  let (responsefile, oc) = Filename.open_temp_file "camlresp" "" in
+  List.iter
+    (fun f ->
+      if f <> "" then begin
+        output_string oc (Filename.quote f); output_char oc '\n'
+      end)
+    lst;
+  close_out oc;
+  temps := responsefile :: !temps;
+  "@" ^ responsefile
+
+let quote_files lst =
+  let s =
+    String.concat " "
+      (List.map (fun f -> if f = "" then f else Filename.quote f) lst) in
+  if String.length s >= 256
+  then build_diversion lst
+  else s
+
 let int32_to_buf b i =
   Buffer.add_char b (Char.chr (i land 0xff));
   Buffer.add_char b (Char.chr ((i lsr 8) land 0xff));
@@ -556,8 +578,7 @@ let build_dll link_exe output_file files exts extra_args =
 	 files
       )
     @ exts in
-  let files = List.map Filename.quote files in
-  let files = String.concat " " files in
+  let files = quote_files files in
   let quiet = if !verbose >= 1 then "" else ">NUL" in
 
   let cmd = match !toolchain with

@@ -1,6 +1,6 @@
 # Compilers
 
-MSVCC = cl /nologo /MD
+MSVCC = cl /nologo /MD -D_CRT_SECURE_NO_DEPRECATE
 CYGCC = gcc 
 MINCC = gcc -mno-cygwin
 OCAMLOPT = ocamlopt
