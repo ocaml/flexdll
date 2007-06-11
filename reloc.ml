@@ -20,6 +20,7 @@ let extra_args = ref []
 let dump = ref false
 let defexports = ref []
 let noentry = ref false
+let use_cygpath = ref true
 
 let mk_dirs_opt pr = String.concat " " (List.map (fun s -> pr ^ (Filename.quote s)) !dirs)
 
@@ -105,7 +106,7 @@ let gcclib () =
 
 let file_exists fn =
   if Sys.file_exists fn then Some fn
-  else if Sys.file_exists (fn ^ ".lnk") then 
+  else if !use_cygpath && Sys.file_exists (fn ^ ".lnk") then 
     Some (get_output1 (Printf.sprintf "cygpath -m %s" fn))
   else None
 
@@ -126,7 +127,7 @@ let find_file fn =
 	 ) (""::!search_path)) in
   match find_file_in l with
     | Some x -> Some x
-    | None -> find_file_in (cygpath l)
+    | None -> if !use_cygpath then find_file_in (cygpath l) else None
 
 
 let find_file =
@@ -690,6 +691,9 @@ let specs = [
   "-dump", Arg.Set dump,
   " Only dump the content of object files";
 
+  "-nocygpath", Arg.Clear use_cygpath,
+  " Do not use cygpath";
+
   "-merge-manifest", Arg.Set merge_manifest,
   " Merge manifest to the dll or exe";
 
@@ -781,7 +785,11 @@ let () =
      exit 1);
   try
     setup_toolchain ();
+
+    use_cygpath := !use_cygpath && (Sys.command "cygpath -v 2>NUL >NUL" = 0);
+
     if !verbose >= 2 then (
+      Printf.printf "** Use cygpath: %b\n" !use_cygpath;
       Printf.printf "** Search path:\n";
       List.iter print_endline !search_path;
       Printf.printf "** Default libraries:\n";

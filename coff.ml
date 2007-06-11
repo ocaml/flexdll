@@ -22,7 +22,9 @@ and section = {
   mutable sec_pos: int;
   sec_name: string;
   vsize: int32;
-  mutable data: [ `String of string | `Uninit of int ];
+  mutable data: 
+    [ `String of string | `Uninit of int 
+    | `Lazy of in_channel * int * int ];
   mutable relocs: reloc list;
   sec_opts: int32;
 }
@@ -122,6 +124,18 @@ let delayed_ptr oc f =
      patch_int32 oc bak (Int32.of_int (pos_out oc));
      f ()
   )
+
+let force_section_data sec =
+  match sec.data with
+    | `Lazy (ic,pos,len) ->
+	let r = `String (read ic pos len) in
+	sec.data <- r;
+	r
+    | x -> x
+
+let copy_data ic pos oc len =
+  (* TODO: bufferized copy when len > threshold *)
+  output_string oc (read ic pos len)
 
 (* Human readable pretty-printers *)
 
@@ -327,7 +341,8 @@ module Section = struct
 
     let data = 
       if int32_ buf 20 = 0 then `Uninit size
-      else `String (read ic (filebase + int32_ buf 20) size) in
+      else `Lazy (ic, filebase + int32_ buf 20, size) in
+(* `String (read ic (filebase + int32_ buf 20) size) in  *)
 (*    dump ic (filebase + int32_ buf 20) size 16; *)
 
     { sec_pos = (-1);
@@ -358,6 +373,9 @@ module Section = struct
       | `String s ->
 	  emit_int32 oc (Int32.of_int (String.length s));
 	  delayed_ptr oc (fun () -> output_string oc s)
+      | `Lazy (ic,pos,len) ->
+	  emit_int32 oc (Int32.of_int len);
+	  delayed_ptr oc (fun () -> copy_data ic pos oc len)
       | `Uninit len ->
 	  emit_int32 oc (Int32.of_int len);
 	  emit_int32 oc 0l; (fun () -> ())
@@ -418,9 +436,10 @@ module Coff = struct
   let directives obj =
     try 
       let sec = List.find (fun s -> s.sec_name = ".drectve") obj.sections in
-      match sec.data with
+      match force_section_data sec with
 	| `String s -> parse_directives s
 	| `Uninit _ -> []
+	| `Lazy _ -> assert false
     with Not_found -> []
 
   let get ic ofs base name =
@@ -663,7 +682,7 @@ module Lib = struct
       let r = 
 	if is_lib ic then `Lib (read_lib ic filename)
 	else let ofs = obj_ofs ic in `Obj (Coff.get ic ofs 0 filename) in
-      close_in ic;
+(*      close_in ic; *)  (* do not close: cf `Lazy *)
       r
     with exn ->
       close_in ic;
