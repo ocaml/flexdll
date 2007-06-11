@@ -466,7 +466,8 @@ let build_dll link_exe output_file files exts extra_args =
 *)
 
   let record_obj obj =
-    let fn = Filename.temp_file "dyndll" ".obj" in
+    let fn = Filename.temp_file "dyndll" 
+      (if !toolchain = `MSVC then ".obj" else ".o") in
     temps := fn :: !temps;
     let oc = open_out_bin fn in
     Coff.put oc obj;
@@ -545,10 +546,8 @@ let build_dll link_exe output_file files exts extra_args =
   add_export_table obj (StrSet.elements !exported) 
     (if link_exe then "_static_symtable" else "_symtbl");
   if not link_exe then add_master_reloc_table obj !reloctbls "_reloctbl";
-  let descr = record_obj obj in
-
+  let descr = Filename.quote (record_obj obj) in
   let files = 
-    descr ::
     List.flatten
       (List.map
 	 (fun (fn,_) ->
@@ -563,33 +562,40 @@ let build_dll link_exe output_file files exts extra_args =
 
   let cmd = match !toolchain with
     | `MSVC ->
+	(* Putting the file the descriptor object at the beginning
+	   with MSVC compilers seems to break Stack overflow recovery 
+	   in OCaml. No idea why. *)
+
 	let implib = Filename.temp_file "dyndll_implib" ".lib" in
 	let impexp = Filename.chop_suffix implib ".lib" ^ ".exp" in
 	temps := implib :: impexp :: !temps;
 	Printf.sprintf 
-	  "link /nologo %s%s%s%s /implib:%s /out:%s /defaultlib:msvcrt.lib %s %s%s"
+	  "link /nologo %s%s%s%s /implib:%s /out:%s /defaultlib:msvcrt.lib %s %s %s%s"
 	  (if !verbose >= 2 then "/verbose " else "")
 	  (if link_exe then "" else "/dll /export:symtbl /export:reloctbl ")
 	  (if link_exe then "" else if !noentry then "/noentry " else "/entry:FlexDLLiniter@12 ")
 	  (mk_dirs_opt "/libpath:")
 	  (Filename.quote implib)
-	  (Filename.quote output_file) files extra_args quiet
+	  (Filename.quote output_file) files descr
+	  extra_args quiet
     | `CYGWIN ->
 	Printf.sprintf
-	  "gcc %s%s -L. %s -o %s %s %s"
+	  "gcc %s%s -L. %s -o %s %s %s %s"
 	  (if link_exe then "" else "-shared ")
 	  (if link_exe then "" else if !noentry then "-Wl,-e0 " else "-Wl,-e_FlexDLLiniter@12 ")
 	  (mk_dirs_opt "-I")
 	  (Filename.quote output_file)
+	  descr
 	  files
 	  extra_args
     | `MINGW ->
 	Printf.sprintf
-	  "gcc -mno-cygwin %s%s -L. %s -o %s %s %s"
+	  "gcc -mno-cygwin %s%s -L. %s -o %s %s %s %s"
 	  (if link_exe then "" else "-shared ")
 	  (if link_exe then "" else if !noentry then "-Wl,-e0 " else "-Wl,-e_FlexDLLiniter@12 ")
 	  (mk_dirs_opt "-I")
 	  (Filename.quote output_file)
+	  descr
 	  files
 	  extra_args
   in

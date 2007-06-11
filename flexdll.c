@@ -275,21 +275,17 @@ int flexdll_relocate(void *tbl) {
 }
 
 void *flexdll_dlopen(const char *file, int mode) {
-  static int inited = 0;
   void *handle;
   dlunit *unit;
+  char flexdll_relocate_env[256];
 
   int exec = (mode & FLEXDLL_RTLD_NOEXEC ? 0 : 1);
   
   error = 0;
   if (!file) return &main_unit;
 
-  if (!inited) {
-    char s[256];
-    sprintf(s,"FLEXDLL_RELOCATE=%08lx",&flexdll_relocate);
-    putenv(s);
-    inited = 1;
-  }
+  sprintf(flexdll_relocate_env,"FLEXDLL_RELOCATE=%08lx",&flexdll_relocate);
+  putenv(flexdll_relocate_env);
 
   handle = ll_dlopen(file, exec);
   if (!handle) { if (!error) error = 1; return NULL; }

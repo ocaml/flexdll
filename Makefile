@@ -49,7 +49,7 @@ package:
 	rm -Rf flexdll
 	mkdir flexdll
 	mkdir flexdll/test
-	cp -a *.c *.ml *.h *.cpp Makefile LICENSE README flexdll/
+	cp -a *.c *.ml *.h Makefile LICENSE README flexdll/
 	cp -aR test/Makefile test/*.c flexdll/test/
 	tar czf $(PACKAGE) flexdll
 	rm -Rf flexdll
