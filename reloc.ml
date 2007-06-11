@@ -366,7 +366,7 @@ let build_dll link_exe output_file files exts extra_args =
   let defined = ref StrSet.empty in
   let add_def s = defined := StrSet.add s !defined in
   if link_exe then add_def "_static_symtable"
-  else add_def "_reloctbl"; (*add_def "_DllMainCRTStartup@12";*)
+  else add_def "_reloctbl";
 
   let aliases = Hashtbl.create 16 in
   let rec normalize name =
@@ -451,6 +451,9 @@ let build_dll link_exe output_file files exts extra_args =
   List.iter (fun s -> exported := StrSet.add ("_" ^ s) !exported) !defexports;
 
   (* re-export symbols imported from implibs *)
+  (* disabled: symbols may be undefined in the DLL! that would
+     raise an error at startup *)
+(*
   List.iter 
     (function 
        | (_,`Lib (_,l)) -> 
@@ -460,6 +463,7 @@ let build_dll link_exe output_file files exts extra_args =
 		else accu
 	     ) !exported l
        | _ -> ()) files;
+*)
 
   let record_obj obj =
     let fn = Filename.temp_file "dyndll" ".obj" in
@@ -596,7 +600,7 @@ let build_dll link_exe output_file files exts extra_args =
     safe_remove manifest_file;
     (if Sys.command cmd <> 0 then failwith "Error during linking\n");
 
-    if Sys.file_exists manifest_file then begin
+    if !merge_manifest && Sys.file_exists manifest_file then begin
       let mcmd =
 	Printf.sprintf "mt -nologo -outputresource:%s -manifest %s" 
 	  (Filename.quote (if link_exe then output_file
