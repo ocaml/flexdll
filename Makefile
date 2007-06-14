@@ -59,7 +59,7 @@ clean:
 
 ## Packaging
 
-COMMON_FILES = LICENSE README flexdll.h
+COMMON_FILES = LICENSE README CHANGES flexdll.h
 URL = frisch.fr:www/flexdll/
 
 # Source packages
@@ -76,7 +76,7 @@ package_src:
 	rm -Rf flexdll
 
 upload:
-	scp $(PACKAGE) $(URL)
+	scp $(PACKAGE) CHANGES $(URL)
 
 upload_dev:
 	$(MAKE) VERSION=dev upload_src
