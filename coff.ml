@@ -1,3 +1,7 @@
+(* This module implements a reader/writer for COFF object files
+   and libraries *)
+
+
 (* Internal representation of COFF object files *)
 
 type symbol = {
@@ -323,7 +327,6 @@ module Section = struct
       then strtbl (int_of_string (strz buf 1 ~max:7 '\000'))
       else strz buf 0 ~max:8 '\000'
     in
-(*    Printf.printf "SECTION %s, data at 0x%08lx, size %i, vsize = %i\n" name (int32 buf 20) size (int32_ buf 8); *)
     let va = int32 buf 12 in
 
     if (int32 buf 36 &&& 0x01000000l <> 0l) 
@@ -342,8 +345,7 @@ module Section = struct
     let data = 
       if int32_ buf 20 = 0 then `Uninit size
       else `Lazy (ic, filebase + int32_ buf 20, size) in
-(* `String (read ic (filebase + int32_ buf 20) size) in  *)
-(*    dump ic (filebase + int32_ buf 20) size 16; *)
+    (* `String (read ic (filebase + int32_ buf 20) size) in  *)
 
     { sec_pos = (-1);
       sec_name = name;
