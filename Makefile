@@ -76,7 +76,7 @@ package_src:
 	rm -Rf flexdll
 
 upload:
-	scp $(PACKAGE) CHANGES $(URL)
+	rsync $(PACKAGE) CHANGES $(URL)
 
 upload_dev:
 	$(MAKE) VERSION=dev upload_src
@@ -94,6 +94,6 @@ package_bin:
 	    flexlink.exe flexdll.h flexdll_*.obj flexdll_*.o
 
 upload_bin: package_bin
-	scp $(PACKAGE_BIN) $(URL)
+	rsync $(PACKAGE_BIN) $(URL)
 
 include $(shell ocamlopt -where)/Makefile.config

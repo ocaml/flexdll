@@ -1,5 +1,13 @@
+(************************************************************************)
+(*   FlexDLL                                                            *)
+(*   Alain Frisch                                                       *)
+(*                                                                      *)
+(*   Copyright 2007 Institut National de Recherche en Informatique et   *)
+(*   en Automatique.                                                    *)
+(************************************************************************)
+
 (* This module implements a reader/writer for COFF object files
-   and libraries *)
+   and libraries. *)
 
 
 (* Internal representation of COFF object files *)

@@ -1,3 +1,15 @@
+(************************************************************************)
+(*   FlexDLL                                                            *)
+(*   Alain Frisch                                                       *)
+(*                                                                      *)
+(*   Copyright 2007 Institut National de Recherche en Informatique et   *)
+(*   en Automatique.                                                    *)
+(************************************************************************)
+
+(* The main application: parse the command line, parse COFF files, 
+   compute relocation and export tables, rewrite some COFF files,
+   call the native linker *)
+
 open Coff
 
 let toolchain = ref `MSVC
