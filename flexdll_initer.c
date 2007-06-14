@@ -1,3 +1,19 @@
+/*****************************************************************
+   FlexDLL
+   Alain Frisch
+
+   Copyright 2007 Institut National de Recherche en Informatique et 
+   en Automatique.
+
+******************************************************************/
+
+/* Custom entry point to perform relocations before the real
+   entry point is called */
+
+/* The adress of the flexdll_relocate function is passed in an
+   environment variable. This is ugly, but I couldn't find a cleaner
+   solution. Let me know if you have some idea! */
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <windows.h>
