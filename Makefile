@@ -59,7 +59,7 @@ clean:
 
 ## Packaging
 
-COMMON_FILES = LICENSE README CHANGES flexdll.h
+COMMON_FILES = LICENSE README CHANGES flexdll.h flexdll.c flexdll_initer.c
 URL = frisch.fr:www/flexdll/
 
 # Source packages
@@ -70,7 +70,7 @@ package_src:
 	rm -Rf flexdll
 	mkdir flexdll
 	mkdir flexdll/test
-	cp -a *.c *.ml Makefile $(COMMON_FILES) flexdll/
+	cp -a *.ml Makefile $(COMMON_FILES) flexdll/
 	cp -aR test/Makefile test/*.c flexdll/test/
 	tar czf $(PACKAGE) flexdll
 	rm -Rf flexdll
@@ -97,3 +97,6 @@ upload_bin: package_bin
 	rsync $(PACKAGE_BIN) $(URL)
 
 include $(shell ocamlopt -where)/Makefile.config
+
+show_toolchain:
+	@echo Toolchain for the visible ocamlopt: $(TOOLCHAIN)
