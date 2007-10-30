@@ -96,7 +96,7 @@ package_bin:
 upload_bin: package_bin
 	rsync $(PACKAGE_BIN) $(URL)
 
-include $(shell ocamlopt -where)/Makefile.config
-
-show_toolchain:
-	@echo Toolchain for the visible ocamlopt: $(TOOLCHAIN)
+#include $(shell ocamlopt -where)/Makefile.config
+#
+#show_toolchain:
+#	@echo Toolchain for the visible ocamlopt: $(TOOLCHAIN)
