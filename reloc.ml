@@ -27,7 +27,7 @@ let add_flexdll_obj = ref true
 let files = ref []
 let exts = ref []
 let output_file = ref ""
-let exe_mode = ref false
+let exe_mode : [`DLL | `EXE | `MAINDLL] ref = ref `DLL
 let extra_args = ref []
 let dump_mode = ref false
 let defexports = ref []
@@ -59,7 +59,7 @@ let quote_files lst =
   let s =
     String.concat " "
       (List.map (fun f -> if f = "" then f else Filename.quote f) lst) in
-  if String.length s >= 256
+  if String.length s >= 8192
   then build_diversion lst
   else s
 
@@ -375,6 +375,8 @@ let dll_exports fn = match !toolchain with
 
 
 let build_dll link_exe output_file files exts extra_args =
+  let main_pgm = link_exe <> `DLL in
+
   (* fully resolve filenames, eliminate duplicates *)
   let _,files =
     List.fold_left (fun (seen,accu) fn ->
@@ -401,7 +403,7 @@ let build_dll link_exe output_file files exts extra_args =
 
   let defined = ref StrSet.empty in
   let add_def s = defined := StrSet.add s !defined in
-  if link_exe then add_def "_static_symtable"
+  if main_pgm then add_def "_static_symtable"
   else add_def "_reloctbl";
 
   let aliases = Hashtbl.create 16 in
@@ -521,7 +523,7 @@ let build_dll link_exe output_file files exts extra_args =
     add_reloc_table obj (fun s -> StrSet.mem s.sym_name imps) reloctbl in
 
   let error_imports name imps =
-    if link_exe then
+    if main_pgm then
       failwith (Printf.sprintf "Cannot resolve symbols for %s:\n %s\n"
 		  name
 		  (String.concat "\n " (StrSet.elements imps))) in
@@ -580,8 +582,8 @@ let build_dll link_exe output_file files exts extra_args =
   end;
 
   add_export_table obj (StrSet.elements !exported)
-    (if link_exe then "_static_symtable" else "_symtbl");
-  if not link_exe then add_master_reloc_table obj !reloctbls "_reloctbl";
+    (if main_pgm then "_static_symtable" else "_symtbl");
+  if not main_pgm then add_master_reloc_table obj !reloctbls "_reloctbl";
   let descr = Filename.quote (record_obj obj) in
   let files =
     List.flatten
@@ -605,10 +607,11 @@ let build_dll link_exe output_file files exts extra_args =
 	let impexp = Filename.chop_suffix implib ".lib" ^ ".exp" in
 	temps := implib :: impexp :: !temps;
 	Printf.sprintf
-	  "link /nologo %s%s%s%s /implib:%s /out:%s /defaultlib:msvcrt.lib %s %s %s%s"
+	  "link /nologo %s%s%s%s%s /implib:%s /out:%s /defaultlib:msvcrt.lib %s %s %s%s"
 	  (if !verbose >= 2 then "/verbose " else "")
-	  (if link_exe then "" else "/dll /export:symtbl /export:reloctbl ")
-	  (if link_exe then "" else if !noentry then "/noentry " else "/entry:FlexDLLiniter@12 ")
+          (if link_exe = `EXE then "" else "/dll ")
+	  (if main_pgm then "" else "/export:symtbl /export:reloctbl ")
+	  (if main_pgm then "" else if !noentry then "/noentry " else "/entry:FlexDLLiniter@12 ")
 	  (mk_dirs_opt "/libpath:")
 	  (Filename.quote implib)
 	  (Filename.quote output_file) files descr
@@ -616,8 +619,8 @@ let build_dll link_exe output_file files exts extra_args =
     | `CYGWIN ->
 	Printf.sprintf
 	  "gcc %s%s -L. %s %s -o %s %s %s %s"
-	  (if link_exe then "" else "-shared ")
-	  (if link_exe then "" else if !noentry then "-Wl,-e0 " else "-Wl,-e_FlexDLLiniter@12 ")
+	  (if link_exe = `EXE then "" else "-shared ")
+	  (if main_pgm then "" else if !noentry then "-Wl,-e0 " else "-Wl,-e_FlexDLLiniter@12 ")
 	  (mk_dirs_opt "-I")
 	  (mk_dirs_opt "-L")
 	  (Filename.quote output_file)
@@ -627,8 +630,8 @@ let build_dll link_exe output_file files exts extra_args =
     | `MINGW ->
 	Printf.sprintf
 	  "gcc -mno-cygwin %s%s -L. %s %s -o %s %s %s %s"
-	  (if link_exe then "" else "-shared ")
-	  (if link_exe then "" else if !noentry then "-Wl,-e0 " else "-Wl,-e_FlexDLLiniter@12 ")
+	  (if link_exe = `EXE then "" else "-shared ")
+	  (if main_pgm then "" else if !noentry then "-Wl,-e0 " else "-Wl,-e_FlexDLLiniter@12 ")
 	  (mk_dirs_opt "-I")
 	  (mk_dirs_opt "-L")
 	  (Filename.quote output_file)
@@ -646,7 +649,7 @@ let build_dll link_exe output_file files exts extra_args =
     if !merge_manifest && Sys.file_exists manifest_file then begin
       let mcmd =
 	Printf.sprintf "mt -nologo -outputresource:%s -manifest %s"
-	  (Filename.quote (if link_exe then output_file
+	  (Filename.quote (if link_exe = `EXE then output_file
 			   else output_file ^ ";#2"))
 	  (Filename.quote manifest_file)
       in
@@ -665,8 +668,11 @@ let specs = [
   "-o", Arg.Set_string output_file,
   " Choose the name of the output file";
 
-  "-exe", Arg.Set exe_mode,
-  " Link an executable (not a dll)";
+  "-exe", Arg.Unit (fun () -> exe_mode := `EXE),
+  " Link the main program as an exe file";
+
+  "-maindll", Arg.Unit (fun () -> exe_mode := `MAINDLL),
+  " Link the main program as a dll file";
 
   "-noflexdllobj", Arg.Clear add_flexdll_obj,
   " Do not add the Flexdll runtime object (for exe)";
@@ -761,7 +767,7 @@ let setup_toolchain () = match !toolchain with
       default_libs :=
 	["-lmingw32"; "-lgcc"; "-lmoldname"; "-lmingwex"; "-lmsvcrt";
 	 "-luser32"; "-lkernel32"; "-ladvapi32"; "-lshell32" ];
-      if !exe_mode then	default_libs := "crt2.o" :: !default_libs
+      if !exe_mode = `EXE then default_libs := "crt2.o" :: !default_libs
       else default_libs := "dllcrt2.o" :: !default_libs
 
 let compile_if_needed file =
@@ -857,7 +863,7 @@ let all_files () =
   | `MSVC -> "msvc.obj"
   | `CYGWIN -> "cygwin.o"
   | `MINGW -> "mingw.o" in
-  if !exe_mode then
+  if !exe_mode <> `DLL then
     if !add_flexdll_obj then f ("flexdll_" ^ tc) :: files
     else files
   else
