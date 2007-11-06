@@ -62,7 +62,7 @@ clean:
 ## Packaging
 
 COMMON_FILES = LICENSE README CHANGES flexdll.h flexdll.c flexdll_initer.c
-URL = frisch.fr:www/flexdll/
+URL = frisch@frisch.fr:www/flexdll/
 
 # Source packages
 
