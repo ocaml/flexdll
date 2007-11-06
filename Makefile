@@ -1,4 +1,8 @@
-VERSION = 0.1
+VERSION = 0.2
+all: flexlink.exe support
+
+version.ml:
+	echo "let version = \"$(VERSION)\"" > version.ml
 
 # Supported tool-chains
 
@@ -12,8 +16,6 @@ CYGCC = gcc
 MINCC = gcc -mno-cygwin
 OCAMLOPT = ocamlopt
 
-all: flexlink.exe support
-
 support:
 	for i in $(CHAINS); do $(MAKE) build_$$i ; done 
 
@@ -21,9 +23,9 @@ build_msvc: flexdll_msvc.obj flexdll_initer_msvc.obj
 build_cygwin: flexdll_cygwin.o flexdll_initer_cygwin.o 
 build_mingw: flexdll_mingw.o flexdll_initer_mingw.o 
 
-flexlink.exe: reloc.ml coff.ml
+flexlink.exe: version.ml reloc.ml coff.ml
 	@echo Building flexlink.exe with TOOLCHAIN=$(TOOLCHAIN)
-	$(OCAMLOPT) -o flexlink.exe coff.ml reloc.ml
+	$(OCAMLOPT) -o flexlink.exe version.ml coff.ml reloc.ml
 
 flexdll_msvc.obj: flexdll.h flexdll.c
 	$(MSVCC) -c /Fo"flexdll_msvc.obj" flexdll.c
@@ -96,7 +98,7 @@ package_bin:
 upload_bin: package_bin
 	rsync $(PACKAGE_BIN) $(URL)
 
-#include $(shell ocamlopt -where)/Makefile.config
-#
-#show_toolchain:
-#	@echo Toolchain for the visible ocamlopt: $(TOOLCHAIN)
+include $(shell cygpath -ad "$(shell ocamlopt -where)/Makefile.config")
+
+show_toolchain:
+	@echo Toolchain for the visible ocamlopt: $(TOOLCHAIN)

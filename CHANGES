@@ -1,2 +1,11 @@
+Version 0.2, released on 2007-11-06
+ - New -maindll option (to build a DLL that contains the "main program" 
+   from FlexDLL's point of view) 
+ - Can now explicitly enable/disable the use of cygpath (on by default
+   only for Cygwin)
+ - New -L xxx (or -Lxxx) option
+ - New -where option
+ - FLEXDIR environment variable (where to look for FlexDLL's .obj files)
+
 Version 0.1, released on 2007-06-14
  - Initial release

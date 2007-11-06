@@ -663,7 +663,10 @@ let build_dll link_exe output_file files exts extra_args =
 
 
 let usage_msg =
-  "flexlink -o <result.dll> file1.obj file2.obj ... -- <extra linker arguments>"
+  Printf.sprintf
+    "FlexDLL version %s\n\nUsage:\n  flexlink -o <result.dll> file1.obj file2.obj ... -- <extra linker arguments>\n"
+    Version.version
+
 let specs = [
   "-o", Arg.Set_string output_file,
   " Choose the name of the output file";
@@ -717,7 +720,7 @@ let specs = [
 
   "-dump", Arg.Set dump_mode,
   " Only dump the content of object files";
- 
+
   "-nocygpath", Arg.Unit (fun () -> cygpath_arg := `No),
   " Do not use cygpath (default for msvc, mingw)";
 
@@ -730,7 +733,7 @@ let specs = [
   "-export", Arg.String (fun s -> defexports := s :: !defexports),
   "<sym> Explicitly export a symbol";
 
-  "-where", Arg.Unit 
+  "-where", Arg.Unit
     (fun () ->
       print_endline (Filename.dirname Sys.argv.(0));
       exit 0
@@ -876,7 +879,7 @@ let () =
     parse_cmdline ();
     setup_toolchain ();
 
-    use_cygpath := 
+    use_cygpath :=
       begin
         match !toolchain, !cygpath_arg with
         | _, `Yes -> true
