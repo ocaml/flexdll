@@ -405,9 +405,13 @@ module Section = struct
 end
 
 module Coff = struct
-  let empty () =
+  let empty x64 =
+    let machine =
+      if x64 then 0x8664 (* amd64 *)
+      else 0x14c (* x86 *)
+    in
     { obj_name = "generated";
-      machine = 0x14c; date = 0x4603de0el; 
+      machine = machine; date = 0x4603de0el; 
       sections = []; symbols = []; opts = 0 }
 
   let parse_directives s =

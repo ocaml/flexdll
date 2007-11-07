@@ -12,6 +12,11 @@
 
 open Coff
 
+let underscore = ref true
+    (* Are "normal" symbols prefixed with an underscore? *)
+
+let x64 = ref false
+
 let toolchain = ref `MSVC
 let save_temps = ref false
 let show_exports = ref false
@@ -376,6 +381,7 @@ let dll_exports fn = match !toolchain with
 
 let build_dll link_exe output_file files exts extra_args =
   let main_pgm = link_exe <> `DLL in
+  let usym s = if !underscore then "_" ^ s else s in
 
   (* fully resolve filenames, eliminate duplicates *)
   let _,files =
@@ -403,8 +409,8 @@ let build_dll link_exe output_file files exts extra_args =
 
   let defined = ref StrSet.empty in
   let add_def s = defined := StrSet.add s !defined in
-  if main_pgm then add_def "_static_symtable"
-  else add_def "_reloctbl";
+  if main_pgm then add_def (usym "static_symtable")
+  else add_def (usym "reloctbl");
 
   let aliases = Hashtbl.create 16 in
   let rec normalize name =
@@ -436,7 +442,7 @@ let build_dll link_exe output_file files exts extra_args =
     List.iter
       (fun sym ->
 	 if Symbol.is_defin sym
-	 then defined := StrSet.add sym.sym_name !defined;
+	 then add_def sym.sym_name
       )
       obj.symbols
   and collect_file fn =
@@ -449,9 +455,11 @@ let build_dll link_exe output_file files exts extra_args =
 	List.iter (fun (_,obj) -> collect_defined_obj obj) objs;
 	List.iter
 	  (fun (s,_) ->
-	     if !verbose >= 2 then
+	    if !verbose >= 2 then
 	       Printf.printf "import symbol %s\n" s;
-	     defined := StrSet.add s (StrSet.add ("__imp_" ^ s) !defined))
+            add_def s;
+	    add_def ("__imp_" ^ s)
+          )
 	  imports
   in
   List.iter (fun (_,x) -> collect_defined x) files;
@@ -486,7 +494,7 @@ let build_dll link_exe output_file files exts extra_args =
   let reloctbls = ref [] in
   let exported = ref StrSet.empty in
 
-  List.iter (fun s -> exported := StrSet.add ("_" ^ s) !exported) !defexports;
+  List.iter (fun s -> exported := StrSet.add (usym s) !exported) !defexports;
 
   (* re-export symbols imported from implibs *)
   (* disabled: symbols may be undefined in the DLL! that would
@@ -536,7 +544,11 @@ let build_dll link_exe output_file files exts extra_args =
   let rec link_obj obj =
     exported := exports !exported obj;
     StrSet.iter
-      (fun s -> try link_libobj (Hashtbl.find defined_in s) with Not_found->())
+      (fun s -> 
+        try
+          let (libname, objname, _) as o = Hashtbl.find defined_in s in
+          link_libobj o
+        with Not_found -> ())
       (needed obj)
   and link_libobj (libname,objname,obj) =
     if Hashtbl.mem libobjects (libname,objname) then ()
@@ -574,7 +586,7 @@ let build_dll link_exe output_file files exts extra_args =
   );
 
   (* Create the descriptor object *)
-  let obj = Coff.empty () in
+  let obj = Coff.empty !x64 in
 
   if not (StrSet.is_empty !imported) then begin
     add_import_table obj (StrSet.elements !imported);
@@ -582,8 +594,8 @@ let build_dll link_exe output_file files exts extra_args =
   end;
 
   add_export_table obj (StrSet.elements !exported)
-    (if main_pgm then "_static_symtable" else "_symtbl");
-  if not main_pgm then add_master_reloc_table obj !reloctbls "_reloctbl";
+    (usym (if main_pgm then "static_symtable" else "symtbl"));
+  if not main_pgm then add_master_reloc_table obj !reloctbls (usym "reloctbl");
   let descr = Filename.quote (record_obj obj) in
   let files =
     List.flatten
@@ -739,6 +751,12 @@ let specs = [
       exit 0
     ),
   " Show the FlexDLL directory";
+
+  "-nounderscore", Arg.Clear underscore,
+  " Normal symbols are not prefixed with an underscore";
+
+  "-x64", Arg.Unit (fun () -> x64 := true; underscore := false),
+  " x86_64 mode";
 
   "--", Arg.Rest (fun s -> extra_args := s :: !extra_args),
   " Introduce extra linker arguments";

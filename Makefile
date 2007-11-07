@@ -54,6 +54,9 @@ demo_cygwin: flexlink.exe flexdll_cygwin.o
 demo_mingw: flexlink.exe flexdll_mingw.o
 	(cd test && $(MAKE) clean demo CHAIN=mingw CC="$(MINCC)" O=o)
 
+demo_msvc64:  flexlink.exe flexdll_msvc.obj
+	(cd test && $(MAKE) clean demo CHAIN=msvc CC="$(MSVCC)" O=obj EXTRA_OPTS="-x64 bufferoverflowu.lib")
+
 clean:
 	rm -f *.obj *.o *.lib *.a *.exe *.cmx *.dll *.manifest *.exp *.cmi *~
 	cd test && $(MAKE) clean
