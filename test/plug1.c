@@ -1,4 +1,4 @@
-int x = 3;
-void dump_x() { printf("x=%i\n", x); }
+int x = 10;
+void dump_x() { printf("AAA\nx=%i\n", x); }
 void torun() { api("plug1.torun();"); }
 
