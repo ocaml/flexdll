@@ -15,7 +15,7 @@ open Coff
 let underscore = ref true
     (* Are "normal" symbols prefixed with an underscore? *)
 
-let x64 = ref false
+let machine : [ `x86 | `x64 ] ref = ref `x86
 
 let toolchain = ref `MSVC
 let save_temps = ref false
@@ -74,14 +74,32 @@ let int32_to_buf b i =
   Buffer.add_char b (Char.chr ((i lsr 16) land 0xff));
   Buffer.add_char b (Char.chr ((i lsr 24) land 0xff))
 
-let exportable s = s <> "" && (s.[0] = '_'  || s.[0] = '?')
+let int_to_buf b i =
+  match !machine with
+  | `x86 -> int32_to_buf b i
+  | `x64 -> int32_to_buf b i; int32_to_buf b 0
+
+
+let exportable s =
+  match !machine with
+  | `x86 ->
+      s <> "" && (s.[0] = '_'  || s.[0] = '?')
+  | `x64 ->
+      if String.length s > 2 && s.[0] = '?' && s.[1] = '?' then false
+      else true
 
 let drop_underscore s =
-  assert (s <> "");
-  match s.[0] with
-    | '_' -> String.sub s 1 (String.length s - 1)
-    | '?' -> s
-    | _ -> Printf.sprintf "Symbol %s doesn't start with _ or ?" s
+  match !machine with
+  | `x86 ->
+      assert (s <> "");
+      begin
+        match s.[0] with
+        | '_' -> String.sub s 1 (String.length s - 1)
+        | '?' -> s
+        | _ -> failwith (Printf.sprintf "Symbol %s doesn't start with _ or ?" s)
+      end
+  | `x64 ->
+      s
 
 
 let has_prefix pr s =
@@ -183,23 +201,31 @@ let add_reloc_table x p sname =
   let strsym = Symbol.intern sect 0l in
   let str_pos = Hashtbl.create 16 in
 
-  Reloc.abs sect 0l nonwrsym;
-  int32_to_buf data 0;
+  Reloc.abs !machine sect 0l nonwrsym;
+  int_to_buf data 0;
 
   (* TODO: use a single symbol per section *)
   let syms = ref [] in
   let reloc sec secsym min max rel =
     if p rel.symbol then (
       (* kind *)
-      let kind = match rel.rtype with
-	| 0x06 -> 0x0002 (* absolute *)
-	| 0x14 -> 0x0001 (* relative *)
-	| k    -> failwith (Printf.sprintf "Unsupported relocated kind %04x" k)
+      let kind = match !machine, rel.rtype with
+	| `x86, 0x06 -> 0x0002 (* absolute *)
+	| `x86, 0x14 | `x64, 0x04 -> 0x0001 (* relative *)
+        | `x64, 0x08 -> 0x0003 (* rel32_4 *)
+	| _, k  ->
+            let msg = 
+              Printf.sprintf "Unsupported relocated kind %04x for %s" 
+                k rel.symbol.sym_name
+            in
+            failwith msg
+(*            Printf.eprintf "%s\n" msg;
+            0x0001 *)
       in
-      int32_to_buf data kind;
+      int_to_buf data kind;
 
       (* name *)
-      let name = drop_underscore (rel.symbol.sym_name) in
+      let name = drop_underscore rel.symbol.sym_name in
       let pos =
 	try Hashtbl.find str_pos name
 	with Not_found ->
@@ -209,12 +235,12 @@ let add_reloc_table x p sname =
 	  Buffer.add_char strings '\000';
 	  pos
       in
-      Reloc.abs sect (Int32.of_int (Buffer.length data)) strsym;
-      int32_to_buf data pos;
+      Reloc.abs !machine sect (Int32.of_int (Buffer.length data)) strsym;
+      int_to_buf data pos;
 
-      Reloc.abs sect (Int32.of_int (Buffer.length data))
+      Reloc.abs !machine sect (Int32.of_int (Buffer.length data))
 	(Lazy.force secsym);
-      int32_to_buf data (Int32.to_int rel.addr);
+      int_to_buf data (Int32.to_int rel.addr);
 
       if rel.addr <= !min then min := rel.addr;
       if rel.addr >= !max then max := rel.addr;
@@ -232,21 +258,21 @@ let add_reloc_table x p sname =
       nonwr := (!min,!max,Lazy.force sym) :: !nonwr
   in
   List.iter section x.sections;
-  int32_to_buf data 0;
+  int_to_buf data 0;
   strsym.value <- Int32.of_int (Buffer.length data);
   Buffer.add_buffer data strings;
   nonwrsym.value <- Int32.of_int (Buffer.length data);
   List.iter
     (fun (min,max,secsym) ->
-      Reloc.abs sect (Int32.of_int (Buffer.length data)) secsym;
-      int32_to_buf data (Int32.to_int min);
-      Reloc.abs sect (Int32.of_int (Buffer.length data)) secsym;
-      int32_to_buf data (Int32.to_int  max);
-      int32_to_buf data 0;
+      Reloc.abs !machine sect (Int32.of_int (Buffer.length data)) secsym;
+      int_to_buf data (Int32.to_int min);
+      Reloc.abs !machine sect (Int32.of_int (Buffer.length data)) secsym;
+      int_to_buf data (Int32.to_int  max);
+      int_to_buf data 0;
     )
     !nonwr;
-  int32_to_buf data 0;
-  int32_to_buf data 0;
+  int_to_buf data 0;
+  int_to_buf data 0;
   sect.data <- `String (Buffer.contents data);
   x.sections <- sect :: x.sections;
   x.symbols <-
@@ -268,7 +294,7 @@ let add_import_table obj imports =
 	  obj.symbols <-
 	    sym :: Symbol.export ("__imp_" ^ s) sect (Int32.of_int i) ::
 	    obj.symbols;
-	  Reloc.abs sect (Int32.of_int i) sym; i + 4)
+	  Reloc.abs !machine sect (Int32.of_int i) sym; i + 4)
        0 imports)
 
 
@@ -281,17 +307,17 @@ let add_export_table obj exports symname =
   let strsym = Symbol.intern sect 0l in
   obj.symbols <- strsym :: (Symbol.export symname sect 0l) :: obj.symbols;
   let exports = List.sort Pervasives.compare exports in
-  (* The runtime library assume the names are sorted! *)
-  int32_to_buf data (List.length exports);
+  (* The runtime library assumes that names are sorted! *)
+  int_to_buf data (List.length exports);
   List.iter
     (fun s  ->
        let sym = Symbol.extern s in
        obj.symbols <- sym :: obj.symbols;
-       Reloc.abs sect (Int32.of_int (Buffer.length data)) sym;
-       int32_to_buf data 0;
+       Reloc.abs !machine sect (Int32.of_int (Buffer.length data)) sym;
+       int_to_buf data 0;
 
-       Reloc.abs sect (Int32.of_int (Buffer.length data)) strsym;
-       int32_to_buf data (Buffer.length strings);
+       Reloc.abs !machine sect (Int32.of_int (Buffer.length data)) strsym;
+       int_to_buf data (Buffer.length strings);
        Buffer.add_string strings (drop_underscore s);
        Buffer.add_char strings '\000';
     )
@@ -311,7 +337,7 @@ let add_master_reloc_table obj names symname =
     (fun s  ->
        let sym = Symbol.extern s in
        obj.symbols <- sym :: obj.symbols;
-       Reloc.abs sect (Int32.of_int (Buffer.length data)) sym;
+       Reloc.abs !machine sect (Int32.of_int (Buffer.length data)) sym;
        int32_to_buf data 0;
     )
     names;
@@ -586,7 +612,7 @@ let build_dll link_exe output_file files exts extra_args =
   );
 
   (* Create the descriptor object *)
-  let obj = Coff.empty !x64 in
+  let obj = Coff.empty (!machine = `x64) in
 
   if not (StrSet.is_empty !imported) then begin
     add_import_table obj (StrSet.elements !imported);
@@ -623,7 +649,14 @@ let build_dll link_exe output_file files exts extra_args =
 	  (if !verbose >= 2 then "/verbose " else "")
           (if link_exe = `EXE then "" else "/dll ")
 	  (if main_pgm then "" else "/export:symtbl /export:reloctbl ")
-	  (if main_pgm then "" else if !noentry then "/noentry " else "/entry:FlexDLLiniter@12 ")
+	  (if main_pgm then "" else if !noentry then "/noentry " else 
+          let s = 
+            match !machine with
+            | `x86 -> "FlexDLLiniter@12"
+            | `x64 -> "FlexDLLiniter"
+          in
+          Printf.sprintf "/entry:%s " s
+          )
 	  (mk_dirs_opt "/libpath:")
 	  (Filename.quote implib)
 	  (Filename.quote output_file) files descr
@@ -755,7 +788,7 @@ let specs = [
   "-nounderscore", Arg.Clear underscore,
   " Normal symbols are not prefixed with an underscore";
 
-  "-x64", Arg.Unit (fun () -> x64 := true; underscore := false),
+  "-x64", Arg.Unit (fun () -> machine := `x64; underscore := false),
   " x86_64 mode";
 
   "--", Arg.Rest (fun s -> extra_args := s :: !extra_args),

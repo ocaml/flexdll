@@ -34,8 +34,8 @@ and section = {
   mutable sec_pos: int;
   sec_name: string;
   vsize: int32;
-  mutable data: 
-    [ `String of string | `Uninit of int 
+  mutable data:
+    [ `String of string | `Uninit of int
     | `Lazy of in_channel * int * int ];
   mutable relocs: reloc list;
   sec_opts: int32;
@@ -76,7 +76,7 @@ let is_zero s =
 (* Tools to read/write binary data *)
 
 let mk_int32 a b c d =
-  let a = Int32.of_int a 
+  let a = Int32.of_int a
   and b = Int32.shift_left (Int32.of_int b) 8
   and c = Int32.shift_left (Int32.of_int c) 16
   and d = Int32.shift_left (Int32.of_int d) 24 in
@@ -92,7 +92,7 @@ let read ic pos len =
   )
 
 let int32 buf loc =
-  mk_int32 
+  mk_int32
     (Char.code buf.[loc]) (Char.code buf.[loc + 1])
     (Char.code buf.[loc + 2]) (Char.code buf.[loc + 3])
 
@@ -115,17 +115,17 @@ let emit_int16 oc i =
 let emit_int8 = output_byte
 
 let int32_ buf loc = Int32.to_int (int32 buf loc)
-  
+
 let int16 buf loc = Char.code buf.[loc] + (Char.code buf.[loc + 1]) lsl 8
 
-let int8 buf loc = Char.code buf.[loc] 
-  
+let int8 buf loc = Char.code buf.[loc]
+
 let strz buf loc ?(max=String.length buf - loc) c =
-  let i = 
+  let i =
     try String.index_from buf loc c
     with Not_found -> String.length buf in
   String.sub buf loc (min max (i - loc))
-    
+
 let emit_zero oc n =
   for i = 1 to n do output_char oc '\000' done
 
@@ -159,7 +159,7 @@ let flags x =
 	Printf.bprintf b "0x%08lx " m
   done;
   Buffer.contents b
-    
+
 let rec dump ic pos len w =
   if len = 0 then (Printf.printf "---\n"; flush stdout)
   else let l = min len w in
@@ -180,20 +180,20 @@ module Symbol = struct
   let counter = ref 0
   let gen_sym () = incr counter; Printf.sprintf "_DREL%i" !counter
 
-  let empty () = 
-    { sym_pos = (-1); sym_name = gen_sym(); value = 0l; 
+  let empty () =
+    { sym_pos = (-1); sym_name = gen_sym(); value = 0l;
       section = `Num 0; storage = 0; stype = 0; auxn = 0; auxs = "";
       extra_info = `None }
 
   let intern sec addr =
     { (empty ()) with section = `Section sec; storage = 3; value = addr }
 
-  let export name sec addr = 
+  let export name sec addr =
     { (empty ()) with sym_name = name; value = addr;
 	section = `Section sec; storage = 2 }
 
-  let extern name = 
-    { (empty ()) with sym_pos = (-1); sym_name = name; 
+  let extern name =
+    { (empty ()) with sym_pos = (-1); sym_name = name;
 	section = `Num 0; storage = 2 }
 
 
@@ -201,7 +201,7 @@ module Symbol = struct
     let buf = read ic pos 18 in
     let auxn = int8 buf 17 in
     { sym_pos = (-1);
-      sym_name = 	
+      sym_name =
 	(if int32_ buf 0 <> 0 then strz buf 0 ~max:8 '\000'
 	 else strtbl (int32_ buf 4));
       value = int32 buf 8;
@@ -227,12 +227,12 @@ module Symbol = struct
     | { storage = 2; section = `Section _ } -> true
     | { storage = 2; section = `Num 0; value = 0l } -> false
     | { storage = 2; section = `Num (0 | 0xffff) } -> true
-    | _ -> false 
+    | _ -> false
 
-  let dump s = 
+  let dump s =
     Printf.printf " %s: " s.sym_name;
     if s.stype <> 0 then Printf.printf "(typ:%i) " s.stype;
-    let sect = match s.section with 
+    let sect = match s.section with
       | `Num 0xffff -> "absolute"
       | `Num 0xfffe -> "debug"
       | `Num i -> string_of_int i
@@ -244,7 +244,7 @@ module Symbol = struct
       | 103 -> "srcfile"
       | n -> string_of_int n in
     match s with
-      | { storage = 6 } -> 
+      | { storage = 6 } ->
 	  Printf.printf "label %s @ 0x%08lx\n" sect s.value
       | { storage = 2; section = `Section _ } ->
 	  Printf.printf "export %s @ 0x%08lx\n" sect s.value
@@ -255,26 +255,26 @@ module Symbol = struct
 	    (int16 s.auxs 12)
 	    (int8 s.auxs 14)
       | { storage = 3 } ->
-	  Printf.printf "static %s @ 0x%08lx\n" sect s.value 
+	  Printf.printf "static %s @ 0x%08lx\n" sect s.value
       | { storage = 103 } ->
 	  Printf.printf "filename %s\n" (strz s.auxs 0 '\000')
       | { storage = 105 } ->
-	  Printf.printf "weak ext\n" 
+	  Printf.printf "weak ext\n"
       | _ ->
-	  Printf.printf 
+	  Printf.printf
 	    "value=0x%08lx, sect=%s, storage=%s, aux=%S\n"
 	    s.value sect storage s.auxs
 
   let put strtbl oc s =
-    if String.length s.sym_name <= 8 
-    then (output_string oc s.sym_name; 
+    if String.length s.sym_name <= 8
+    then (output_string oc s.sym_name;
 	  emit_zero oc (8 - String.length s.sym_name))
     else (emit_zero oc 4; emit_int32 oc (strtbl s.sym_name));
     emit_int32 oc s.value;
     let sec = match s.section with
       | `Num i -> i
       | `Section sec when sec.sec_pos <= 0 ->
-	  failwith (Printf.sprintf 
+	  failwith (Printf.sprintf
 		      "Cannot emit section for symbol %s" s.sym_name)
       | `Section sec -> sec.sec_pos in
     emit_int16 oc sec;
@@ -295,20 +295,25 @@ module Symbol = struct
 end
 
 module Reloc = struct
-  let abs sec addr sym = 
-    sec.relocs <- { addr = addr; symbol = sym; rtype = 6 } :: sec.relocs
+  let abs machine sec addr sym =
+    let rtype =
+      match machine with
+      | `x86 -> 0x06
+      | `x64 -> 0x01
+    in
+    sec.relocs <- { addr = addr; symbol = sym; rtype = rtype } :: sec.relocs
 
   let get symtbl va ic base =
     let buf = read ic base 10 in
     { addr = Int32.sub (int32 buf 00) va;
-      symbol = (try match symtbl.(int32_ buf 4) with Some s -> s 
+      symbol = (try match symtbl.(int32_ buf 4) with Some s -> s
 		  | None -> assert false
 		with exn -> assert false);
       rtype = int16 buf 8
     }
 
   let dump x =
-    Printf.printf " Reloc %ld -> %s, type 0x%04x\n" 
+    Printf.printf " Reloc %ld -> %s, type 0x%04x\n"
       x.addr x.symbol.sym_name x.rtype
 
   let put oc x =
@@ -330,14 +335,14 @@ module Section = struct
   let get filebase strtbl symtbl ic base =
     let buf = read ic base 40 in
     let size = int32_ buf 16 in
-    let name = 
-      if buf.[0] = '/' 
+    let name =
+      if buf.[0] = '/'
       then strtbl (int_of_string (strz buf 1 ~max:7 '\000'))
       else strz buf 0 ~max:8 '\000'
     in
     let va = int32 buf 12 in
 
-    if (int32 buf 36 &&& 0x01000000l <> 0l) 
+    if (int32 buf 36 &&& 0x01000000l <> 0l)
     then (Printf.printf "More relocs!\n"; assert false);
 
 
@@ -350,7 +355,7 @@ module Section = struct
       !r
     in
 
-    let data = 
+    let data =
       if int32_ buf 20 = 0 then `Uninit size
       else `Lazy (ic, filebase + int32_ buf 20, size) in
     (* `String (read ic (filebase + int32_ buf 20) size) in  *)
@@ -372,7 +377,7 @@ module Section = struct
 
   let put strtbl oc x =
     let name =
-      if String.length x.sec_name <= 8 
+      if String.length x.sec_name <= 8
       then x.sec_name
       else Printf.sprintf "/%ld" (strtbl x.sec_name)
     in
@@ -411,7 +416,7 @@ module Coff = struct
       else 0x14c (* x86 *)
     in
     { obj_name = "generated";
-      machine = machine; date = 0x4603de0el; 
+      machine = machine; date = 0x4603de0el;
       sections = []; symbols = []; opts = 0 }
 
   let parse_directives s =
@@ -420,7 +425,7 @@ module Coff = struct
       | ' ' -> aux0 (i+1)
       | '-' | '/' -> aux1 (i+1) (i+1)
       | _ -> raise Exit
-    and aux1 i0 i = if i = l then (String.sub s i0 (i - i0), [])::[] 
+    and aux1 i0 i = if i = l then (String.sub s i0 (i - i0), [])::[]
     else match s.[i] with
       | 'a'..'z' | 'A'..'Z' -> aux1 i0 (i+1)
       | ' ' -> (String.sub s i0 (i - i0), []) :: aux0 (i+1)
@@ -432,8 +437,8 @@ module Coff = struct
     and aux3 cmd args i0 i = match s.[i] with
       | '"' -> aux5 cmd (String.sub s i0 (i - i0) :: args) (i+1)
       | _   -> aux3 cmd args i0 (i+1)
-    and aux4 cmd args i0 i = 
-      if i = l then (cmd, String.sub s i0 (i - i0) :: args)::[] 
+    and aux4 cmd args i0 i =
+      if i = l then (cmd, String.sub s i0 (i - i0) :: args)::[]
       else match s.[i] with
 	| ' ' -> (cmd, String.sub s i0 (i - i0) :: args) :: aux0 (i+1)
 	| ',' -> aux2 cmd (String.sub s i0 (i - i0) :: args) (i+1)
@@ -446,9 +451,9 @@ module Coff = struct
     try List.map (fun (cmd,args) -> (cmd,List.rev args)) (aux0 0)
     with _ ->
       failwith (Printf.sprintf "Cannot parse directive: %s\n" s)
- 
+
   let directives obj =
-    try 
+    try
       let sec = List.find (fun s -> s.sec_name = ".drectve") obj.sections in
       match force_section_data sec with
 	| `String s -> parse_directives s
@@ -457,14 +462,14 @@ module Coff = struct
     with Not_found -> []
 
   let get ic ofs base name =
-    let buf = read ic ofs 20 in    
+    let buf = read ic ofs 20 in
     let opthdr = int16 buf 16 in
 
     let symtable = base + int32_ buf 8 in
     let symcount = int32_ buf 12 in
 
     (* the string table *)
-    let strtbl = 
+    let strtbl =
       let pos = symtable + 18 * symcount in
       if pos = 0 then fun i -> assert false
       else
@@ -475,7 +480,7 @@ module Coff = struct
 
 
     (* the symbol table *)
-    let symbols,symtbl = 
+    let symbols,symtbl =
       let tbl = Array.create symcount None in
       let rec fill accu i =
 	if i = symcount then List.rev accu
@@ -511,7 +516,7 @@ module Coff = struct
 		let num = int16 s.auxs 12 in
 		if num > 0 then
 		  (try s.extra_info <- `Section sections.(num - 1)
-		   with Invalid_argument _ -> 
+		   with Invalid_argument _ ->
 		     Printf.eprintf "** section %i / %i (%s)\n" num
 		       (Array.length sections) s.sym_name;
 		     assert false);
@@ -544,7 +549,7 @@ module Coff = struct
     let a = ref [] in
     List.iter
       (fun s ->
-	 match s.extra_info with 
+	 match s.extra_info with
 	   | `Alias s' -> a := (s.sym_name,s'.sym_name) :: !a
 	   | _ -> ()
       )
@@ -557,7 +562,7 @@ module Coff = struct
     Printf.printf "machine: 0x%x\n" x.machine;
     Printf.printf "date:    0x%lx\n" x.date;
     Printf.printf "opts:    0x%x\n" x.opts;
-    List.iter Symbol.dump x.symbols; 
+    List.iter Symbol.dump x.symbols;
     List.iter Section.dump x.sections;
     ()
 
@@ -601,7 +606,7 @@ module Coff = struct
     emit_int16 oc 0;
     emit_int16 oc x.opts;
 
-    let sects = 
+    let sects =
       List.map (Section.put strtbl oc) x.sections in
     List.iter
       (fun (data,relocs) -> data (); relocs ())
@@ -624,13 +629,13 @@ module Import = struct
     let name = strz buf 20 '\000' in
 (*    Printf.printf "Import header. Version = %i\n" (int16 buf 4);
     Printf.printf " machine     = 0x%x\n" (int16 buf 6);
-    Printf.printf " time stamp  = 0x%lx\n" (int32 buf 8);    
+    Printf.printf " time stamp  = 0x%lx\n" (int32 buf 8);
     Printf.printf " size data   = %ld\n" (int32 buf 12);
     Printf.printf " ord/hint    = %i\n" (int16 buf 16);
     Printf.printf " type        = %i\n" (w land 0b11);
-    Printf.printf " name type   = %i\n" ((w land 0b11100) lsr 2); 
+    Printf.printf " name type   = %i\n" ((w land 0b11100) lsr 2);
     Printf.printf " symbol      = %s\n" name;
-    Printf.printf " DLL         = %s\n" 
+    Printf.printf " DLL         = %s\n"
       (strz buf (21 + String.length name) '\000'); *)
     name, w
 
@@ -642,13 +647,13 @@ module Lib = struct
   let read_lib ic libname =
     let strtbl = ref "" in
     let imports = ref [] and objects = ref [] in
-    let obj size name = 
+    let obj size name =
 (*      Printf.printf "-> %s (size %i)\n" name size;  *)
       let pos = pos_in ic in
-      if (size > 18) && (read ic pos 4 = "\000\000\255\255") 
+      if (size > 18) && (read ic pos 4 = "\000\000\255\255")
       then imports := Import.read ic pos size :: !imports
-      else objects := (name, 
-		       Coff.get ic pos pos 
+      else objects := (name,
+		       Coff.get ic pos pos
 			 (Printf.sprintf "%s(%s)" libname name)) :: !objects
     in
     let rec read_member () =
@@ -665,18 +670,18 @@ module Lib = struct
 	| s ->
 	    obj size (strz s 0 '/');
       end;
-      seek_in ic (base + size + size mod 2); 
+      seek_in ic (base + size + size mod 2);
       read_member ()
     in
     (try read_member () with End_of_file -> ());
     !objects,!imports
 
-  let is_lib ic = 
+  let is_lib ic =
     in_channel_length ic > String.length magic_lib
-    && read ic 0 (String.length magic_lib) = magic_lib 
+    && read ic 0 (String.length magic_lib) = magic_lib
 
-  let obj_ofs ic = 
-    try 
+  let obj_ofs ic =
+    try
       let b = read ic 0x3c 4 in
       let ofs = int32_ b 0 in
       if read ic ofs 4 = "PE\000\000" then ofs + 4
@@ -693,7 +698,7 @@ module Lib = struct
   let read filename =
     let ic = open_in_bin filename in
     try
-      let r = 
+      let r =
 	if is_lib ic then `Lib (read_lib ic filename)
 	else let ofs = obj_ofs ic in `Obj (Coff.get ic ofs 0 filename) in
 (*      close_in ic; *)  (* do not close: cf `Lazy *)

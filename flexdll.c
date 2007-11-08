@@ -2,7 +2,7 @@
    FlexDLL
    Alain Frisch
 
-   Copyright 2007 Institut National de Recherche en Informatique et 
+   Copyright 2007 Institut National de Recherche en Informatique et
    en Automatique.
 
 ******************************************************************/
@@ -18,19 +18,20 @@
 typedef long intnat;
 typedef unsigned long uintnat;
 
-#define RELOC_REL   0x0001
-#define RELOC_ABS   0x0002
-#define RELOC_DONE  0x0100
+#define RELOC_REL32     0x0001
+#define RELOC_ABS       0x0002
+#define RELOC_REL32_4   0x0003
+#define RELOC_DONE      0x0100
 
-typedef struct { uintnat kind; char *name; uintnat *addr; } reloc_entry;
-typedef struct { char *first; char *last; uintnat old; } nonwr;
+typedef struct { UINT_PTR kind; char *name; UINT_PTR *addr; } reloc_entry;
+typedef struct { char *first; char *last; UINT_PTR old; } nonwr;
 typedef struct { nonwr *nonwr; reloc_entry entries[]; } reloctbl;
 typedef struct { void *addr; char *name; } dynsymbol;
-typedef struct { uintnat size; dynsymbol entries[]; } symtbl;
-typedef struct dlunit { 
-  void *handle; 
+typedef struct { UINT_PTR size; dynsymbol entries[]; } symtbl;
+typedef struct dlunit {
+  void *handle;
   symtbl *symtbl;
-  int global; 
+  int global;
   int count;
   struct dlunit *next,*prev;
 } dlunit;
@@ -71,8 +72,8 @@ static char * ll_dlerror(void)
 
 static void *ll_dlopen(const char *libname, int for_execution) {
   HMODULE m;
-  m = LoadLibraryEx(libname, NULL, 
-  		    for_execution ? 0 : DONT_RESOLVE_DLL_REFERENCES);
+  m = LoadLibraryEx(libname, NULL,
+		    for_execution ? 0 : DONT_RESOLVE_DLL_REFERENCES);
   /* Under Win 95/98/ME, LoadLibraryEx can fail in cases where LoadLibrary
      would succeed.  Just try again with LoadLibrary for good measure. */
   if (m == NULL) m = LoadLibrary(libname);
@@ -80,12 +81,12 @@ static void *ll_dlopen(const char *libname, int for_execution) {
 }
 
 
-static void ll_dlclose(void *handle) { 
-  FreeLibrary((HMODULE) handle); 
+static void ll_dlclose(void *handle) {
+  FreeLibrary((HMODULE) handle);
 }
 
-static void *ll_dlsym(void *handle, char *name) { 
-  return (void *) GetProcAddress((HMODULE) handle, name); 
+static void *ll_dlsym(void *handle, char *name) {
+  return (void *) GetProcAddress((HMODULE) handle, name);
 }
 
 static char *ll_dlerror(void)
@@ -117,9 +118,9 @@ static void dump_reloctbl(reloctbl *tbl) {
     printf(" Non-writable relocation in zone %08lx -> %08lx\n",
 	   wr->first,
 	   wr->last);
-  
+
   for (ptr = tbl->entries; ptr->kind; ptr++)
-    printf(" %08lx (kind:%04lx) (now:%08lx)  %s\n", 
+    printf(" %08lx (kind:%04lx) (now:%08lx)  %s\n",
 	   ptr->addr,
 	   ptr->kind,
 	   *((uintnat*) ptr->addr),
@@ -164,25 +165,33 @@ static void cannot_resolve_msg(char *name) {
 static void relocate(resolver f, void *data, reloctbl *tbl) {
   reloc_entry *ptr;
   nonwr *wr;
-  uintnat s;
+  INT_PTR s;
 
   if (!tbl) return;
 
   for (wr = tbl->nonwr; wr->last != 0; wr++)
     allow_write(wr->first,wr->last + 4,PAGE_EXECUTE_WRITECOPY,&wr->old);
-  
+
   for (ptr = tbl->entries; ptr->kind; ptr++) {
     if (ptr->kind & RELOC_DONE) continue;
-    s = (uintnat) f(data,ptr->name);
-    if (!s) { 
+    s = (UINT_PTR) f(data,ptr->name);
+    if (!s) {
       error = 2;
       cannot_resolve_msg(ptr->name);
       return;
     }
     switch (ptr->kind & 0xff) {
-    case RELOC_ABS: *(ptr->addr) += s; break;
-    case RELOC_REL: *(ptr->addr) = s - (uintnat) (ptr->addr) - 4; break;
-    default: assert(0);
+    case RELOC_ABS:
+      *(ptr->addr) += s;
+      break;
+    case RELOC_REL32:
+      *((UINT32*) ptr->addr) = s - (UINT_PTR) (ptr->addr) - 4;
+      break;
+    case RELOC_REL32_4:
+      *((UINT32*) ptr->addr) = s - (UINT_PTR) (ptr->addr) - 8;
+      break;
+    default:
+      assert(0);
     }
     ptr->kind |= RELOC_DONE;
   }
@@ -203,10 +212,13 @@ static void dump_symtbl(symtbl *tbl)
   int i;
 
   if (!tbl) { printf("No symbol table\n"); return; }
-  printf("Dynamic symbol at %lx\n", tbl);
+  printf("Dynamic symbol at %lx (size = %i)\n", tbl, tbl->size); fflush(stdout);
 
-  for (i = 0; i < tbl->size; i++)
-    printf(" %08lx: %s\n", tbl->entries[i].addr, tbl->entries[i].name);
+  for (i = 0; i < tbl->size; i++) {
+    printf("[%i] ", i); fflush(stdout);
+    printf(" %p: %s\n", tbl->entries[i].addr, tbl->entries[i].name);
+    fflush(stdout);
+  }
 }
 
 static int compare_dynsymbol(const void *s1, const void *s2) {
@@ -220,7 +232,7 @@ static void *find_symbol(symtbl *tbl, const char *name) {
   if (!tbl) return NULL;
 
   s.name = (char*) name;
-  sym = 
+  sym =
     bsearch(&s,&tbl->entries,tbl->size, sizeof(dynsymbol),&compare_dynsymbol);
 
   return (NULL == sym ? NULL : sym -> addr);
@@ -280,7 +292,7 @@ void *flexdll_dlopen(const char *file, int mode) {
   char flexdll_relocate_env[256];
 
   int exec = (mode & FLEXDLL_RTLD_NOEXEC ? 0 : 1);
-  
+
   error = 0;
   if (!file) return &main_unit;
 
@@ -306,7 +318,7 @@ void *flexdll_dlopen(const char *file, int mode) {
   if (exec) {
     /* Relocation has already been done if the flexdll's DLL entry point
        is used */
-    flexdll_relocate(ll_dlsym(handle, "reloctbl")); 
+    flexdll_relocate(ll_dlsym(handle, "reloctbl"));
     if (error) { flexdll_dlclose(unit); return NULL; }
   }
 
