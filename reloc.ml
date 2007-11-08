@@ -438,6 +438,8 @@ let build_dll link_exe output_file files exts extra_args =
   if main_pgm then add_def (usym "static_symtable")
   else add_def (usym "reloctbl");
 
+  if !machine = `x64 then add_def "__ImageBase";
+
   let aliases = Hashtbl.create 16 in
   let rec normalize name =
     try

@@ -133,7 +133,7 @@ static void dump_master_reloctbl(reloctbl **ptr) {
   while (*ptr) dump_reloctbl(*ptr++);
 }
 
-static void allow_write(char *begin, char *end, uintnat new, uintnat *old) {
+static void allow_write(char *begin, char *end, uintnat new, UINT_PTR *old) {
   static long int pagesize = 0;
   int res;
   SYSTEM_INFO si;
@@ -144,7 +144,7 @@ static void allow_write(char *begin, char *end, uintnat new, uintnat *old) {
   }
 
   begin -= (uintnat) begin % pagesize;
-  res = VirtualProtect(begin, end - begin, new, old);
+  res = VirtualProtect(begin, end - begin, new, (uintnat*) old);
   if (0 == res) {
     fprintf(stderr, "natdynlink: VirtualProtect failed (%s), begin = 0x%08lx, end = 0x%08lx\n", ll_dlerror(), begin, end);
     exit(2);
