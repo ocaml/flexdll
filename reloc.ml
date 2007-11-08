@@ -338,10 +338,10 @@ let add_master_reloc_table obj names symname =
        let sym = Symbol.extern s in
        obj.symbols <- sym :: obj.symbols;
        Reloc.abs !machine sect (Int32.of_int (Buffer.length data)) sym;
-       int32_to_buf data 0;
+       int_to_buf data 0;
     )
     names;
-  int32_to_buf data 0;
+  int_to_buf data 0;
   sect.data <- `String (Buffer.contents data);
   obj.sections <- sect :: obj.sections
 
