@@ -210,12 +210,15 @@ let add_reloc_table x p sname =
     if p rel.symbol then (
       (* kind *)
       let kind = match !machine, rel.rtype with
-	| `x86, 0x06 -> 0x0002 (* absolute *)
-	| `x86, 0x14 | `x64, 0x04 -> 0x0001 (* relative *)
+	| `x86, 0x06
+        | `x64, 0x01 -> 0x0002 (* absolute, native size (32/64) *)
+	| `x86, 0x14
+        | `x64, 0x04 -> 0x0001 (* rel32 *)
+        | `x64, 0x05 -> 0x0004 (* rel32_1 *)
         | `x64, 0x08 -> 0x0003 (* rel32_4 *)
 	| _, k  ->
-            let msg = 
-              Printf.sprintf "Unsupported relocated kind %04x for %s" 
+            let msg =
+              Printf.sprintf "Unsupported relocation kind %04x for %s"
                 k rel.symbol.sym_name
             in
             failwith msg
@@ -572,7 +575,7 @@ let build_dll link_exe output_file files exts extra_args =
   let rec link_obj obj =
     exported := exports !exported obj;
     StrSet.iter
-      (fun s -> 
+      (fun s ->
         try
           let (libname, objname, _) as o = Hashtbl.find defined_in s in
           link_libobj o
@@ -651,8 +654,8 @@ let build_dll link_exe output_file files exts extra_args =
 	  (if !verbose >= 2 then "/verbose " else "")
           (if link_exe = `EXE then "" else "/dll ")
 	  (if main_pgm then "" else "/export:symtbl /export:reloctbl ")
-	  (if main_pgm then "" else if !noentry then "/noentry " else 
-          let s = 
+	  (if main_pgm then "" else if !noentry then "/noentry " else
+          let s =
             match !machine with
             | `x86 -> "FlexDLLiniter@12"
             | `x64 -> "FlexDLLiniter"

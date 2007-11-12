@@ -21,6 +21,7 @@ typedef unsigned long uintnat;
 #define RELOC_REL32     0x0001
 #define RELOC_ABS       0x0002
 #define RELOC_REL32_4   0x0003
+#define RELOC_REL32_1   0x0004
 #define RELOC_DONE      0x0100
 
 typedef struct { UINT_PTR kind; char *name; UINT_PTR *addr; } reloc_entry;
@@ -189,6 +190,9 @@ static void relocate(resolver f, void *data, reloctbl *tbl) {
       break;
     case RELOC_REL32_4:
       *((UINT32*) ptr->addr) = s - (UINT_PTR) (ptr->addr) - 8;
+      break;
+    case RELOC_REL32_1:
+      *((UINT32*) ptr->addr) = s - (UINT_PTR) (ptr->addr) - 5;
       break;
     default:
       assert(0);
