@@ -17,6 +17,7 @@ let underscore = ref true
 
 let machine : [ `x86 | `x64 ] ref = ref `x86
 
+let explain = ref false
 let toolchain = ref `MSVC
 let save_temps = ref false
 let show_exports = ref false
@@ -572,24 +573,28 @@ let build_dll link_exe output_file files exts extra_args =
     add_reloc name obj imps;
     record_obj obj in
 
-  let rec link_obj obj =
+  let rec link_obj fn obj =
     exported := exports !exported obj;
     StrSet.iter
       (fun s ->
-        try
-          let (libname, objname, _) as o = Hashtbl.find defined_in s in
-          link_libobj o
-        with Not_found -> ())
+        if StrSet.mem s !exported then ()
+        else
+          try
+            let (libname, objname, _) as o = Hashtbl.find defined_in s in
+            if !explain then
+              Printf.printf "%s -> %s(%s) because of %s\n%!" fn libname objname s;
+            link_libobj o
+          with Not_found -> ())
       (needed obj)
   and link_libobj (libname,objname,obj) =
     if Hashtbl.mem libobjects (libname,objname) then ()
     else (Hashtbl.replace libobjects (libname,objname) (obj,imports obj);
-	  link_obj obj) in
+	  link_obj (Printf.sprintf "%s(%s)" libname objname) obj) in
 
   let redirect = Hashtbl.create 16 in
   List.iter
     (fun (fn,obj) ->
-       link_obj obj;
+       link_obj fn obj;
        let imps = imports obj in
        if (StrSet.is_empty imps) then ()
        else Hashtbl.replace redirect fn (close_obj fn imps obj);
@@ -795,6 +800,9 @@ let specs = [
 
   "-x64", Arg.Unit (fun () -> machine := `x64; underscore := false),
   " x86_64 mode";
+
+  "-explain", Arg.Set explain,
+  " Explain why library objects are linked";
 
   "--", Arg.Rest (fun s -> extra_args := s :: !extra_args),
   " Introduce extra linker arguments";
