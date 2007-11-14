@@ -25,7 +25,7 @@ extern int reloctbl;
 static int flexdll_init() {
   func *sym = 0;
   char *s = getenv("FLEXDLL_RELOCATE");
-  if (!s) return FALSE;
+  if (!s) { fprintf(stderr, "Cannot find FLEXDLL_RELOCATE\n"); return FALSE; }
   sscanf(s,"%08lx",&sym);
   if (sym && sym(&reloctbl)) return TRUE;
   return FALSE;

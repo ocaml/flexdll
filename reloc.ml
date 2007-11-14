@@ -17,6 +17,7 @@ let underscore = ref true
 
 let machine : [ `x86 | `x64 ] ref = ref `x86
 
+let subsystem = ref "console"
 let explain = ref false
 let toolchain = ref `MSVC
 let save_temps = ref false
@@ -643,7 +644,6 @@ let build_dll link_exe output_file files exts extra_args =
       )
     @ exts in
   let files = quote_files files in
-  let quiet = if !verbose >= 1 then "" else ">NUL" in
 
   let cmd = match !toolchain with
     | `MSVC ->
@@ -655,7 +655,7 @@ let build_dll link_exe output_file files exts extra_args =
 	let impexp = Filename.chop_suffix implib ".lib" ^ ".exp" in
 	temps := implib :: impexp :: !temps;
 	Printf.sprintf
-	  "link /nologo %s%s%s%s%s /implib:%s /out:%s /defaultlib:msvcrt.lib /subsystem:console %s %s %s%s"
+	  "link /nologo %s%s%s%s%s /implib:%s /out:%s /defaultlib:msvcrt.lib /subsystem:%s %s %s %s"
 	  (if !verbose >= 2 then "/verbose " else "")
           (if link_exe = `EXE then "" else "/dll ")
 	  (if main_pgm then "" else "/export:symtbl /export:reloctbl ")
@@ -669,8 +669,10 @@ let build_dll link_exe output_file files exts extra_args =
           )
 	  (mk_dirs_opt "/libpath:")
 	  (Filename.quote implib)
-	  (Filename.quote output_file) files descr
-	  extra_args quiet
+	  (Filename.quote output_file) 
+          !subsystem
+          files descr
+	  extra_args
     | `CYGWIN ->
 	Printf.sprintf
 	  "gcc %s%s -L. %s %s -o %s %s %s %s"
@@ -694,12 +696,19 @@ let build_dll link_exe output_file files exts extra_args =
 	  files
 	  extra_args
   in
-  if !verbose >= 1 || !dry_mode then Printf.printf "+ %s\n" cmd;
-  flush stdout;
+  if !verbose >= 1 || !dry_mode then Printf.printf "+ %s\n%!" cmd;
   if not !dry_mode then begin
     let manifest_file = output_file ^ ".manifest" in
     safe_remove manifest_file;
-    (if Sys.command cmd <> 0 then failwith "Error during linking\n");
+    let cmd_quiet =
+      match !toolchain with
+      | `MSVC when !verbose < 1 -> cmd ^ " >NUL"
+      | _ -> cmd
+    in
+    if Sys.command cmd_quiet <> 0 then begin
+      if cmd <> cmd_quiet then ignore (Sys.command cmd);
+      failwith "Error during linking\n"
+    end;
 
     if !merge_manifest && Sys.file_exists manifest_file then begin
       let mcmd =
@@ -803,6 +812,9 @@ let specs = [
 
   "-explain", Arg.Set explain,
   " Explain why library objects are linked";
+
+  "-subsystem", Arg.Set_string subsystem,
+  " Set the subsystem (default: console)";
 
   "--", Arg.Rest (fun s -> extra_args := s :: !extra_args),
   " Introduce extra linker arguments";
