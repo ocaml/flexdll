@@ -818,10 +818,10 @@ let specs = [
   " Explain why library objects are linked";
 
   "-subsystem", Arg.Set_string subsystem,
-  " Set the subsystem (default: console)";
+  "<id> Set the subsystem (default: console)";
 
   "-link", Arg.String (fun s -> extra_args := s :: !extra_args),
-  " Next argument is passed verbatim to the linker";
+  "<option> Next argument is passed verbatim to the linker";
 
   "--", Arg.Rest (fun s -> extra_args := s :: !extra_args),
   " Following arguments are passed verbatim to the linker";
