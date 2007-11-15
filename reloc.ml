@@ -124,15 +124,19 @@ let parse_libpath s =
   in
   aux 0
 
-let get_output cmd =
-  if (Sys.command (cmd ^ " > tmp_getcmd") < 0)
-  then failwith ("Cannot run " ^ cmd);
-  let ic = open_in "tmp_getcmd" in
+let read_file fn = 
+  let ic = open_in fn in
   let r = ref [] in
   (try while true do r := input_line ic :: !r done with End_of_file -> ());
   close_in ic;
-  Sys.remove "tmp_getcmd";
   List.rev !r
+
+let get_output cmd =
+  if (Sys.command (cmd ^ " > tmp_getcmd") < 0)
+  then failwith ("Cannot run " ^ cmd);
+  let r = read_file "tmp_getcmd" in
+  Sys.remove "tmp_getcmd";
+  r
 
 let get_output1 cmd = List.hd (get_output cmd)
 
@@ -882,18 +886,20 @@ let compile_if_needed file =
     file
 
 let parse_cmdline () =
-  (* Split -lXXX and -LXXX options *)
+  (* Split -lXXX, -LXXX and -IXXX options *)
+  let tosplit = function
+    | "-l" | "-L" | "-I" -> true
+    | _ -> false
+  in
+
   let rec tr = function
-    | ("-defaultlib" as d) :: x :: rest -> d :: x :: (tr rest)
-    | s :: rest when String.length s > 2 ->
-        begin
-          match String.sub s 0 2 with
-          | ("-l" | "-L") as o ->
-              o :: (String.sub s 2 (String.length s - 2)) :: (tr rest)
-          | _ ->
-              s :: (tr rest)
-        end
-    | x :: rest -> x :: (tr rest)
+    | ("-defaultlib" as d) :: x :: rest -> d :: x :: tr rest
+    | s :: rest when String.length s > 2 && tosplit (String.sub s 0 2) ->
+        String.sub s 0 2 :: String.sub s 2 (String.length s - 2) :: tr rest
+    | s :: rest when String.length s > 1 && s.[0] = '@' ->
+        let fn = String.sub s 1 (String.length s - 1) in
+        tr (read_file fn @ rest)
+    | x :: rest -> x :: tr rest
     | [] -> []
   in
   let args =
