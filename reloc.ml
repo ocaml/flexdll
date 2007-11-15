@@ -820,8 +820,11 @@ let specs = [
   "-subsystem", Arg.Set_string subsystem,
   " Set the subsystem (default: console)";
 
+  "-link", Arg.String (fun s -> extra_args := s :: !extra_args),
+  " Next argument is passed verbatim to the linker";
+
   "--", Arg.Rest (fun s -> extra_args := s :: !extra_args),
-  " Introduce extra linker arguments";
+  " Following arguments are passed verbatim to the linker";
 ]
 
 let clean () =
@@ -896,6 +899,8 @@ let parse_cmdline () =
     | ("-defaultlib" as d) :: x :: rest -> d :: x :: tr rest
     | s :: rest when String.length s > 2 && tosplit (String.sub s 0 2) ->
         String.sub s 0 2 :: String.sub s 2 (String.length s - 2) :: tr rest
+    | s :: rest when String.length s >= 5 && String.sub s 0 5 = "/link" ->
+        "-link" :: String.sub s 5 (String.length s - 5) :: tr rest
     | x :: rest -> x :: tr rest
     | [] -> []
   in
@@ -963,8 +968,8 @@ let () =
         match !toolchain, !cygpath_arg with
         | _, `Yes -> true
         | _, `No -> false
-        | `CYGWIN, `None -> (Sys.command "cygpath -v 2>NUL >NUL" = 0)
-        | (`MINGW|`MSVC), `None -> false
+        | (`CYGWIN|`MINGW), `None -> (Sys.command "cygpath -v 2>NUL >NUL" = 0)
+        | `MSVC, `None -> false
       end;
 
 
