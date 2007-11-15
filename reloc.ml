@@ -896,9 +896,6 @@ let parse_cmdline () =
     | ("-defaultlib" as d) :: x :: rest -> d :: x :: tr rest
     | s :: rest when String.length s > 2 && tosplit (String.sub s 0 2) ->
         String.sub s 0 2 :: String.sub s 2 (String.length s - 2) :: tr rest
-    | s :: rest when String.length s > 1 && s.[0] = '@' ->
-        let fn = String.sub s 1 (String.length s - 1) in
-        tr (read_file fn @ rest)
     | x :: rest -> x :: tr rest
     | [] -> []
   in
