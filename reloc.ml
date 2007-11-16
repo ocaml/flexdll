@@ -866,7 +866,7 @@ let compile_if_needed file =
 	  Printf.sprintf
 	    "cl /c /MD /nologo /Fo%s %s %s"
 	    (Filename.quote tmp_obj)
-	    (mk_dirs_opt "/I:")
+	    (mk_dirs_opt "/I")
 	    file
       | `CYGWIN ->
 	  Printf.sprintf
