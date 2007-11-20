@@ -105,3 +105,9 @@ include $(shell cygpath -ad "$(shell ocamlopt -where)/Makefile.config")
 
 show_toolchain:
 	@echo Toolchain for the visible ocamlopt: $(TOOLCHAIN)
+
+
+swap:
+	NOMLFICORE=1 $(OCAMLOPT) -o flexlink-new.exe version.ml coff.ml reloc.ml
+	cp flexlink.exe flexlink.exe.bak
+	cp flexlink-new.exe flexlink.exe

@@ -735,6 +735,17 @@ let usage_msg =
     "FlexDLL version %s\n\nUsage:\n  flexlink -o <result.dll> file1.obj file2.obj ... -- <extra linker arguments>\n"
     Version.version
 
+let footer =
+  "\
+Notes:
+* The -I, -l and -L options do not need to be separated from their argument.
+* An option like /linkXXX is an abbrevation for '-link XXX'.
+* FlexDLL's object files are searched by default in the same directory as
+  flexlink, or in the directory given by the environment variable FLEXDIR
+  if it is defined.
+
+Homepage: http://alain.frisch.fr/flexdll.html"
+
 let specs = [
   "-o", Arg.Set_string output_file,
   " Choose the name of the output file";
@@ -993,10 +1004,10 @@ let () =
 	Printf.eprintf "** Fatal error: invalid argument (%s)\n" s;
 	exit 2
     | Arg.Help s ->
-        print_string s;
+        Printf.printf "%s\n%s\n" s footer;
         exit 0
     | Arg.Bad s ->
-        Printf.eprintf "%s" s;
+        Printf.eprintf "%s\n%s\n" s footer;
         exit 2
     | exn ->
 	Printf.eprintf "** Error: %s\n" (Printexc.to_string exn);
