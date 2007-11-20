@@ -25,6 +25,7 @@ build_mingw: flexdll_mingw.o flexdll_initer_mingw.o
 
 flexlink.exe: version.ml reloc.ml coff.ml
 	@echo Building flexlink.exe with TOOLCHAIN=$(TOOLCHAIN)
+	rm -f flexlink.exe
 	$(OCAMLOPT) -o flexlink.exe version.ml coff.ml reloc.ml
 
 flexdll_msvc.obj: flexdll.h flexdll.c
