@@ -46,6 +46,7 @@ Notes:
 * FlexDLL's object files are searched by default in the same directory as
   flexlink, or in the directory given by the environment variable FLEXDIR
   if it is defined.
+* Extra argument can be passed in the environment variable FLEXLINKFLAGS.
 
 Homepage: http://alain.frisch.fr/flexdll.html"
 
@@ -142,6 +143,25 @@ let specs = [
 ]
 
 
+let flexlinkflags =
+  let s =
+    try Sys.getenv "FLEXLINKFLAGS"
+    with Not_found -> ""
+  in
+  let n = String.length s in
+  let rec skip_ws i = if i < n && s.[i] = ' ' then skip_ws (i + 1) else i in
+  let rec scan_quote i = if i = n then i else if s.[i] = '"' then i + 1 else scan_quote (i+1) in
+  let rec scan_arg i =
+    if i = n || s.[i] = ' ' then i
+    else if s.[i] = '"' then scan_arg (scan_quote (i + 1))
+    else scan_arg (i + 1) in
+  let rec args i =
+    let i = skip_ws i in
+    if i = n then []
+    else let j = scan_arg i in String.sub s i (j - i) :: args j
+  in
+  args 0
+
 let parse_cmdline () =
   (* Split -lXXX, -LXXX and -IXXX options *)
   let tosplit = function
@@ -160,7 +180,7 @@ let parse_cmdline () =
   in
   let args =
     match Array.to_list Sys.argv with
-    | pgm :: args -> pgm :: tr args
+    | pgm :: args -> pgm :: tr (flexlinkflags @ args)
     | _ -> assert false
   in
 
