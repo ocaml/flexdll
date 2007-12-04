@@ -1,3 +1,7 @@
+Since 0.3
+ - Code cleanup
+ - FLEXLINKFLAGS env var to pass extra arguments
+
 Version 0.3, released on 2007-11-20
  - Make it work under x86_64
  - New -subsystem option (currently for MSVC chain only)
