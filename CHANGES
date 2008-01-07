@@ -1,3 +1,7 @@
+Since 0.4
+ - use a temp file name for getting the output of commands (allow 
+   several instances of flexlink to run in parallel)
+
 Version 0.4, release on 2008-01-02
  - Code cleanup
  - FLEXLINKFLAGS env var to pass extra arguments

@@ -47,10 +47,11 @@ let read_file fn =
   List.rev !r
 
 let get_output cmd =
-  if (Sys.command (cmd ^ " > tmp_getcmd") < 0)
+  let fn = Filename.temp_file "flexdll" "" in
+  if (Sys.command (cmd ^ " > " ^ fn) < 0)
   then failwith ("Cannot run " ^ cmd);
-  let r = read_file "tmp_getcmd" in
-  Sys.remove "tmp_getcmd";
+  let r = read_file fn in
+  Sys.remove fn;
   r
 
 let get_output1 cmd =
