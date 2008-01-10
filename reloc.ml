@@ -658,7 +658,7 @@ let build_dll link_exe output_file files exts extra_args =
 	let implib = temp_file "dyndll_implib" ".lib" in
 	let _impexp = add_temp (Filename.chop_suffix implib ".lib" ^ ".exp") in
 	Printf.sprintf
-	  "link /nologo %s%s%s%s%s /implib:%s /out:%s /defaultlib:msvcrt.lib /subsystem:%s %s %s %s"
+	  "link /nologo %s%s%s%s%s /implib:%s /out:%s /defaultlib:msvcrt.lib /subsystem:%s %s %s %s /manifestdependency:\"type='win32' name='Microsoft.VC80.CRT' version='8.0.50608.0' processorArchitecture='x86' publicKeyToken='1fc8b3b9a1e18e3b'\""
 	  (if !verbose >= 2 then "/verbose " else "")
           (if link_exe = `EXE then "" else "/dll ")
 	  (if main_pgm then "" else "/export:symtbl /export:reloctbl ")
@@ -739,7 +739,8 @@ let setup_toolchain () = match !toolchain with
 		       "-lshell32"; "-lcygwin"; "-lgcc"]
   | `MSVC ->
       search_path := !dirs @
-	parse_libpath (try Sys.getenv "LIB" with Not_found -> "")
+	parse_libpath (try Sys.getenv "LIB" with Not_found -> "");
+      default_libs := ["msvcrt.lib"]
   | `MINGW ->
       search_path :=
 	!dirs @
