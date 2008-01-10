@@ -1,4 +1,5 @@
 Since 0.4
+ - new -default-manifest option
  - use a temp file name for getting the output of commands (allow 
    several instances of flexlink to run in parallel)
 
