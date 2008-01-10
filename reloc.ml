@@ -16,6 +16,13 @@ open Cmdline
 let search_path = ref []
 let default_libs = ref []
 
+let flexdir =
+  try
+    let s = Sys.getenv "FLEXDIR" in
+    if s = "" then raise Not_found else s
+  with Not_found ->
+    Filename.dirname Sys.executable_name
+
 (* Temporary files *)
 
 let temps = ref []
@@ -714,11 +721,15 @@ let build_dll link_exe output_file files exts extra_args =
     end;
 
     if !merge_manifest && Sys.file_exists manifest_file then begin
+      let fn =
+        if !default_manifest then Filename.concat flexdir "default.manifest"
+        else manifest_file
+      in
       let mcmd =
 	Printf.sprintf "mt -nologo -outputresource:%s -manifest %s"
 	  (Filename.quote (if link_exe = `EXE then output_file
 			   else output_file ^ ";#2"))
-	  (Filename.quote manifest_file)
+	  (Filename.quote fn)
       in
       if !verbose >= 1 then Printf.printf "+ %s\n%!" mcmd;
       if Sys.command mcmd <> 0 then
@@ -803,13 +814,6 @@ let dump fn =
       Coff.dump o
 
 let all_files () =
-  let flexdir =
-    try
-      let s = Sys.getenv "FLEXDIR" in
-      if s = "" then raise Not_found else s
-    with Not_found ->
-      Filename.dirname Sys.executable_name
-  in
   let files = List.rev (List.map compile_if_needed !files) in
   let f = Filename.concat flexdir in
   let tc = match !toolchain with

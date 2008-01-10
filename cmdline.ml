@@ -21,6 +21,7 @@ let dry_mode = ref false
 let verbose = ref 0
 let dirs = ref []
 let merge_manifest = ref false
+let default_manifest = ref false
 let add_flexdll_obj = ref true
 let files = ref []
 let exts = ref []
@@ -111,7 +112,10 @@ let specs = [
   " Use cygpath (default for cygwin)";
 
   "-merge-manifest", Arg.Set merge_manifest,
-  " Merge manifest to the dll or exe";
+  " Merge manifest to the dll or exe (if generated)";
+
+  "-default-manifest", Arg.Set default_manifest,
+  " Use the default manifest, not the generated one";
 
   "-export", Arg.String (fun s -> defexports := s :: !defexports),
   "<sym> Explicitly export a symbol";

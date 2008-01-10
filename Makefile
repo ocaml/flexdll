@@ -1,4 +1,4 @@
-VERSION = 0.4
+VERSION = 0.5
 all: flexlink.exe support
 
 version.ml:
@@ -14,7 +14,7 @@ CHAINS = mingw cygwin msvc
 MSVCC = cl /nologo /MD -D_CRT_SECURE_NO_DEPRECATE
 CYGCC = gcc 
 MINCC = gcc -mno-cygwin
-OCAMLOPT = ocamlopt
+OCAMLOPT = FLEXLINKFLAGS=-default-manifest ocamlopt
 
 support:
 	for i in $(CHAINS); do $(MAKE) build_$$i ; done 
@@ -101,8 +101,10 @@ package_bin:
 	zip $(PACKAGE_BIN) $(COMMON_FILES) \
 	    flexlink.exe flexdll.h flexdll_*.obj flexdll_*.o
 
-upload_bin: package_bin
+do_upload_bin:
 	rsync $(PACKAGE_BIN) $(URL)
+
+upload_bin: package_bin do_upload_bin
 
 include $(shell cygpath -ad "$(shell ocamlopt -where)/Makefile.config")
 
