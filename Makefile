@@ -61,13 +61,13 @@ demo_msvc64:  flexlink.exe flexdll_msvc.obj
 	(cd test && $(MAKE) clean demo CHAIN=msvc CC="$(MSVCC)" O=obj EXTRA_OPTS="-x64 bufferoverflowu.lib")
 
 clean:
-	rm -f *.obj *.o *.lib *.a *.exe *.cmx *.dll *.manifest *.exp *.cmi *~
+	rm -f *.obj *.o *.lib *.a *.exe *.cmx *.dll *.exp *.cmi *~
 	cd test && $(MAKE) clean
 
 
 ## Packaging
 
-COMMON_FILES = LICENSE README CHANGES flexdll.h flexdll.c flexdll_initer.c
+COMMON_FILES = LICENSE README CHANGES flexdll.h flexdll.c flexdll_initer.c default.manifest
 URL = frisch.fr:www/flexdll/
 
 # Source packages
