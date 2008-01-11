@@ -665,7 +665,8 @@ let build_dll link_exe output_file files exts extra_args =
 	let implib = temp_file "dyndll_implib" ".lib" in
 	let _impexp = add_temp (Filename.chop_suffix implib ".lib" ^ ".exp") in
 	Printf.sprintf
-	  "link /nologo %s%s%s%s%s /implib:%s /out:%s /defaultlib:msvcrt.lib /subsystem:%s %s %s %s /manifestdependency:\"type='win32' name='Microsoft.VC80.CRT' version='8.0.50608.0' processorArchitecture='x86' publicKeyToken='1fc8b3b9a1e18e3b'\""
+(*	  "link /nologo %s%s%s%s%s /implib:%s /out:%s /defaultlib:msvcrt.lib /subsystem:%s %s %s %s /manifestdependency:\"type='win32' name='Microsoft.VC80.CRT' version='8.0.50608.0' processorArchitecture='x86' publicKeyToken='1fc8b3b9a1e18e3b'\"" *)
+	  "link /nologo %s%s%s%s%s /implib:%s /out:%s /defaultlib:msvcrt.lib /subsystem:%s %s %s %s"
 	  (if !verbose >= 2 then "/verbose " else "")
           (if link_exe = `EXE then "" else "/dll ")
 	  (if main_pgm then "" else "/export:symtbl /export:reloctbl ")
@@ -720,7 +721,8 @@ let build_dll link_exe output_file files exts extra_args =
       failwith "Error during linking\n"
     end;
 
-    if !merge_manifest && Sys.file_exists manifest_file then begin
+    if !merge_manifest && (!default_manifest || Sys.file_exists manifest_file) 
+    then begin
       let fn =
         if !default_manifest then Filename.concat flexdir "default.manifest"
         else manifest_file
