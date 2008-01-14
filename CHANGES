@@ -1,5 +1,5 @@
-Since 0.4
- - new -default-manifest option
+Version 0.5, release on 2008-01-11
+ - new -default-manifest option (always on, currently)
  - use a temp file name for getting the output of commands (allow 
    several instances of flexlink to run in parallel)
 
