@@ -286,8 +286,20 @@ module Symbol = struct
 	  (* weak ext *)
 	  emit_int32 oc (Int32.of_int s'.sym_pos);
 	  output_string oc (String.sub s.auxs 4 (String.length s.auxs - 4))
-      | { storage = 3; extra_info = `Section s' } ->
+      | { storage = 3; extra_info = `Section s' } when int8 s.auxs 14 = 5 (* IMAGE_COMDAT_SELECT_ASSOCIATIVE *) ->
 	  (* section def *)
+          output_string oc (String.sub s.auxs 0 12);
+          emit_int16 oc s'.sec_pos;
+          output_string oc (String.sub s.auxs 14 4)
+      | { storage = 3; extra_info = `Section s' } when int8 s.auxs 14 = 5 (* IMAGE_COMDAT_SELECT_ASSOCIATIVE *) ->
+	  (* section def *)
+          Printf.eprintf "!!! section symbol %s -> %s\n%!" s.sym_name s'.sec_name;
+          Printf.eprintf "length = %i\n" (int32_ s.auxs 0);
+          Printf.eprintf "# reloc = %i\n" (int16 s.auxs 4);
+          Printf.eprintf "# linenum = %i\n" (int16 s.auxs 6);
+          Printf.eprintf "checksum = %i\n" (int32_ s.auxs 8);
+          Printf.eprintf "idx = %i\n" (int16 s.auxs 12);
+          Printf.eprintf "sel = %i\n" (int8 s.auxs 14);
 	  assert false
       | _ ->
 	  if s.storage = 105 then assert (int16 s.auxs 12 = 0);

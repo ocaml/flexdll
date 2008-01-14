@@ -1,3 +1,6 @@
+Since 0.5
+ - support COMDAT section symbols
+
 Version 0.5, release on 2008-01-11
  - new -default-manifest option (always on, currently)
  - use a temp file name for getting the output of commands (allow 

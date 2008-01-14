@@ -15,6 +15,7 @@ MSVCC = cl /nologo /MD -D_CRT_SECURE_NO_DEPRECATE
 CYGCC = gcc 
 MINCC = gcc -mno-cygwin
 OCAMLOPT = FLEXLINKFLAGS=-default-manifest ocamlopt
+#OCAMLOPT = ocamlopt
 
 support:
 	for i in $(CHAINS); do $(MAKE) build_$$i ; done 
