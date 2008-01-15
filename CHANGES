@@ -1,5 +1,6 @@
-Since 0.5
+Version 0.6, released on 2008-01-15
  - support COMDAT section symbols
+ - support mixed libraries (import library + regular objects)
 
 Version 0.5, release on 2008-01-11
  - new -default-manifest option (always on, currently)

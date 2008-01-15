@@ -448,7 +448,7 @@ let build_dll link_exe output_file files exts extra_args =
   let objs =
     collect (function (f,`Obj x) -> Some (f,x) | _ -> None) files in
   let libs =
-    collect (function (f,`Lib (x,[])) -> Some (f,x) | _ -> None) files in
+    collect (function (f,`Lib (x,_)) -> Some (f,x) | _ -> None) files in
 
   let defined = ref StrSet.empty in
   let add_def s = defined := StrSet.add s !defined in
@@ -516,12 +516,20 @@ let build_dll link_exe output_file files exts extra_args =
      objects. *)
   let defined_in = Hashtbl.create 16 in
   let def_in_obj fn (objname,obj) = List.iter
-    (fun sym ->
-       if Symbol.is_defin sym
-       then Hashtbl.replace defined_in sym.sym_name (fn,objname,obj);
-    ) obj.symbols in
+      (fun sym ->
+        if Symbol.is_defin sym
+        then begin
+          if !explain then
+            Printf.printf "Symbol %s found in %s(%s)\n%!" sym.sym_name fn
+              objname;
+          Hashtbl.replace defined_in sym.sym_name (fn,objname,obj);
+        end
+      ) obj.symbols in
   List.iter
-    (fun (fn,objs) -> List.iter (def_in_obj fn) objs)
+    (fun (fn,objs) ->
+      if !explain then
+        Printf.printf "Scanning lib %s\n%!" fn;
+      List.iter (def_in_obj fn) objs)
     libs;
 
   let imported = ref StrSet.empty in
@@ -596,7 +604,10 @@ let build_dll link_exe output_file files exts extra_args =
             if !explain then
               Printf.printf "%s -> %s(%s) because of %s\n%!" fn libname objname s;
             link_libobj o
-          with Not_found -> ())
+          with Not_found ->
+            if !explain then
+              Printf.printf "%s needs %s (not found)\n%!" fn s
+      )
       (needed obj)
   and link_libobj (libname,objname,obj) =
     if Hashtbl.mem libobjects (libname,objname) then ()
@@ -648,9 +659,16 @@ let build_dll link_exe output_file files exts extra_args =
   let files =
     List.flatten
       (List.map
-	 (fun (fn,_) ->
+	 (fun (fn,d) ->
 	    let all = Hashtbl.find_all redirect fn in
-	    if all = [] then [fn] else all)
+	    if all = [] then [fn]
+            else match d with `Lib (_,[]) | `Obj _ -> all | _ -> fn::all
+            (* Special case for mixed import libraries + normal objects:
+               if some objects require relocation, we still pass
+               the import library to the linker so that it can find
+               imported symbols. Extracted object have higher priorities
+               than objects embedded in the library, so this is ok. *)
+         )
 	 files
       )
     @ exts in
