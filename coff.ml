@@ -291,9 +291,9 @@ module Symbol = struct
           output_string oc (String.sub s.auxs 0 12);
           emit_int16 oc s'.sec_pos;
           output_string oc (String.sub s.auxs 14 4)
-      | { storage = 3; extra_info = `Section s' } when int8 s.auxs 14 = 5 (* IMAGE_COMDAT_SELECT_ASSOCIATIVE *) ->
+      | { storage = 3; extra_info = `Section s' } ->
 	  (* section def *)
-          Printf.eprintf "!!! section symbol %s -> %s\n%!" s.sym_name s'.sec_name;
+          Printf.eprintf "!!! section symbol not supported (symbol: %s -> section:%s)\n%!" s.sym_name s'.sec_name;
           Printf.eprintf "length = %i\n" (int32_ s.auxs 0);
           Printf.eprintf "# reloc = %i\n" (int16 s.auxs 4);
           Printf.eprintf "# linenum = %i\n" (int16 s.auxs 6);
@@ -369,8 +369,10 @@ module Section = struct
 
     let data =
       if int32_ buf 20 = 0 then `Uninit size
-      else `Lazy (ic, filebase + int32_ buf 20, size) in
-    (* `String (read ic (filebase + int32_ buf 20) size) in  *)
+      else
+(*        `Lazy (ic, filebase + int32_ buf 20, size) *)
+        `String (read ic (filebase + int32_ buf 20) size)
+    in
 
     { sec_pos = (-1);
       sec_name = name;
@@ -710,10 +712,14 @@ module Lib = struct
   let read filename =
     let ic = open_in_bin filename in
     try
+(*      let t0 = Unix.gettimeofday () in
+      Printf.printf "Reading %s...%!" filename; *)
       let r =
 	if is_lib ic then `Lib (read_lib ic filename)
 	else let ofs = obj_ofs ic in `Obj (Coff.get ic ofs 0 filename) in
 (*      close_in ic; *)  (* do not close: cf `Lazy *)
+(*      let t1 = Unix.gettimeofday () in
+      Printf.printf "  Done  (%f ms)\n%!" (t1 -. t0);  *)
       r
     with exn ->
       close_in ic;

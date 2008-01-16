@@ -129,20 +129,24 @@ let find_file fn =
 let find_file =
   let memo = Hashtbl.create 16 in
   fun fn ->
-    try Hashtbl.find memo fn
+    let k = String.lowercase fn in
+    try Hashtbl.find memo k
     with Not_found ->
-      let fn =
-	if String.length fn > 2 && String.sub fn 0 2 = "-l" then
-	  "lib" ^ (String.sub fn 2 (String.length fn - 2))
-	else fn in
-      let r =
-	match find_file fn with
+      try Hashtbl.find memo (k ^ ".lib")
+      with Not_found ->
+        let fn =
+	  if String.length fn > 2 && String.sub fn 0 2 = "-l" then
+	    "lib" ^ (String.sub fn 2 (String.length fn - 2))
+	  else fn in
+        let r =
+	  match find_file fn with
 	  | Some fn -> fn
 	  | None ->
 	      failwith (Printf.sprintf "Cannot find file %S" fn)
-      in
-      Hashtbl.add memo fn r;
-      r
+        in
+        Hashtbl.add memo k r;
+        Hashtbl.add memo (k ^ ".lib") r;
+        r
 
 
 (*******************************)
@@ -430,8 +434,9 @@ let build_dll link_exe output_file files exts extra_args =
   let _,files =
     List.fold_left (fun (seen,accu) fn ->
 		      let fn = find_file fn in
-		      if StrSet.mem fn seen then (seen, accu)
-		      else (StrSet.add fn seen, fn :: accu)
+                      let k = String.lowercase fn in
+		      if StrSet.mem k seen then (seen, accu)
+		      else (StrSet.add k seen, fn :: accu)
 		   ) (StrSet.empty,[]) files in
   let files = List.rev files in
 
@@ -466,6 +471,7 @@ let build_dll link_exe output_file files exts extra_args =
 
   (* Collect all the available symbols, including those defined
      in default libraries *)
+  let collected = Hashtbl.create 8 in
   let rec collect_defined_obj obj =
     List.iter (fun (x,y) ->
 		 if !verbose >= 2 then
@@ -491,8 +497,11 @@ let build_dll link_exe output_file files exts extra_args =
       )
       obj.symbols
   and collect_file fn =
-    if !verbose >= 2 then Printf.printf "** open: %s\n" fn;
-    collect_defined (Lib.read fn)
+    if not (Hashtbl.mem collected (String.lowercase fn)) then begin
+      Hashtbl.replace collected (String.lowercase fn) ();
+      if !verbose >= 2 then Printf.printf "** open: %s\n" fn;
+      collect_defined (Lib.read fn)
+    end
 
   and collect_defined = function
     | `Obj obj -> collect_defined_obj obj
@@ -507,7 +516,9 @@ let build_dll link_exe output_file files exts extra_args =
           )
 	  imports
   in
-  List.iter (fun (_,x) -> collect_defined x) files;
+  List.iter (fun (fn,x) ->
+    Hashtbl.replace collected (String.lowercase fn) ();
+    collect_defined x) files;
   List.iter (fun fn -> collect_file (find_file fn)) !default_libs;
   List.iter (fun fn -> collect_file (find_file fn)) exts;
 
@@ -564,11 +575,13 @@ let build_dll link_exe output_file files exts extra_args =
        | _ -> ()) files;
 *)
 
-  let record_obj obj =
+  let record_obj name obj =
     let fn = temp_file "dyndll"
       (if !toolchain = `MSVC then ".obj" else ".o") in
     let oc = open_out_bin fn in
     Coff.put oc obj;
+(*    Printf.printf "%i bytes, %s\n%!" (1000. *. (t1 -. t0))
+      (out_channel_length oc) name; *)
     close_out oc;
     fn
   in
@@ -591,7 +604,7 @@ let build_dll link_exe output_file files exts extra_args =
   let close_obj name imps obj =
     error_imports name imps;
     add_reloc name obj imps;
-    record_obj obj in
+    record_obj name obj in
 
   let rec link_obj fn obj =
     exported := exports !exported obj;
@@ -623,22 +636,23 @@ let build_dll link_exe output_file files exts extra_args =
        else Hashtbl.replace redirect fn (close_obj fn imps obj);
     ) objs;
 
-  let to_explode = Hashtbl.create 16 in
+  let need_lib = Hashtbl.create 16 in
   Hashtbl.iter
     (fun (libname,objname) (obj,imps) ->
-       if not (StrSet.is_empty imps) then (
-	 error_imports (Printf.sprintf "%s(%s)" libname objname) imps;
-	 Hashtbl.replace to_explode libname ()
-       )
+      if StrSet.is_empty imps
+      then Hashtbl.replace need_lib libname ()
+          (* the linker will find this object in this library *)
+      else begin
+	error_imports (Printf.sprintf "%s(%s)" libname objname) imps;
+        if !explain then
+          Printf.printf "Library object %s(%s) needs to be rewritten\n"
+            libname objname;
+        Hashtbl.add redirect libname
+          (close_obj (Printf.sprintf "%s(%s)" libname objname) imps obj)
+      end
     )
     libobjects;
-  Hashtbl.iter
-    (fun (libname,objname) (obj,imps) ->
-       if Hashtbl.mem to_explode libname
-       then Hashtbl.add redirect libname
-	 (close_obj (Printf.sprintf "%s(%s)" libname objname) imps obj)
-    )
-    libobjects;
+
   if !show_exports then (
     Printf.printf "** Exported symbols:\n";
     StrSet.iter print_endline !exported;
@@ -655,19 +669,21 @@ let build_dll link_exe output_file files exts extra_args =
   add_export_table obj (StrSet.elements !exported)
     (usym (if main_pgm then "static_symtable" else "symtbl"));
   if not main_pgm then add_master_reloc_table obj !reloctbls (usym "reloctbl");
-  let descr = Filename.quote (record_obj obj) in
+  let descr = Filename.quote (record_obj "descriptor" obj) in
   let files =
     List.flatten
       (List.map
 	 (fun (fn,d) ->
 	    let all = Hashtbl.find_all redirect fn in
 	    if all = [] then [fn]
-            else match d with `Lib (_,[]) | `Obj _ -> all | _ -> fn::all
-            (* Special case for mixed import libraries + normal objects:
-               if some objects require relocation, we still pass
-               the import library to the linker so that it can find
-               imported symbols. Extracted object have higher priorities
-               than objects embedded in the library, so this is ok. *)
+            else
+              match d with
+              | `Lib _ when Hashtbl.mem need_lib fn -> fn::all
+              | `Lib (_, []) | `Obj _ -> all
+              | `Lib _ -> fn::all
+            (* Note: extracted object have higher priorities
+               than objects embedded in the library, so this is ok.
+               We always keep libraries with import symbols. *)
          )
 	 files
       )
@@ -683,7 +699,6 @@ let build_dll link_exe output_file files exts extra_args =
 	let implib = temp_file "dyndll_implib" ".lib" in
 	let _impexp = add_temp (Filename.chop_suffix implib ".lib" ^ ".exp") in
 	Printf.sprintf
-(*	  "link /nologo %s%s%s%s%s /implib:%s /out:%s /defaultlib:msvcrt.lib /subsystem:%s %s %s %s /manifestdependency:\"type='win32' name='Microsoft.VC80.CRT' version='8.0.50608.0' processorArchitecture='x86' publicKeyToken='1fc8b3b9a1e18e3b'\"" *)
 	  "link /nologo %s%s%s%s%s /implib:%s /out:%s /defaultlib:msvcrt.lib /subsystem:%s %s %s %s"
 	  (if !verbose >= 2 then "/verbose " else "")
           (if link_exe = `EXE then "" else "/dll ")

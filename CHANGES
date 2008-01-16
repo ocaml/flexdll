@@ -1,6 +1,8 @@
-Version 0.6, released on 2008-01-15
+Since 0.5
  - support COMDAT section symbols
  - support mixed libraries (import library + regular objects)
+ - optimizations (do not rewrite library objects when not needed,
+   pass the lib to the linker)
 
 Version 0.5, release on 2008-01-11
  - new -default-manifest option (always on, currently)
