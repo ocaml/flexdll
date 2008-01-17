@@ -735,7 +735,7 @@ let build_dll link_exe output_file files exts extra_args =
 	  extra_args
     | `MINGW ->
 	Printf.sprintf
-	  "gcc -mno-cygwin %s%s -L. %s %s -o %s %s %s %s"
+	  "gcc -mno-cygwin %s%s -L. %s %s -o %s %s %s %s %s"
 	  (if link_exe = `EXE then "" else "-shared ")
 	  (if main_pgm then "" else if !noentry then "-Wl,-e0 " else "-Wl,-e_FlexDLLiniter@12 ")
 	  (mk_dirs_opt "-I")
@@ -743,6 +743,7 @@ let build_dll link_exe output_file files exts extra_args =
 	  (Filename.quote output_file)
 	  descr
 	  files
+          (if !implib then "-Wl,--out-implib=" ^ Filename.quote (Filename.chop_extension output_file ^ ".a") else "")
 	  extra_args
   in
   if !verbose >= 1 || !dry_mode then Printf.printf "+ %s\n%!" cmd;
