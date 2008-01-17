@@ -696,7 +696,12 @@ let build_dll link_exe output_file files exts extra_args =
 	   with MSVC compilers seems to break Stack overflow recovery
 	   in OCaml. No idea why. *)
 
-	let implib = temp_file "dyndll_implib" ".lib" in
+	let implib =
+          if !implib then
+            Filename.chop_extension output_file ^ ".lib"
+          else
+            temp_file "dyndll_implib" ".lib"
+        in
 	let _impexp = add_temp (Filename.chop_suffix implib ".lib" ^ ".exp") in
 	Printf.sprintf
 	  "link /nologo %s%s%s%s%s /implib:%s /out:%s /defaultlib:msvcrt.lib /subsystem:%s %s %s %s"

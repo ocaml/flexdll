@@ -33,6 +33,7 @@ let defexports = ref []
 let noentry = ref false
 let use_cygpath = ref true
 let cygpath_arg : [`Yes | `No | `None] ref = ref `None
+let implib = ref false
 
 let usage_msg =
   Printf.sprintf
@@ -89,6 +90,9 @@ let specs = [
 
   "-save-temps", Arg.Set save_temps,
   " Do not delete intermediate files";
+
+  "-implib", Arg.Set implib,
+  " Do not delete the generated import library";
 
   "-v", Arg.Unit (fun () -> incr verbose),
   " Increment verbosity (can be repeated)";

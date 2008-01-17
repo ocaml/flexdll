@@ -3,6 +3,8 @@ Since 0.5
  - support mixed libraries (import library + regular objects)
  - optimizations (do not rewrite library objects when not needed,
    pass the lib to the linker)
+ - new -real-manifest, replace -default-manifest
+ - new -implib option
 
 Version 0.5, release on 2008-01-11
  - new -default-manifest option (always on, currently)
