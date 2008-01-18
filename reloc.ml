@@ -371,8 +371,15 @@ let add_master_reloc_table obj names symname =
 
 let collect_dllexports obj =
   let dirs = Coff.directives obj in
-  List.map (function (_,x::_) -> x | _ -> assert false)
+  let l = List.map (function  (_,x::_) -> x
+    | _ -> assert false)
     (List.find_all (fun (cmd,args) -> String.uppercase cmd = "EXPORT") dirs)
+  in
+  match !toolchain with
+  | `MSVC -> List.map drop_underscore l
+  | _ -> l
+
+
 
 let exports accu obj =
   List.fold_left
