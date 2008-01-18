@@ -34,6 +34,7 @@ let noentry = ref false
 let use_cygpath = ref true
 let cygpath_arg : [`Yes | `No | `None] ref = ref `None
 let implib = ref false
+let deffile = ref None
 
 let usage_msg =
   Printf.sprintf
@@ -93,6 +94,9 @@ let specs = [
 
   "-implib", Arg.Set implib,
   " Do not delete the generated import library";
+
+  "-outdef", Arg.String (fun s -> deffile := Some s),
+  " Produce a def file with exported symbols";
 
   "-v", Arg.Unit (fun () -> incr verbose),
   " Increment verbosity (can be repeated)";
@@ -183,6 +187,15 @@ let parse_cmdline () =
         String.sub s 0 2 :: String.sub s 2 (String.length s - 2) :: tr rest
     | s :: rest when String.length s >= 5 && String.sub s 0 5 = "/link" ->
         "-link" :: String.sub s 5 (String.length s - 5) :: tr rest
+    | x :: rest when x <> "" && x.[0] = '-' ->
+        begin
+          try
+            let i = String.index x ':' in
+            String.sub x 0 i :: String.sub x (i + 1) (String.length x - i - 1)
+            :: tr rest
+          with Not_found ->
+            x :: tr rest
+        end
     | x :: rest -> x :: tr rest
     | [] -> []
   in

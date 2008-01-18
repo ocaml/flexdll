@@ -606,8 +606,11 @@ let build_dll link_exe output_file files exts extra_args =
     add_reloc name obj imps;
     record_obj name obj in
 
+  let dll_exports = ref StrSet.empty in
   let rec link_obj fn obj =
     exported := exports !exported obj;
+    dll_exports := List.fold_left (fun accu x -> StrSet.add x accu)
+        !dll_exports (collect_dllexports obj);
     StrSet.iter
       (fun s ->
         if StrSet.mem s !exported then ()
@@ -689,6 +692,22 @@ let build_dll link_exe output_file files exts extra_args =
       )
     @ exts in
   let files = quote_files files in
+
+  begin
+    match !deffile with
+    | Some x when not !dry_mode ->
+        let fn =
+          if x = "" then Filename.chop_extension output_file ^ ".def"
+          else x
+        in
+        if !verbose >= 1 then Printf.printf "Generate %s\n%!" fn;
+        let oc = open_out fn in
+        Printf.fprintf oc "LIBRARY %s\n" output_file;
+        Printf.fprintf oc "EXPORTS\n";
+        StrSet.iter (Printf.fprintf oc "  %s\n") !dll_exports;
+        close_out oc
+    | _ -> ()
+  end;
 
   let cmd = match !toolchain with
     | `MSVC ->

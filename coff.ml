@@ -434,7 +434,11 @@ module Coff = struct
       sections = []; symbols = []; opts = 0 }
 
   let parse_directives s =
-    let l = String.length s in
+    let rec find_end i =
+      if i = 0 || s.[i - 1] <> '\000' then i
+      else find_end (i - 1)
+    in
+    let l = find_end (String.length s) in
     let rec aux0 i = if i = l then [] else match s.[i] with
       | ' ' -> aux0 (i+1)
       | '-' | '/' -> aux1 (i+1) (i+1)
