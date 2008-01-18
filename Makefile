@@ -102,7 +102,7 @@ package_bin:
 	$(MAKE) clean all
 	rm -f $(PACKAGE_BIN)
 	zip $(PACKAGE_BIN) $(COMMON_FILES) \
-	    flexlink.exe flexdll.h flexdll_*.obj flexdll_*.o
+	    flexlink.exe flexdll_*.obj flexdll_*.o
 
 do_upload_bin:
 	rsync $(PACKAGE_BIN) $(URL)
@@ -119,3 +119,9 @@ swap:
 	NOMLFICORE=1 $(OCAMLOPT) -o flexlink-new.exe $(LINKFLAGS) $(OBJS)
 	cp flexlink.exe flexlink.exe.bak
 	cp flexlink-new.exe flexlink.exe
+
+PREFIX = "C:\Program Files\flexdll"
+
+install:
+	mkdir -p $(PREFIX)
+	cp $(COMMON_FILES) flexlink.exe flexdll_*.obj flexdll_*.o $(PREFIX)
