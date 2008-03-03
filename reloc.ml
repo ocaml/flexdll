@@ -507,17 +507,17 @@ let build_dll link_exe output_file files exts extra_args =
     if not (Hashtbl.mem collected (String.lowercase fn)) then begin
       Hashtbl.replace collected (String.lowercase fn) ();
       if !verbose >= 2 then Printf.printf "** open: %s\n" fn;
-      collect_defined (Lib.read fn)
+      collect_defined fn (Lib.read fn)
     end
 
-  and collect_defined = function
+  and collect_defined fn = function
     | `Obj obj -> collect_defined_obj obj
     | `Lib (objs,imports) ->
 	List.iter (fun (_,obj) -> collect_defined_obj obj) objs;
 	List.iter
 	  (fun (s,_) ->
 	    if !verbose >= 2 then
-	       Printf.printf "import symbol %s\n" s;
+	       Printf.printf "lib %s import symbol %s\n%!" fn s;
             add_def s;
 	    add_def ("__imp_" ^ s)
           )
@@ -525,7 +525,7 @@ let build_dll link_exe output_file files exts extra_args =
   in
   List.iter (fun (fn,x) ->
     Hashtbl.replace collected (String.lowercase fn) ();
-    collect_defined x) files;
+    collect_defined fn x) files;
   List.iter (fun fn -> collect_file (find_file fn)) !default_libs;
   List.iter (fun fn -> collect_file (find_file fn)) exts;
 
@@ -865,7 +865,6 @@ let compile_if_needed file =
 let dump fn =
   let fn = find_file fn in
   Printf.printf "*** %s:\n" fn;
-  print_endline fn;
   match Lib.read fn with
   | `Lib (objs,imports) ->
       List.iter

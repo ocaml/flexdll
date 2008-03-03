@@ -728,4 +728,13 @@ module Lib = struct
     with exn ->
       close_in ic;
       raise exn
+
+  let read filename =
+    try
+      read filename
+    with exn ->
+      failwith
+        (Printf.sprintf "Error while reading %s: %s"
+           filename (Printexc.to_string exn))
+
 end

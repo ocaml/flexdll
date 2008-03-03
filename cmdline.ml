@@ -130,7 +130,7 @@ let specs = [
 
   "-where", Arg.Unit
     (fun () ->
-      print_endline (Filename.dirname Sys.argv.(0));
+      print_endline (Filename.dirname Sys.executable_name);
       exit 0
     ),
   " Show the FlexDLL directory";
