@@ -684,16 +684,22 @@ let build_dll link_exe output_file files exts extra_args =
     List.flatten
       (List.map
 	 (fun (fn,d) ->
-	    let all = Hashtbl.find_all redirect fn in
-	    if all = [] then [fn]
-            else
-              match d with
-              | `Lib _ when Hashtbl.mem need_lib fn -> fn::all
-              | `Lib (_, []) | `Obj _ -> all
-              | `Lib _ -> fn::all
+	   let all = Hashtbl.find_all redirect fn in
+           let r =
+	   if all = [] then [fn]
+           else
+             match d with
+             | `Lib _ when Hashtbl.mem need_lib fn -> all @ [fn]
+             | `Lib (_, []) | `Obj _ -> all
+             | `Lib _ -> all @ [fn]
             (* Note: extracted object have higher priorities
                than objects embedded in the library, so this is ok.
-               We always keep libraries with import symbols. *)
+               We always keep libraries with import symbols.
+               For mingw, it is necessary to put the library after
+               extracted objects. *)
+           in
+(*           Printf.printf "%s -> %s\n%!" fn (String.concat "," r); *)
+           r
          )
 	 files
       )
