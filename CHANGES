@@ -1,4 +1,4 @@
-Since 0.5
+Version 0.6, released on 2008-02-11
  - support COMDAT section symbols
  - support mixed libraries (import library + regular objects)
  - optimizations (do not rewrite library objects when not needed,
@@ -6,13 +6,14 @@ Since 0.5
  - new -real-manifest, replace -default-manifest
  - new -implib option
  - new -outdef option
+ - new zlib/libpng license
 
-Version 0.5, release on 2008-01-11
+Version 0.5, released on 2008-01-11
  - new -default-manifest option (always on, currently)
  - use a temp file name for getting the output of commands (allow 
    several instances of flexlink to run in parallel)
 
-Version 0.4, release on 2008-01-02
+Version 0.4, released on 2008-01-02
  - Code cleanup
  - FLEXLINKFLAGS env var to pass extra arguments
 
