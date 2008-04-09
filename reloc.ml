@@ -119,7 +119,7 @@ let find_file fn =
       (List.map
 	 (fun dir ->
 	    let fn = Filename.concat dir fn in
-	    [ fn; fn ^ ".lib"; fn ^ ".a" ]
+	    [ fn; fn ^ ".lib"; fn ^ ".a"; fn ^ ".dll.a" ]
 	 ) (""::!search_path)) in
   match find_file_in l with
     | Some x -> Some x
