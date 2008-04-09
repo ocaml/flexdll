@@ -1,3 +1,7 @@
+Version 0.7, released on 2008-03-09
+ - allow .dll.a as automatic extension for libraries
+ - minor bug fixes
+
 Version 0.6, released on 2008-02-11
  - support COMDAT section symbols
  - support mixed libraries (import library + regular objects)
