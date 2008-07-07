@@ -792,7 +792,7 @@ let build_dll link_exe output_file files exts extra_args =
       failwith "Error during linking\n"
     end;
 
-    if !merge_manifest && (not !real_manifest || Sys.file_exists manifest_file)
+    if (not !no_merge_manifest) && !merge_manifest && (not !real_manifest || Sys.file_exists manifest_file)
     then begin
       let fn =
         if !real_manifest then manifest_file

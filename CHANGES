@@ -1,3 +1,6 @@
+Version 0.8, released on 2008-03-10
+ - new -no-merge-manifest
+
 Version 0.7, released on 2008-03-09
  - allow .dll.a as automatic extension for libraries
  - minor bug fixes

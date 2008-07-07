@@ -20,6 +20,7 @@ let show_imports = ref false
 let dry_mode = ref false
 let verbose = ref 0
 let dirs = ref []
+let no_merge_manifest = ref false
 let merge_manifest = ref false
 let real_manifest = ref false
 let add_flexdll_obj = ref true
@@ -118,6 +119,9 @@ let specs = [
 
   "-cygpath", Arg.Unit (fun () -> cygpath_arg := `Yes),
   " Use cygpath (default for cygwin)";
+
+  "-no-merge-manifest", Arg.Set no_merge_manifest,
+  " Do not merge the manifest (takes precedence over -merge-manifest)";
 
   "-merge-manifest", Arg.Set merge_manifest,
   " Merge manifest to the dll or exe (if generated)";
