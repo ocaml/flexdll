@@ -250,7 +250,7 @@ module Symbol = struct
 	  Printf.printf "export %s @ 0x%08lx\n" sect s.value
       | { storage = 2; section = `Num 0; value = 0l } ->
 	  Printf.printf "extern\n"
-      | { storage = 3; value = 0l; auxn = 1 } ->
+      | { storage = 3; value = 0l; auxn = auxn } when auxn > 0 ->
 	  Printf.printf "section %s, num %i, select %i\n" sect
 	    (int16 s.auxs 12)
 	    (int8 s.auxs 14)
@@ -529,7 +529,7 @@ module Coff = struct
 		   | Some s' -> s.extra_info <- `Alias s'
 		   | None -> assert false
 		 with Invalid_argument _ -> assert false);
-	    | { storage = 3; stype = 0; auxn = 1 } ->
+	    | { storage = 3; stype = 0; auxn = auxn } when auxn > 0 ->
 		(* section def *)
 		let num = int16 s.auxs 12 in
 		if num > 0 then

@@ -1,6 +1,7 @@
-VERSION = 0.8
+VERSION = 0.9
 all: flexlink.exe support
 
+.PHONY: version.ml
 version.ml:
 	echo "let version = \"$(VERSION)\"" > version.ml
 
