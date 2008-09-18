@@ -235,6 +235,7 @@ let add_reloc_table x p sname =
         | `x64, 0x04 -> 0x0001 (* rel32 *)
         | `x64, 0x05 -> 0x0004 (* rel32_1 *)
         | `x64, 0x08 -> 0x0003 (* rel32_4 *)
+        | `x86, (0x0a | 0x0b) -> 0x0100 (* debug relocs: ignore *)
 	| _, k  ->
             let msg =
               Printf.sprintf "Unsupported relocation kind %04x for %s"

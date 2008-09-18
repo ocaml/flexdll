@@ -1,5 +1,6 @@
-Version 0.9, released on 2008-08-17
+Version 0.9, released on 2008-09-18
  - fix bug with COFF symbols for sections (with more than 1 auxilliary block)
+ - ignore debug relocations on x86 (of kind 0x000a, 0x000b)
 
 Version 0.8, released on 2008-03-10
  - new -no-merge-manifest
