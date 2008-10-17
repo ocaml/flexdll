@@ -98,7 +98,11 @@ let cygpath l =
   get_output (Printf.sprintf "cygpath -m %s" (String.concat " " l))
 
 let gcclib () =
-  Filename.dirname (get_output1 "gcc -print-libgcc-file-name")
+  let extra = match !toolchain with
+  | `MINGW -> "-mno-cygwin "
+  | _ -> ""
+  in
+  Filename.dirname (get_output1 (Printf.sprintf "gcc %s-print-libgcc-file-name" extra))
 
 let file_exists fn =
   if Sys.file_exists fn then Some fn

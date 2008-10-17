@@ -1,3 +1,7 @@
+Since 0.9
+- use "gcc -mno-cygwin -print-libgcc-file-name" to get the standard
+  library directory for mingw
+
 Version 0.9, released on 2008-09-18
  - fix bug with COFF symbols for sections (with more than 1 auxilliary block)
  - ignore debug relocations on x86 (of kind 0x000a, 0x000b)
