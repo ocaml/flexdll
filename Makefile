@@ -1,4 +1,4 @@
-VERSION = 0.9
+VERSION = 0.10
 all: flexlink.exe support
 
 .PHONY: version.ml

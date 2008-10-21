@@ -87,7 +87,7 @@ let quote_files lst =
   let s =
     String.concat " "
       (List.map (fun f -> if f = "" then f else Filename.quote f) lst) in
-  if String.length s >= 8192
+  if String.length s >= 2048
   then build_diversion lst
   else s
 

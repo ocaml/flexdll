@@ -1,6 +1,8 @@
-Since 0.9
+Version 0.10, release on 2008-10-21
 - use "gcc -mno-cygwin -print-libgcc-file-name" to get the standard
   library directory for mingw
+- lower the length threshold to use a diversion file when calling the
+  linker with many arguments
 
 Version 0.9, released on 2008-09-18
  - fix bug with COFF symbols for sections (with more than 1 auxilliary block)
