@@ -97,7 +97,7 @@ upload_src: package_src upload
 
 # Binary package
 
-PACKAGE_BIN = flexdll-bin-$(VERSION).zip
+PACKAGE_BIN = flexdll-bin-$(VERSION)$(PACKAGE_BIN_SUFFIX).zip
 
 package_bin:
 	$(MAKE) clean all
@@ -109,6 +109,9 @@ do_upload_bin:
 	rsync $(PACKAGE_BIN) $(URL)
 
 upload_bin: package_bin do_upload_bin
+
+upload_bin_64:
+	PACKAGE_BIN_SUFFIX=-amd64 $(MAKE) upload_bin
 
 include $(shell cygpath -ad "$(shell ocamlopt -where)/Makefile.config")
 
