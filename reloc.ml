@@ -467,6 +467,7 @@ let build_dll link_exe output_file files exts extra_args =
   let libs =
     collect (function (f,`Lib (x,_)) -> Some (f,x) | _ -> None) files in
 
+  let from_imports = ref StrSet.empty in
   let defined = ref StrSet.empty in
   let add_def s = defined := StrSet.add s !defined in
   if main_pgm then add_def (usym "static_symtable")
@@ -523,6 +524,7 @@ let build_dll link_exe output_file files exts extra_args =
 	  (fun (s,_) ->
 	    if !verbose >= 2 then
 	       Printf.printf "lib %s import symbol %s\n%!" fn s;
+            from_imports := StrSet.add s !from_imports;
             add_def s;
 	    add_def ("__imp_" ^ s)
           )
@@ -556,14 +558,18 @@ let build_dll link_exe output_file files exts extra_args =
       List.iter (def_in_obj fn) objs)
     libs;
 
+  let imported_from_implib = ref StrSet.empty in
   let imported = ref StrSet.empty in
   let needed obj = needed normalize StrSet.empty obj in
   let imports obj =
+    let n = needed obj in
+    imported_from_implib := StrSet.union !imported_from_implib
+        (StrSet.inter n !from_imports);
     StrSet.filter
       (fun s -> match check_prefix "__imp_" s with
 	 | Some s' -> imported := StrSet.add s' !imported; false
 	 | None -> true)
-      (StrSet.diff (needed obj) !defined) in
+      (StrSet.diff n !defined) in
 
   (* Second step: transitive closure, starting from given objects *)
 
@@ -672,7 +678,12 @@ let build_dll link_exe output_file files exts extra_args =
   if !show_exports then (
     Printf.printf "** Exported symbols:\n";
     StrSet.iter print_endline !exported;
+    Printf.printf "** Symbols from import libs:\n";
+    StrSet.iter print_endline !imported_from_implib;
   );
+
+  if !reexport_from_implibs then
+    exported := StrSet.union !exported !imported_from_implib;
 
   (* Create the descriptor object *)
   let obj = Coff.empty (!machine = `x64) in
