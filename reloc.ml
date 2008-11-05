@@ -428,8 +428,8 @@ let parse_dll_exports fn =
 
 
 let dll_exports fn = match !toolchain with
-  | `MSVC ->
-      failwith "Creation of import library not supported on the MSVC toolchain"
+  | `MSVC | `LIGHTLD ->
+      failwith "Creation of import library not supported for this toolchain"
   | `CYGWIN | `MINGW ->
       let dmp = temp_file "dyndll" ".dmp" in
       if cmd_verbose (Printf.sprintf "objdump -p %s > %s" fn dmp) <> 0
@@ -531,7 +531,8 @@ let build_dll link_exe output_file files exts extra_args =
   List.iter (fun (fn,x) ->
     Hashtbl.replace collected (String.lowercase fn) ();
     collect_defined fn x) files;
-  List.iter (fun fn -> collect_file (find_file fn)) !default_libs;
+  if !use_default_libs then
+    List.iter (fun fn -> collect_file (find_file fn)) !default_libs;
   List.iter (fun fn -> collect_file (find_file fn)) exts;
 
   (* Determine which objects from the given libraries should be linked
@@ -782,6 +783,17 @@ let build_dll link_exe output_file files exts extra_args =
 	  files
           (if !implib then "-Wl,--out-implib=" ^ Filename.quote (Filename.chop_extension output_file ^ ".a") else "")
 	  extra_args
+    | `LIGHTLD ->
+        no_merge_manifest := true;
+	Printf.sprintf
+	  "ld %s%s -o %s %s %s %s %s"
+	  (if link_exe = `EXE then "" else "--shared ")
+	  (if main_pgm then "" else if !noentry then "-e0 " else "-e FlexDLLiniter@12 ")
+	  (Filename.quote output_file)
+	  descr
+	  files
+          (if !implib then "--out-implib " ^ Filename.quote (Filename.chop_extension output_file ^ ".a") else "")
+	  extra_args
   in
   if !verbose >= 1 || !dry_mode then Printf.printf "+ %s\n%!" cmd;
   if not !dry_mode then begin
@@ -842,6 +854,8 @@ let setup_toolchain () = match !toolchain with
 	 "-luser32"; "-lkernel32"; "-ladvapi32"; "-lshell32" ];
       if !exe_mode = `EXE then default_libs := "crt2.o" :: !default_libs
       else default_libs := "dllcrt2.o" :: !default_libs
+  | `LIGHTLD ->
+      search_path := !dirs
 
 let compile_if_needed file =
   if Filename.check_suffix file ".c" then begin
@@ -866,6 +880,8 @@ let compile_if_needed file =
 	    (Filename.quote tmp_obj)
 	    (mk_dirs_opt "-I")
 	    file
+      | `LIGHTLD ->
+          failwith "Compilation of C code is not supported for this toolchain"
     in
     if !verbose >= 1 || !dry_mode then Printf.printf "+ %s\n%!" cmd;
     if (Sys.command cmd <> 0) then failwith "Error while compiling";
@@ -896,7 +912,7 @@ let all_files () =
   let tc = match !toolchain with
   | `MSVC -> "msvc.obj"
   | `CYGWIN -> "cygwin.o"
-  | `MINGW -> "mingw.o" in
+  | `MINGW | `LIGHTLD -> "mingw.o" in
   if !exe_mode <> `DLL then
     if !add_flexdll_obj then f ("flexdll_" ^ tc) :: files
     else files
@@ -915,7 +931,7 @@ let () =
         | _, `Yes -> true
         | _, `No -> false
         | (`CYGWIN|`MINGW), `None -> (Sys.command "cygpath -v 2>NUL >NUL" = 0)
-        | `MSVC, `None -> false
+        | (`MSVC|`LIGHTLD), `None -> false
       end;
 
 
@@ -923,8 +939,10 @@ let () =
       Printf.printf "** Use cygpath: %b\n" !use_cygpath;
       Printf.printf "** Search path:\n";
       List.iter print_endline !search_path;
-      Printf.printf "** Default libraries:\n";
-      List.iter print_endline !default_libs;
+      if !use_default_libs then begin
+        Printf.printf "** Default libraries:\n";
+        List.iter print_endline !default_libs;
+      end
     );
     let files = all_files () in
     if !dump_mode then List.iter dump files

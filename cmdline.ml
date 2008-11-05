@@ -11,9 +11,10 @@ let underscore = ref true
 
 let machine : [ `x86 | `x64 ] ref = ref `x86
 
+let use_default_libs = ref true
 let subsystem = ref "console"
 let explain = ref false
-let toolchain : [ `MSVC | `MINGW | `CYGWIN ] ref = ref `MSVC
+let toolchain : [ `MSVC | `MINGW | `CYGWIN | `LIGHTLD ] ref = ref `MSVC
 let save_temps = ref false
 let show_exports = ref false
 let show_imports = ref false
@@ -79,11 +80,12 @@ let specs = [
   "-l", Arg.String (fun s -> files := ("-l" ^ s) :: !files),
   "<lib> Library file";
 
-  "-chain", Arg.Symbol (["msvc";"cygwin";"mingw"],
+  "-chain", Arg.Symbol (["msvc";"cygwin";"mingw";"ld"],
 			(function
 			   | "msvc" -> toolchain := `MSVC
 			   | "cygwin" -> toolchain := `CYGWIN
 			   | "mingw" -> toolchain := `MINGW
+                           | "ld" -> toolchain := `LIGHTLD
 			   | _ -> assert false)),
   " Choose which linker to use";
 
@@ -141,6 +143,9 @@ let specs = [
 
   "-nounderscore", Arg.Clear underscore,
   " Normal symbols are not prefixed with an underscore";
+
+  "-nodefaultlibs", Arg.Clear use_default_libs,
+  " Do not assume any default library";
 
   "-x64", Arg.Unit (fun () -> machine := `x64; underscore := false),
   " x86_64 mode";

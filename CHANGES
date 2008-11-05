@@ -1,3 +1,6 @@
+Since 0.10
+- experimental support for directly calling "ld" instead of "gcc"
+
 Version 0.10, release on 2008-10-21
 - use "gcc -mno-cygwin -print-libgcc-file-name" to get the standard
   library directory for mingw
