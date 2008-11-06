@@ -11,7 +11,7 @@ let underscore = ref true
 
 let machine : [ `x86 | `x64 ] ref = ref `x86
 
-let reexport_from_implibs = ref false
+let reexport_from_implibs = ref true
 let use_default_libs = ref true
 let subsystem = ref "console"
 let explain = ref false
@@ -135,8 +135,8 @@ let specs = [
   "-export", Arg.String (fun s -> defexports := s :: !defexports),
   "<sym> Explicitly export a symbol";
 
-  "-reexport", Arg.Set reexport_from_implibs,
-  " Reexport symbols imported from import libraries";
+  "-noreexport", Arg.Clear reexport_from_implibs,
+  " Do not reexport symbols imported from import libraries";
 
   "-where", Arg.Unit
     (fun () ->
