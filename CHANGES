@@ -1,6 +1,8 @@
 Since 0.10
 - experimental support for directly calling "ld" instead of "gcc"
 - allow to reexport symbols imported from an import library
+- quote the response file argument
+- use slashes instead of backslashed in response file (needed for mingw's ld)
 
 Version 0.10, release on 2008-10-21
 - use "gcc -mno-cygwin -print-libgcc-file-name" to get the standard

@@ -77,7 +77,11 @@ let build_diversion lst =
   List.iter
     (fun f ->
       if f <> "" then begin
-        output_string oc (Filename.quote f); output_char oc '\n'
+        let s = Filename.quote f in
+        for i = 0 to String.length s - 1 do
+          if s.[i] = '\\' then s.[i] <- '/'
+        done;
+        output_string oc s; output_char oc '\n'
       end)
     lst;
   close_out oc;
@@ -88,7 +92,7 @@ let quote_files lst =
     String.concat " "
       (List.map (fun f -> if f = "" then f else Filename.quote f) lst) in
   if String.length s >= 2048
-  then build_diversion lst
+  then Filename.quote (build_diversion lst)
   else s
 
 
