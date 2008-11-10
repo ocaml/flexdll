@@ -24,7 +24,7 @@ let verbose = ref 0
 let dirs = ref []
 let no_merge_manifest = ref false
 let merge_manifest = ref false
-let real_manifest = ref false
+let real_manifest = ref true
 let add_flexdll_obj = ref true
 let files = ref []
 let exts = ref []
@@ -130,7 +130,10 @@ let specs = [
   " Merge manifest to the dll or exe (if generated)";
 
   "-real-manifest", Arg.Set real_manifest,
-  " Use the generated manifest, not the default one";
+  " Use the generated manifest (default behavior)";
+
+  "-default-manifest", Arg.Clear real_manifest,
+  " Use the default manifest";
 
   "-export", Arg.String (fun s -> defexports := s :: !defexports),
   "<sym> Explicitly export a symbol";

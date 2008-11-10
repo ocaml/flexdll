@@ -3,6 +3,7 @@ Since 0.10
 - by default, reexport symbols imported from an import library
 - quote the response file argument
 - use slashes instead of backslashed in response file (needed for mingw's ld)
+- by default, use the real manifest
 
 Version 0.10, release on 2008-10-21
 - use "gcc -mno-cygwin -print-libgcc-file-name" to get the standard
