@@ -1,11 +1,12 @@
-Since 0.10
+Version 0.11, released on 2008-11-10
+- compiled with mingw port so as to depend on msvcrt.dll, not msvcr80.dll
 - experimental support for directly calling "ld" instead of "gcc"
 - by default, reexport symbols imported from an import library
 - quote the response file argument
 - use slashes instead of backslashed in response file (needed for mingw's ld)
 - by default, use the real manifest
 
-Version 0.10, release on 2008-10-21
+Version 0.10, released on 2008-10-21
 - use "gcc -mno-cygwin -print-libgcc-file-name" to get the standard
   library directory for mingw
 - lower the length threshold to use a diversion file when calling the
