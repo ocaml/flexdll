@@ -87,11 +87,11 @@ let build_diversion lst =
   close_out oc;
   "@" ^ responsefile
 
-let quote_files lst =
+let quote_files use_reponse_file lst =
   let s =
     String.concat " "
       (List.map (fun f -> if f = "" then f else Filename.quote f) lst) in
-  if String.length s >= 2048
+  if use_reponse_file && String.length s >= 2048
   then Filename.quote (build_diversion lst)
   else s
 
@@ -725,7 +725,13 @@ let build_dll link_exe output_file files exts extra_args =
 	 files
       )
     @ exts in
-  let files = quote_files files in
+
+  let use_response_file =
+    match !toolchain with
+    | `MSVC | `LIGHTLD -> true
+    | `MINGW | `CYGWIN -> false
+  in
+  let files = quote_files use_response_file files in
 
   begin
     match !deffile with
