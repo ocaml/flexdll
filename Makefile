@@ -17,8 +17,7 @@ CYGCC = gcc
 MINCC = gcc -mno-cygwin
 OCAMLOPT = ocamlopt
 #OCAMLOPT = FLEXLINKFLAGS=-real-manifest ocamlopt
-#LINKFLAGS = unix.cmxa
-LINKFLAGS =
+LINKFLAGS = unix.cmxa
 
 support:
 	for i in $(CHAINS); do $(MAKE) build_$$i ; done 
@@ -27,7 +26,7 @@ build_msvc: flexdll_msvc.obj flexdll_initer_msvc.obj
 build_cygwin: flexdll_cygwin.o flexdll_initer_cygwin.o 
 build_mingw: flexdll_mingw.o flexdll_initer_mingw.o 
 
-OBJS = version.ml coff.ml cmdline.ml reloc.ml
+OBJS = version.ml coff.ml cmdline.ml flexlink_cmd.ml reloc.ml
 
 flexlink.exe: $(OBJS)
 	@echo Building flexlink.exe with TOOLCHAIN=$(TOOLCHAIN)

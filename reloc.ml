@@ -87,13 +87,17 @@ let build_diversion lst =
   close_out oc;
   "@" ^ responsefile
 
-let quote_files use_reponse_file lst =
+let alternate_cmd_exe = ref false
+
+let quote_files use_response_file lst =
   let s =
     String.concat " "
       (List.map (fun f -> if f = "" then f else Filename.quote f) lst) in
-  if use_reponse_file && String.length s >= 2048
-  then Filename.quote (build_diversion lst)
-  else s
+  if String.length s >= 4096 then
+    if use_response_file then Filename.quote (build_diversion lst)
+    else (alternate_cmd_exe := true; s)
+  else
+    s
 
 
 (* Looking for files *)
@@ -825,9 +829,18 @@ let build_dll link_exe output_file files exts extra_args =
       | `MSVC when !verbose < 1 -> cmd ^ " >NUL"
       | _ -> cmd
     in
+    let comspec = try Unix.getenv "COMSPEC" with Not_found -> "" in
+    if !alternate_cmd_exe then begin
+      Unix.putenv "COMSPEC" Sys.executable_name;
+      Unix.putenv "FLEXLINK_COMSPEC" "1";
+    end;
     if Sys.command cmd_quiet <> 0 then begin
       if cmd <> cmd_quiet then ignore (Sys.command cmd);
       failwith "Error during linking\n"
+    end;
+    if !alternate_cmd_exe then begin
+      Unix.putenv "COMSPEC" comspec;
+      Unix.putenv "FLEXLINK_COMSPEC" "";
     end;
 
     if (not !no_merge_manifest) && !merge_manifest && (not !real_manifest || Sys.file_exists manifest_file)
@@ -941,35 +954,41 @@ let all_files () =
     if !noentry then files
     else f ("flexdll_initer_" ^ tc) :: files
 
+let main () =
+  parse_cmdline ();
+  setup_toolchain ();
+
+  use_cygpath :=
+    begin
+      match !toolchain, !cygpath_arg with
+      | _, `Yes -> true
+      | _, `No -> false
+      | (`CYGWIN|`MINGW), `None -> (Sys.command "cygpath -v 2>NUL >NUL" = 0)
+      | (`MSVC|`LIGHTLD), `None -> false
+    end;
+
+
+  if !verbose >= 2 then (
+    Printf.printf "** Use cygpath: %b\n" !use_cygpath;
+    Printf.printf "** Search path:\n";
+    List.iter print_endline !search_path;
+    if !use_default_libs then begin
+      Printf.printf "** Default libraries:\n";
+      List.iter print_endline !default_libs;
+    end
+   );
+  let files = all_files () in
+  if !dump_mode then List.iter dump files
+  else
+    build_dll !exe_mode !output_file files !exts
+      (String.concat " " (List.rev !extra_args))
+
+
 let () =
   try
-    parse_cmdline ();
-    setup_toolchain ();
-
-    use_cygpath :=
-      begin
-        match !toolchain, !cygpath_arg with
-        | _, `Yes -> true
-        | _, `No -> false
-        | (`CYGWIN|`MINGW), `None -> (Sys.command "cygpath -v 2>NUL >NUL" = 0)
-        | (`MSVC|`LIGHTLD), `None -> false
-      end;
-
-
-    if !verbose >= 2 then (
-      Printf.printf "** Use cygpath: %b\n" !use_cygpath;
-      Printf.printf "** Search path:\n";
-      List.iter print_endline !search_path;
-      if !use_default_libs then begin
-        Printf.printf "** Default libraries:\n";
-        List.iter print_endline !default_libs;
-      end
-    );
-    let files = all_files () in
-    if !dump_mode then List.iter dump files
-    else
-      build_dll !exe_mode !output_file files !exts
-	(String.concat " " (List.rev !extra_args))
+    if (try Sys.getenv "FLEXLINK_COMSPEC" <> "" with Not_found -> false)
+    then Flexlink_cmd.cmd_exe ()
+    else main ()
   with
     | Failure s ->
 	Printf.eprintf "** Fatal error: %s\n" s;
