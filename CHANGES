@@ -1,7 +1,8 @@
 Since 0.11
 - gcc 3 does not support response files; to support longer command lines, we use a
   custom replacement for cmd.exe (which restricts the length of the command line
-  to 8kB whereas Windows supports 32kB) 
+  to 8kB whereas Windows supports 32kB)
+- patch for Richard Jones: do not find directories when looking for a file
 
 Version 0.11, released on 2008-11-10
 - compiled with mingw port so as to depend on msvcrt.dll, not msvcr80.dll

@@ -113,7 +113,7 @@ let gcclib () =
   Filename.dirname (get_output1 (Printf.sprintf "gcc %s-print-libgcc-file-name" extra))
 
 let file_exists fn =
-  if Sys.file_exists fn then Some fn
+  if Sys.file_exists fn && not (Sys.is_directory fn) then Some fn
   else if !use_cygpath && Sys.file_exists (fn ^ ".lnk") then
     Some (get_output1 (Printf.sprintf "cygpath -m %s" fn))
   else None
