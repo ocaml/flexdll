@@ -1,4 +1,4 @@
-Since 0.11
+Version 0.12, released on 2008-11-17
 - gcc 3 does not support response files; to support longer command lines, we use a
   custom replacement for cmd.exe (which restricts the length of the command line
   to 8kB whereas Windows supports 32kB)
