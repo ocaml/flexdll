@@ -1,3 +1,10 @@
+Version 0.13, released on 2008-11-20
+- another technique to work around the lack of response file for gcc: 
+  put the command line in an external bash script and apply bash to it
+  (relies on the fact that Cygwin programs can call Cygwin programs
+  with long command lines); this idea is from Xavier Leroy
+- the -subsystem switch is now supported for the mingw toolchain
+
 Version 0.12, released on 2008-11-17
 - gcc 3 does not support response files; to support longer command lines, we use a
   custom replacement for cmd.exe (which restricts the length of the command line

@@ -87,15 +87,49 @@ let build_diversion lst =
   close_out oc;
   "@" ^ responsefile
 
-let alternate_cmd_exe = ref false
+type cmdline = {
+    may_use_response_file: bool;
+    mutable too_long: bool;
+  }
 
-let quote_files use_response_file lst =
+let new_cmdline () =
+  let rf = match !toolchain with
+  | `MSVC | `LIGHTLD -> true
+  | `MINGW | `CYGWIN -> false
+  in
+  {
+   may_use_response_file = rf;
+   too_long = false;
+ }
+
+let run_command cmdline cmd =
+  let cmd_quiet =
+    match !toolchain with
+    | `MSVC when !verbose < 1 -> cmd ^ " >NUL"
+    | _ -> cmd
+  in
+  if cmdline.too_long then begin
+    (* Dump the command in a text file and apply bash to it. *)
+    let (fn, oc) = open_temp_file "longcmd" "" in
+    output_string oc cmd;
+    close_out oc;
+
+    if !verbose >= 1 then Printf.printf "(call with bash: %s)\n%!" fn;
+    if Sys.command (Printf.sprintf "bash %s" fn) <> 0 then
+      failwith "Error during linking\n"
+  end else
+    if Sys.command cmd_quiet <> 0 then begin
+      if cmd <> cmd_quiet then ignore (Sys.command cmd);
+      failwith "Error during linking\n"
+    end
+
+let quote_files cmdline lst =
   let s =
     String.concat " "
       (List.map (fun f -> if f = "" then f else Filename.quote f) lst) in
   if String.length s >= 4096 then
-    if use_response_file then Filename.quote (build_diversion lst)
-    else (alternate_cmd_exe := true; s)
+    if cmdline.may_use_response_file then Filename.quote (build_diversion lst)
+    else (cmdline.too_long <- true; s)
   else
     s
 
@@ -730,12 +764,8 @@ let build_dll link_exe output_file files exts extra_args =
       )
     @ exts in
 
-  let use_response_file =
-    match !toolchain with
-    | `MSVC | `LIGHTLD -> true
-    | `MINGW | `CYGWIN -> false
-  in
-  let files = quote_files use_response_file files in
+  let cmdline = new_cmdline () in
+  let files = quote_files cmdline files in
 
   begin
     match !deffile with
@@ -798,7 +828,8 @@ let build_dll link_exe output_file files exts extra_args =
 	  extra_args
     | `MINGW ->
 	Printf.sprintf
-	  "gcc -mno-cygwin %s%s -L. %s %s -o %s %s %s %s %s"
+	  "gcc -mno-cygwin -m%s %s%s -L. %s %s -o %s %s %s %s %s"
+          !subsystem
 	  (if link_exe = `EXE then "" else "-shared ")
 	  (if main_pgm then "" else if !noentry then "-Wl,-e0 " else "-Wl,-e_FlexDLLiniter@12 ")
 	  (mk_dirs_opt "-I")
@@ -824,24 +855,7 @@ let build_dll link_exe output_file files exts extra_args =
   if not !dry_mode then begin
     let manifest_file = output_file ^ ".manifest" in
     safe_remove manifest_file;
-    let cmd_quiet =
-      match !toolchain with
-      | `MSVC when !verbose < 1 -> cmd ^ " >NUL"
-      | _ -> cmd
-    in
-    let comspec = try Unix.getenv "COMSPEC" with Not_found -> "" in
-    if !alternate_cmd_exe then begin
-      Unix.putenv "COMSPEC" Sys.executable_name;
-      Unix.putenv "FLEXLINK_COMSPEC" "1";
-    end;
-    if Sys.command cmd_quiet <> 0 then begin
-      if cmd <> cmd_quiet then ignore (Sys.command cmd);
-      failwith "Error during linking\n"
-    end;
-    if !alternate_cmd_exe then begin
-      Unix.putenv "COMSPEC" comspec;
-      Unix.putenv "FLEXLINK_COMSPEC" "";
-    end;
+    run_command cmdline cmd;
 
     if (not !no_merge_manifest) && !merge_manifest && (not !real_manifest || Sys.file_exists manifest_file)
     then begin
@@ -985,10 +999,7 @@ let main () =
 
 
 let () =
-  try
-    if (try Sys.getenv "FLEXLINK_COMSPEC" <> "" with Not_found -> false)
-    then Flexlink_cmd.cmd_exe ()
-    else main ()
+  try main ()
   with
     | Failure s ->
 	Printf.eprintf "** Fatal error: %s\n" s;
