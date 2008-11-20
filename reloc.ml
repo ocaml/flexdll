@@ -995,7 +995,7 @@ let main () =
   if !dump_mode then List.iter dump files
   else
     build_dll !exe_mode !output_file files !exts
-      (String.concat " " (List.rev !extra_args))
+      (String.concat " " (List.map Filename.quote (List.rev !extra_args)))
 
 
 let () =
