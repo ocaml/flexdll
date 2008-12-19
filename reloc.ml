@@ -728,7 +728,7 @@ let build_dll link_exe output_file files exts extra_args =
     exported := StrSet.union !exported !imported_from_implib;
 
   (* Create the descriptor object *)
-  let obj = Coff.empty (!machine = `x64) in
+  let obj = Coff.create !machine in
 
   if not (StrSet.is_empty !imported) then begin
     add_import_table obj (StrSet.elements !imported);

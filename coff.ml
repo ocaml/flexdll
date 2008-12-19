@@ -424,10 +424,16 @@ module Section = struct
 end
 
 module Coff = struct
-  let empty x64 =
+  let add_section x sect =
+    x.sections <- sect :: x.sections
+  let add_symbol x sym =
+    x.symbols <- sym :: x.symbols
+
+  let create machine =
     let machine =
-      if x64 then 0x8664 (* amd64 *)
-      else 0x14c (* x86 *)
+      match machine with
+      | `x64 -> 0x8664
+      | `x86 -> 0x14c
     in
     { obj_name = "generated";
       machine = machine; date = 0x4603de0el;
