@@ -9,29 +9,6 @@
 (* This module implements a reader/writer for COFF object files
    and libraries. *)
 
-module Future: sig
-  type t
-  val create: unit -> t
-  val set: t -> int32 -> unit
-  val set_delayed: t -> (unit -> int32) -> unit
-  val create_delayed: (unit -> int32) -> t
-  val get: t -> unit -> int32
-  val add: t -> t -> t
-  val sub: t -> t -> t
-  val create_cst: int32 -> t
-end = struct
-  exception Undefined
-  type t = (unit -> int32) ref
-  let set x v = x := (fun () -> v)
-  let set_delayed x f = x := f
-  let get x () = let r = !x () in set x r; r
-  let create () = ref (fun () -> raise Undefined)
-  let create_delayed f = ref f
-  let add x y = ref (fun () -> Int32.add (!x ()) (!y ()))
-  let sub x y = ref (fun () -> Int32.sub (!x ()) (!y ()))
-  let create_cst x = ref (fun () -> x)
-end
-
 module Buf : sig
   type t
   val create: unit -> t
@@ -41,30 +18,41 @@ module Buf : sig
   val int8: t -> int -> unit
   val int32: t -> int32 -> unit
   val int16: t -> int -> unit
-  val lazy_int32: t -> (unit -> int32) -> unit
-  val future_int32: t -> Future.t
-  val set_future: t -> Future.t -> (unit -> int32) -> unit
+  val lazy_int32: t -> int32 Lazy.t -> unit
+  val future_int32: t -> int32 Lazy.t -> int32 ref
+  val set_future: t -> int32 ref -> unit
   val at: t -> int -> (unit -> unit) -> unit
 end = struct
   type t = {
       mutable buf: string;
       mutable pos: int;
+      mutable len: int;
       mutable patches: (unit -> unit) list;
     }
 
   let create () =
     { buf = String.create 16;
       pos = 0;
+      len = 16;
       patches = [] }
 
-  let int8 b x =
-    let len = String.length b.buf in
+  let ensure b n =
+    let len = ref b.len in
     let pos = b.pos in
-    if pos = len then begin
-      let nlen = len * 2 in
+    while n > !len do len := !len * 2 done;
+    let nbuf = String.create !len in
+    String.blit b.buf 0 nbuf 0 pos;
+    b.buf <- nbuf;
+    b.len <- !len
+
+  let int8 b x =
+    let pos = b.pos in
+    if pos = b.len then begin
+      let nlen = b.len * 2 in
       let nbuf = String.create nlen in
       String.blit b.buf 0 nbuf 0 pos;
       b.buf <- nbuf;
+      b.len <- nlen
     end;
     b.buf.[pos] <- Char.chr (x land 0xff);
     b.pos <- succ pos
@@ -87,9 +75,11 @@ end = struct
     output_string oc (String.sub b.buf 0 b.pos)
 
   let string b s =
-    for i = 0 to String.length s - 1 do
-      int8 b (Char.code s.[i])
-    done
+    let l = String.length s in
+    let r = b.pos + l in
+    if r > b.len then ensure b r;
+    String.blit s 0 b.buf b.pos l;
+    b.pos <- b.pos + l
 
   let int32 b i =
     int8 b (Int32.to_int i);
@@ -106,16 +96,15 @@ end = struct
   let lazy_int32 b i =
     let pos = b.pos in
     int32 b 0l;
-    add_patch b (fun () -> at b pos (fun () -> int32 b (i ())))
+    add_patch b (fun () -> at b pos (fun () -> int32 b (Lazy.force i)))
 
-  let future_int32 b =
-    let f = Future.create () in
-    lazy_int32 b (Future.get f);
-    f
+  let future_int32 b ofs =
+    let r = ref 0l in
+    lazy_int32 b (lazy (Int32.add !r (Lazy.force ofs)));
+    r
 
-  let set_future b f ofs =
-    let pos = Int32.of_int (length b) in
-    Future.set_delayed f (fun () -> Int32.add (ofs ()) pos)
+  let set_future b r =
+    r := Int32.of_int (length b)
 end
 
 

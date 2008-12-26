@@ -747,11 +747,9 @@ let build_dll link_exe output_file files exts extra_args =
            | (fn, _) -> failwith ("File is not an object file: " ^ fn)
         ) files
     in
-    prerr_endline "OK";
     let oc = open_out_bin output_file in
     Create_dll.create_dll oc (obj :: objs);
-    close_out oc;
-    prerr_endline "DONE"
+    close_out oc
   end else
   
 

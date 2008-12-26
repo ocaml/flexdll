@@ -76,6 +76,8 @@ let create_dll oc objs =
   let globals = Hashtbl.create 8 in
   let locals = Hashtbl.create 8 in
   let relocs = ref [] in
+
+  prerr_endline "step 1";
   List.iter
     (fun obj ->
       List.iter
@@ -117,15 +119,13 @@ let create_dll oc objs =
           | {sym_name=name; value=ofs; storage=storage; section = `Section s} as sym when s.sec_pos >= 0 ->
               let info = Hashtbl.find sec_info s.sec_pos in
               let rva =
-                Future.create_delayed
-                  (fun () ->
-                    Int32.add ofs
-                      (
-                       Int32.add
-                         info.sec_info_ofs
-                         info.sec_info_sec.vaddress
-                      )
-                  )
+                lazy
+                  (Int32.add ofs
+                     (
+                      Int32.add
+                        info.sec_info_ofs
+                        info.sec_info_sec.vaddress
+                     ))
               in
               if storage = 2
               then Hashtbl.replace globals name rva
@@ -160,6 +160,7 @@ let create_dll oc objs =
     sects := s :: !sects
   in
 
+  prerr_endline "step 2";
   Hashtbl.iter
     (fun name (l, sect) ->
       let data = Buf.create () in
@@ -170,6 +171,7 @@ let create_dll oc objs =
           info.sec_info_ofs <- Int32.of_int sec_ofs;
           let sdata = sect_data s in
           Buf.string data sdata;
+
           List.iter
             (fun r ->
               (* rva of the target symbol *)
@@ -185,27 +187,23 @@ let create_dll oc objs =
 
               (* rva of the relocation *)
               let rel_rva =
-                Future.create_delayed
-                  (fun () ->
-                    Int32.add r.addr
-                      (Int32.add
-                         info.sec_info_sec.vaddress
-                         info.sec_info_ofs
-                      ))
+                lazy (
+                Int32.add r.addr
+                  (Int32.add
+                     info.sec_info_sec.vaddress
+                     info.sec_info_ofs
+                  ))
               in
 
               let initial = read_int32 sdata (Int32.to_int r.addr) in
-              let initial = Future.create_cst initial in
               Buf.at data (sec_ofs + Int32.to_int r.addr)
                 (fun () ->
                   match r.rtype with
                   | 0x06 -> (* absolute address *)
                       relocs := rel_rva :: !relocs;
-                      let rva = Future.add rva (Future.create_cst image_base) in
-                      Buf.lazy_int32 data (Future.get (Future.add initial rva))
+                      Buf.lazy_int32 data (lazy (Int32.add (Int32.add initial (Lazy.force rva)) image_base))
                   | 0x14 -> (* rel32 *)
-                      let rva = Future.sub rva (Future.create_cst 4l) in
-                      Buf.lazy_int32 data (Future.get (Future.sub (Future.add initial rva) rel_rva))
+                      Buf.lazy_int32 data (lazy (Int32.sub (Int32.add initial (Lazy.force rva)) (Int32.add (Lazy.force rel_rva) 4l)))
                   | _ ->
                       assert false
                 )
@@ -219,40 +217,42 @@ let create_dll oc objs =
     sections;
 
   (* create the export table *)
+  prerr_endline "create export table";
   let edata =
     let edata = Section.create ".edata" 0x40000040l in
     let b = Buf.create () in
     edata.data <- `Buf b;
+    let vaddress = lazy edata.vaddress in
 
     let export_symbols = ["symtbl";"reloctbl"] in
     let export_symbols = List.sort compare export_symbols in
     Buf.int32 b 0l; (* flags *)
     Buf.int32 b 0l; (* timestamp *)
     Buf.int32 b 0l; (* version *)
-    let dllname_offset = Buf.future_int32 b in (* name rva *)
+    let dllname_offset = Buf.future_int32 b vaddress in (* name rva *)
     Buf.int32 b 1l; (* ordinal base *)
     Buf.int32 b (Int32.of_int (List.length export_symbols)); (* addr table entries *)
     Buf.int32 b (Int32.of_int (List.length export_symbols)); (* number of name pointers *)
-    let exp_tbl = Buf.future_int32 b in (* export address table rva *)
-    let name_ptr_tbl = Buf.future_int32 b in (* name pointer rva *)
-    let ord_ptr_tbl = Buf.future_int32 b in (* ordinal table pointer rva *)
-    Buf.set_future b dllname_offset (fun () -> edata.vaddress);
+    let exp_tbl = Buf.future_int32 b vaddress in (* export address table rva *)
+    let name_ptr_tbl = Buf.future_int32 b vaddress in (* name pointer rva *)
+    let ord_ptr_tbl = Buf.future_int32 b vaddress in (* ordinal table pointer rva *)
+    Buf.set_future b dllname_offset;
     Buf.string b dllname;
     Buf.int8 b 0;
-    Buf.set_future b exp_tbl (fun () -> edata.vaddress);
-    List.iter (fun s -> Buf.lazy_int32 b (Future.get (rva_of_global ("_" ^ s))))
+    Buf.set_future b exp_tbl;
+    List.iter (fun s -> Buf.lazy_int32 b (rva_of_global ("_" ^ s)))
       export_symbols;
-    Buf.set_future b name_ptr_tbl (fun () -> edata.vaddress);
+    Buf.set_future b name_ptr_tbl;
     let export_symbols_ofs =
-      List.map (fun _ -> Buf.future_int32 b) export_symbols
+      List.map (fun _ -> Buf.future_int32 b vaddress) export_symbols
     in
-    Buf.set_future b ord_ptr_tbl (fun () -> edata.vaddress);
+    Buf.set_future b ord_ptr_tbl;
     for i = 0 to List.length export_symbols - 1 do
       Buf.int16 b i
     done;
     List.iter2
       (fun s f ->
-        Buf.set_future b f (fun () -> edata.vaddress);
+        Buf.set_future b f;
         Buf.string b s;
         Buf.int8 b 0
       )
@@ -263,13 +263,15 @@ let create_dll oc objs =
   in
 
   (* create the reloc table *)
+  prerr_endline "create reloc table";
   let rdata =
     let rdata = Section.create ".rdata" 0x40000040l in
     let b = Buf.create () in
     rdata.data <- `Buf b;
 
     (* careful with list functions: the list of relocs can be very long *)
-    let relocs = List.rev_map (fun rva -> Future.get rva ()) !relocs in
+    let relocs = List.rev_map (fun rva -> Lazy.force rva) !relocs in
+    Printf.eprintf "# relocs = %i\n" (List.length relocs);
     let relocs = split_relocs page_size relocs in
     List.iter
       (fun (base, relocs) ->
