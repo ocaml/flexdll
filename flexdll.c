@@ -220,7 +220,8 @@ static void dump_symtbl(symtbl *tbl)
 
   for (i = 0; i < tbl->size; i++) {
     printf("[%i] ", i); fflush(stdout);
-    printf(" %p: %s\n", tbl->entries[i].addr, tbl->entries[i].name);
+    printf(" %p: ", tbl->entries[i].addr); fflush(stdout);
+    printf("%s\n", tbl->entries[i].name);
     fflush(stdout);
   }
 }
@@ -285,6 +286,8 @@ static void *find_symbol_global(void *data, const char *name) {
 }
 
 int flexdll_relocate(void *tbl) {
+  if (!tbl) { printf("No master relocation table\n"); return 0; }
+  printf("Master relocation table at %p\n", tbl); fflush(stdout);
   relocate_master(find_symbol_global, NULL, tbl);
   if (error) return 0;
   return 1;

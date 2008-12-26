@@ -9,6 +9,115 @@
 (* This module implements a reader/writer for COFF object files
    and libraries. *)
 
+module Future: sig
+  type t
+  val create: unit -> t
+  val set: t -> int32 -> unit
+  val set_delayed: t -> (unit -> int32) -> unit
+  val create_delayed: (unit -> int32) -> t
+  val get: t -> unit -> int32
+  val add: t -> t -> t
+  val sub: t -> t -> t
+  val create_cst: int32 -> t
+end = struct
+  exception Undefined
+  type t = (unit -> int32) ref
+  let set x v = x := (fun () -> v)
+  let set_delayed x f = x := f
+  let get x () = let r = !x () in set x r; r
+  let create () = ref (fun () -> raise Undefined)
+  let create_delayed f = ref f
+  let add x y = ref (fun () -> Int32.add (!x ()) (!y ()))
+  let sub x y = ref (fun () -> Int32.sub (!x ()) (!y ()))
+  let create_cst x = ref (fun () -> x)
+end
+
+module Buf : sig
+  type t
+  val create: unit -> t
+  val length: t -> int
+  val dump: out_channel -> t -> unit
+  val string: t -> string -> unit
+  val int8: t -> int -> unit
+  val int32: t -> int32 -> unit
+  val int16: t -> int -> unit
+  val lazy_int32: t -> (unit -> int32) -> unit
+  val future_int32: t -> Future.t
+  val set_future: t -> Future.t -> (unit -> int32) -> unit
+  val at: t -> int -> (unit -> unit) -> unit
+end = struct
+  type t = {
+      mutable buf: string;
+      mutable pos: int;
+      mutable patches: (unit -> unit) list;
+    }
+
+  let create () =
+    { buf = String.create 16;
+      pos = 0;
+      patches = [] }
+
+  let int8 b x =
+    let len = String.length b.buf in
+    let pos = b.pos in
+    if pos = len then begin
+      let nlen = len * 2 in
+      let nbuf = String.create nlen in
+      String.blit b.buf 0 nbuf 0 pos;
+      b.buf <- nbuf;
+    end;
+    b.buf.[pos] <- Char.chr (x land 0xff);
+    b.pos <- succ pos
+
+  let int16 b x =
+    int8 b x;
+    int8 b (x asr 8)
+
+  let length b = b.pos
+
+  let patch b =
+    List.iter (fun f -> f ()) b.patches;
+    b.patches <- []
+
+  let add_patch b f =
+    b.patches <- f :: b.patches
+
+  let dump oc b =
+    patch b;
+    output_string oc (String.sub b.buf 0 b.pos)
+
+  let string b s =
+    for i = 0 to String.length s - 1 do
+      int8 b (Char.code s.[i])
+    done
+
+  let int32 b i =
+    int8 b (Int32.to_int i);
+    int8 b (Int32.to_int (Int32.shift_right i 8));
+    int8 b (Int32.to_int (Int32.shift_right i 16));
+    int8 b (Int32.to_int (Int32.shift_right i 24))
+
+  let at b n f =
+    let pos = b.pos in
+    b.pos <- n;
+    f ();
+    b.pos <- pos
+
+  let lazy_int32 b i =
+    let pos = b.pos in
+    int32 b 0l;
+    add_patch b (fun () -> at b pos (fun () -> int32 b (i ())))
+
+  let future_int32 b =
+    let f = Future.create () in
+    lazy_int32 b (Future.get f);
+    f
+
+  let set_future b f ofs =
+    let pos = Int32.of_int (length b) in
+    Future.set_delayed f (fun () -> Int32.add (ofs ()) pos)
+end
+
 
 (* Internal representation of COFF object files *)
 
@@ -33,9 +142,11 @@ and reloc = {
 and section = {
   mutable sec_pos: int;
   sec_name: string;
-  vsize: int32;
+  mutable vsize: int32;
+  mutable vaddress: int32;
   mutable data:
-    [ `String of string | `Uninit of int
+      [ `String of string | `Uninit of int
+    | `Buf of Buf.t
     | `Lazy of in_channel * int * int ];
   mutable relocs: reloc list;
   sec_opts: int32;
@@ -188,6 +299,12 @@ module Symbol = struct
   let intern sec addr =
     { (empty ()) with section = `Section sec; storage = 3; value = addr }
 
+  let named_intern name sec addr =
+    { (empty ()) with sym_name = name; section = `Section sec; storage = 3; value = addr }
+
+  let label name sec addr =
+    { (empty ()) with sym_name = name; section = `Section sec; storage = 6; value = addr }
+
   let export name sec addr =
     { (empty ()) with sym_name = name; value = addr;
 	section = `Section sec; storage = 2 }
@@ -250,6 +367,8 @@ module Symbol = struct
 	  Printf.printf "export %s @ 0x%08lx\n" sect s.value
       | { storage = 2; section = `Num 0; value = 0l } ->
 	  Printf.printf "extern\n"
+      | { storage = 2; section = `Num 0; value = n } ->
+	  Printf.printf "common symbol, size %ld\n" n
       | { storage = 3; value = 0l; auxn = auxn } when auxn > 0 ->
 	  Printf.printf "section %s, num %i, select %i\n" sect
 	    (int16 s.auxs 12)
@@ -315,6 +434,14 @@ module Reloc = struct
     in
     sec.relocs <- { addr = addr; symbol = sym; rtype = rtype } :: sec.relocs
 
+  let rel32 machine sec addr sym =
+    let rtype =
+      match machine with
+      | `x86 -> 0x14
+      | `x64 -> 0x04
+    in
+    sec.relocs <- { addr = addr; symbol = sym; rtype = rtype } :: sec.relocs
+
   let get symtbl va ic base =
     let buf = read ic base 10 in
     { addr = Int32.sub (int32 buf 00) va;
@@ -341,7 +468,7 @@ end
 module Section = struct
   let create name flags = {
     sec_pos = (-1); sec_name = name; data = `String ""; relocs = [];
-    vsize = 0l;  sec_opts = flags;
+    vaddress = 0l; vsize = 0l;  sec_opts = flags;
   }
 
   let get filebase strtbl symtbl ic base =
@@ -377,6 +504,7 @@ module Section = struct
     { sec_pos = (-1);
       sec_name = name;
       vsize = int32 buf 8;
+      vaddress = va;
       data = data;
       relocs = relocs;
       sec_opts = int32 buf 36
@@ -389,6 +517,13 @@ module Section = struct
       (flags x.sec_opts);
     List.iter Reloc.dump x.relocs
 
+  let size s =
+    match s.data with
+    | `String s -> String.length s
+    | `Lazy (_,_,len) -> len
+    | `Uninit len -> len
+    | `Buf buf -> Buf.length buf
+
   let put strtbl oc x =
     let name =
       if String.length x.sec_name <= 8
@@ -396,18 +531,18 @@ module Section = struct
       else Printf.sprintf "/%ld" (strtbl x.sec_name)
     in
     output_string oc name; emit_zero oc (8 - String.length name);
-    emit_int32 oc 0l;
-    emit_int32 oc 0l;
+    emit_int32 oc x.vsize;
+    emit_int32 oc x.vaddress;
+    emit_int32 oc (Int32.of_int (size x));
     let send_data = match x.data with
       | `String s ->
-	  emit_int32 oc (Int32.of_int (String.length s));
 	  delayed_ptr oc (fun () -> output_string oc s)
       | `Lazy (ic,pos,len) ->
-	  emit_int32 oc (Int32.of_int len);
 	  delayed_ptr oc (fun () -> copy_data ic pos oc len)
       | `Uninit len ->
-	  emit_int32 oc (Int32.of_int len);
 	  emit_int32 oc 0l; (fun () -> ())
+      | `Buf buf ->
+	  delayed_ptr oc (fun () -> Buf.dump oc buf)
     in
 
     let send_reloc =
@@ -482,7 +617,7 @@ module Coff = struct
       match force_section_data sec with
 	| `String s -> parse_directives s
 	| `Uninit _ -> []
-	| `Lazy _ -> assert false
+	| `Lazy _ | `Buf _ -> assert false
     with Not_found -> []
 
   let get ic ofs base name =

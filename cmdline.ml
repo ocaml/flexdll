@@ -15,6 +15,7 @@ let reexport_from_implibs = ref true
 let use_default_libs = ref true
 let subsystem = ref "console"
 let explain = ref false
+let builtin_linker = ref false
 let toolchain : [ `MSVC | `MINGW | `CYGWIN | `LIGHTLD ] ref = ref `MSVC
 let save_temps = ref false
 let show_exports = ref false
@@ -153,6 +154,9 @@ let specs = [
 
   "-nodefaultlibs", Arg.Clear use_default_libs,
   " Do not assume any default library";
+
+  "-builtin", Arg.Set builtin_linker,
+  " Use built-in linker to produce a dll";
 
   "-x64", Arg.Unit (fun () -> machine := `x64; underscore := false),
   " x86_64 mode";

@@ -199,9 +199,9 @@ let find_file =
 
 let int32_to_buf b i =
   Buffer.add_char b (Char.chr (i land 0xff));
-  Buffer.add_char b (Char.chr ((i lsr 8) land 0xff));
-  Buffer.add_char b (Char.chr ((i lsr 16) land 0xff));
-  Buffer.add_char b (Char.chr ((i lsr 24) land 0xff))
+  Buffer.add_char b (Char.chr ((i asr 8) land 0xff));
+  Buffer.add_char b (Char.chr ((i asr 16) land 0xff));
+  Buffer.add_char b (Char.chr ((i asr 24) land 0xff))
 
 let int_to_buf b i =
   match !machine with
@@ -539,7 +539,7 @@ let build_dll link_exe output_file files exts extra_args =
 	List.find_all (fun (cmd,args) -> String.uppercase cmd = c)
 	  dirs)
     in
-    let deflibs = List.flatten (all_args "DEFAULTLIB") in
+    let deflibs = if !builtin_linker then [] else List.flatten (all_args "DEFAULTLIB") in
     List.iter (fun fn ->
 		 let fn = find_file fn in
 		 if not (Hashtbl.mem loaded_filenames fn)
@@ -738,7 +738,7 @@ let build_dll link_exe output_file files exts extra_args =
   add_export_table obj (StrSet.elements !exported)
     (usym (if main_pgm then "static_symtable" else "symtbl"));
   if not main_pgm then add_master_reloc_table obj !reloctbls (usym "reloctbl");
-  let descr = Filename.quote (record_obj "descriptor" obj) in
+  let descr = record_obj "descriptor" obj in
   let files =
     List.flatten
       (List.map
@@ -764,8 +764,23 @@ let build_dll link_exe output_file files exts extra_args =
       )
     @ exts in
 
+  if !builtin_linker then begin
+    let oc = open_out_bin output_file in
+    let objs = List.map
+        (fun s ->
+          prerr_endline s;
+          match Lib.read s with
+          | `Obj o -> o
+          | _ -> failwith ("File is not an object file: " ^ s)
+        ) (descr :: files)
+    in
+    Create_dll.create_dll oc objs;
+    close_out oc
+  end else
+
   let cmdline = new_cmdline () in
   let files = quote_files cmdline files in
+  let descr = Filename.quote descr in
 
   begin
     match !deffile with
@@ -877,7 +892,12 @@ let build_dll link_exe output_file files exts extra_args =
   end
 
 
-let setup_toolchain () = match !toolchain with
+let setup_toolchain () =
+  match !toolchain with
+  | _ when !builtin_linker ->
+      search_path := !dirs;
+      add_flexdll_obj := false;
+      noentry := true
   | `CYGWIN ->
       search_path :=
 	!dirs @
