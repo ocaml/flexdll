@@ -34,6 +34,24 @@ let sect_data s =
   | `String data -> data
   | _ -> assert false
 
+let split_relocs page_size relocs =
+  let relocs = List.sort compare relocs in
+  let blocks = ref [] and current_block = ref (ref []) and current_base = ref (-1l) in
+  List.iter
+    (fun rva ->
+      let base = Int32.mul (Int32.div rva page_size) page_size in
+      let ofs = Int32.to_int (Int32.sub rva base) in
+      if base = !current_base then (!current_block) := ofs :: !(!current_block)
+      else begin
+        current_base := base;
+        current_block := ref [ofs];
+        blocks := (base, !current_block) :: !blocks
+      end
+    )
+    relocs;
+  List.rev_map (fun (base, relocs) -> (base, List.rev !relocs)) !blocks
+
+
 type sec_info = {
     sec_info_obj: coff; (* original object *)
     mutable sec_info_sec: section; (* target section in the image *)
@@ -42,6 +60,8 @@ type sec_info = {
 
 let create_dll oc objs =
   let image_base = 0x10000000l in
+  let page_size = 0x1000l in
+  let dllname = "foo.dll" in
 
   (* msdos stub *)
   output_string oc "MZ";
@@ -55,11 +75,13 @@ let create_dll oc objs =
   let sym_id = ref 0 in
   let globals = Hashtbl.create 8 in
   let locals = Hashtbl.create 8 in
+  let relocs = ref [] in
   List.iter
     (fun obj ->
       Printf.printf "************** object: %s\n" obj.obj_name;
       List.iter
         (fun s ->
+          (* todo: cut the section name at 8 chars, remove the part of $ *)
           if discard_section s then ()
           else let (l, sect) =
             try Hashtbl.find sections s.sec_name
@@ -137,6 +159,15 @@ let create_dll oc objs =
   in
 
   let sects = ref [] in
+  (* Put image sections at their target rva *)
+  let va = ref 0x1000l in
+  let put_sect s =
+    s.vsize <- Int32.of_int (Section.size s);
+    s.vaddress <- !va;
+    va := align (Int32.add !va s.vsize) 0x1000l;
+    sects := s :: !sects
+  in
+
   Hashtbl.iter
     (fun name (l, sect) ->
       Printf.printf "*********** SECTION %s ***********\n" name;
@@ -175,13 +206,13 @@ let create_dll oc objs =
                       ))
               in
 
-
               let initial = read_int32 sdata (Int32.to_int r.addr) in
               let initial = Future.create_cst initial in
               Buf.at data (sec_ofs + Int32.to_int r.addr)
                 (fun () ->
                   match r.rtype with
                   | 0x06 -> (* absolute address *)
+                      relocs := rel_rva :: !relocs;
                       let rva = Future.add rva (Future.create_cst image_base) in
                       Buf.lazy_int32 data (Future.get (Future.add initial rva))
                   | 0x14 -> (* rel32 *)
@@ -195,65 +226,83 @@ let create_dll oc objs =
         )
         !l;
       sect.data <- `Buf data;
-      sects := sect :: !sects;
+      put_sect sect
     )
     sections;
 
-  let dllname = "foo.dll" in
-  let export_symbols = ["symtbl";"reloctbl"] in
-  let export_symbols = List.sort compare export_symbols in
-  let edata = Section.create ".edata" 0x40000040l in
-  sects := edata :: !sects;
-  let b = Buf.create () in
-  Buf.int32 b 0l; (* flags *)
-  Buf.int32 b 0l; (* timestamp *)
-  Buf.int32 b 0l; (* version *)
-  let dllname_offset = Buf.future_int32 b in (* name rva *)
-  Buf.int32 b 1l; (* ordinal base *)
-  Buf.int32 b (Int32.of_int (List.length export_symbols)); (* addr table entries *)
-  Buf.int32 b (Int32.of_int (List.length export_symbols)); (* number of name pointers *)
-  let exp_tbl = Buf.future_int32 b in (* export address table rva *)
-  let name_ptr_tbl = Buf.future_int32 b in (* name pointer rva *)
-  let ord_ptr_tbl = Buf.future_int32 b in (* ordinal table pointer rva *)
-  Buf.set_future b dllname_offset (fun () -> edata.vaddress);
-  Buf.string b dllname;
-  Buf.int8 b 0;
-  Buf.set_future b exp_tbl (fun () -> edata.vaddress);
-  List.iter (fun s -> Buf.lazy_int32 b (Future.get (rva_of_global ("_" ^ s))))
-    export_symbols;
-  Buf.set_future b name_ptr_tbl (fun () -> edata.vaddress);
-  let export_symbols_ofs =
-    List.map (fun _ -> Buf.future_int32 b) export_symbols
+  (* create the export table *)
+  let edata =
+    let edata = Section.create ".edata" 0x40000040l in
+    let b = Buf.create () in
+    edata.data <- `Buf b;
+
+    let export_symbols = ["symtbl";"reloctbl"] in
+    let export_symbols = List.sort compare export_symbols in
+    Buf.int32 b 0l; (* flags *)
+    Buf.int32 b 0l; (* timestamp *)
+    Buf.int32 b 0l; (* version *)
+    let dllname_offset = Buf.future_int32 b in (* name rva *)
+    Buf.int32 b 1l; (* ordinal base *)
+    Buf.int32 b (Int32.of_int (List.length export_symbols)); (* addr table entries *)
+    Buf.int32 b (Int32.of_int (List.length export_symbols)); (* number of name pointers *)
+    let exp_tbl = Buf.future_int32 b in (* export address table rva *)
+    let name_ptr_tbl = Buf.future_int32 b in (* name pointer rva *)
+    let ord_ptr_tbl = Buf.future_int32 b in (* ordinal table pointer rva *)
+    Buf.set_future b dllname_offset (fun () -> edata.vaddress);
+    Buf.string b dllname;
+    Buf.int8 b 0;
+    Buf.set_future b exp_tbl (fun () -> edata.vaddress);
+    List.iter (fun s -> Buf.lazy_int32 b (Future.get (rva_of_global ("_" ^ s))))
+      export_symbols;
+    Buf.set_future b name_ptr_tbl (fun () -> edata.vaddress);
+    let export_symbols_ofs =
+      List.map (fun _ -> Buf.future_int32 b) export_symbols
+    in
+    Buf.set_future b ord_ptr_tbl (fun () -> edata.vaddress);
+    for i = 0 to List.length export_symbols - 1 do
+      Buf.int16 b i
+    done;
+    List.iter2
+      (fun s f ->
+        Buf.set_future b f (fun () -> edata.vaddress);
+        Buf.string b s;
+        Buf.int8 b 0
+      )
+      export_symbols
+      export_symbols_ofs;
+    put_sect edata;
+    edata
   in
-  Buf.set_future b ord_ptr_tbl (fun () -> edata.vaddress);
-  for i = 0 to List.length export_symbols - 1 do
-    Buf.int16 b i
-  done;
-  List.iter2
-    (fun s f ->
-      Buf.set_future b f (fun () -> edata.vaddress);
-      Buf.string b s;
-      Buf.int8 b 0
-    )
-    export_symbols
-    export_symbols_ofs;
-  edata.data <- `Buf b;
 
-  let va = ref 0x1000l in
-  List.iter
-    (fun s ->
-      s.vsize <- Int32.of_int (Section.size s);
-      s.vaddress <- !va;
-      va := align (Int32.add !va s.vsize) 0x1000l;
-    )
-    !sects;
+  (* create the reloc table *)
+  let rdata =
+    let rdata = Section.create ".rdata" 0x40000040l in
+    let b = Buf.create () in
+    rdata.data <- `Buf b;
 
-  Hashtbl.iter
-    (fun name rva ->
-      Printf.printf "GLOBAL SYMBOL %s, addr %lx, in \n" name (Future.get rva ());
-    )
-    globals;
-
+    let relocs = List.map (fun rva -> Future.get rva ()) !relocs in
+    let relocs = split_relocs page_size relocs in
+    List.iter
+      (fun (base, relocs) ->
+        Printf.printf "relocs from base %lx\n" base;
+        List.iter (fun ofs -> Printf.printf "  offset %x\n" ofs) relocs
+      ) relocs;
+    List.iter
+      (fun (base, relocs) ->
+        let n = List.length relocs in
+        let size = 8 + 2 * n in
+        let size = if n mod 2 = 1 then size + 2 else size in
+        Buf.int32 b base;
+        Buf.int32 b (Int32.of_int size);
+        List.iter
+          (fun ofs -> Buf.int16 b (ofs lor 0x3000)) (* HIGHLOW reloc *)
+          relocs;
+        if n mod 2 = 1 then Buf.int16 b 0
+      )
+      relocs;
+    put_sect rdata;
+    rdata
+  in
 
   output_string oc "PE\000\000";
   (* coff header *)
@@ -300,11 +349,12 @@ let create_dll oc objs =
   for i = 0 to 15 do
     match i with
     | 0 -> emit_int32 oc edata.vaddress; emit_int32 oc edata.vsize
+    | 5 -> emit_int32 oc rdata.vaddress; emit_int32 oc rdata.vsize
     | _ -> emit_int32 oc 0l; emit_int32 oc 0l;
   done;
 
   let sects =
-    List.map (Section.put (fun _ -> assert false) oc) !sects
+    List.map (Section.put (fun _ -> assert false) oc) (List.rev !sects)
   in
   let align_file () =
     let i = pos_out oc mod 0x200 in
