@@ -637,14 +637,15 @@ let build_dll link_exe output_file files exts extra_args =
 *)
 
   let record_obj name obj =
-    let fn = temp_file "dyndll"
-      (if !toolchain = `MSVC then ".obj" else ".o") in
-    let oc = open_out_bin fn in
-    Coff.put oc obj;
-(*    Printf.printf "%i bytes, %s\n%!" (1000. *. (t1 -. t0))
-      (out_channel_length oc) name; *)
-    close_out oc;
-    fn
+    if !builtin_linker then ""
+    else begin
+      let fn = temp_file "dyndll"
+        (if !toolchain = `MSVC then ".obj" else ".o") in
+      let oc = open_out_bin fn in
+      Coff.put oc obj;
+      close_out oc;
+      fn
+    end
   in
 
   let add_reloc name obj imps =
@@ -738,13 +739,28 @@ let build_dll link_exe output_file files exts extra_args =
   add_export_table obj (StrSet.elements !exported)
     (usym (if main_pgm then "static_symtable" else "symtbl"));
   if not main_pgm then add_master_reloc_table obj !reloctbls (usym "reloctbl");
+
+  if !builtin_linker then begin
+    let objs = List.map
+        (function
+           | (_, `Obj obj) -> obj
+           | (fn, _) -> failwith ("File is not an object file: " ^ fn)
+        ) files
+    in
+    prerr_endline "OK";
+    let oc = open_out_bin output_file in
+    Create_dll.create_dll oc (obj :: objs);
+    close_out oc;
+    prerr_endline "DONE"
+  end else
+  
+
   let descr = record_obj "descriptor" obj in
   let files =
     List.flatten
       (List.map
 	 (fun (fn,d) ->
 	   let all = Hashtbl.find_all redirect fn in
-           let r =
 	   if all = [] then [fn]
            else
              match d with
@@ -756,27 +772,10 @@ let build_dll link_exe output_file files exts extra_args =
                We always keep libraries with import symbols.
                For mingw, it is necessary to put the library after
                extracted objects. *)
-           in
-(*           Printf.printf "%s -> %s\n%!" fn (String.concat "," r); *)
-           r
          )
 	 files
       )
     @ exts in
-
-  if !builtin_linker then begin
-    let oc = open_out_bin output_file in
-    let objs = List.map
-        (fun s ->
-          prerr_endline s;
-          match Lib.read s with
-          | `Obj o -> o
-          | _ -> failwith ("File is not an object file: " ^ s)
-        ) (descr :: files)
-    in
-    Create_dll.create_dll oc objs;
-    close_out oc
-  end else
 
   let cmdline = new_cmdline () in
   let files = quote_files cmdline files in

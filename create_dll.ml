@@ -78,7 +78,6 @@ let create_dll oc objs =
   let relocs = ref [] in
   List.iter
     (fun obj ->
-      Printf.printf "************** object: %s\n" obj.obj_name;
       List.iter
         (fun s ->
           (* todo: cut the section name at 8 chars, remove the part of $ *)
@@ -129,21 +128,14 @@ let create_dll oc objs =
                   )
               in
               if storage = 2
-              then begin
-                Printf.printf "GLOBAL SYMBOL:\n%!";
-                Symbol.dump sym;
-                Hashtbl.replace globals name rva
-              end
+              then Hashtbl.replace globals name rva
               else begin
                 sym.sym_pos <- !sym_id;
                 incr sym_id;
-                Printf.printf "LOCAL SYMBOL:\n%!";
-                Symbol.dump sym;
                 Hashtbl.replace locals sym.sym_pos rva
               end
-          | sym ->
-              Printf.printf "IGNORING SYMBOL:\n%!";
-              Symbol.dump sym
+          | _ ->
+              ()
         )
         obj.symbols;
     )
@@ -170,13 +162,10 @@ let create_dll oc objs =
 
   Hashtbl.iter
     (fun name (l, sect) ->
-      Printf.printf "*********** SECTION %s ***********\n" name;
       let data = Buf.create () in
       List.iter
         (fun s ->
           let info = Hashtbl.find sec_info s.sec_pos in
-          Printf.printf "From %s\n" info.sec_info_obj.obj_name;
-          Section.dump s;
           let sec_ofs = Buf.length data in
           info.sec_info_ofs <- Int32.of_int sec_ofs;
           let sdata = sect_data s in
@@ -190,7 +179,6 @@ let create_dll oc objs =
                 else if sym.sym_pos >= 0 then rva_of_local sym.sym_pos
                 else begin
                   Symbol.dump sym;
-                  Printf.printf "is_extern? %b\n%!" (Symbol.is_extern sym);
                   failwith (Printf.sprintf "Cannot resolve symbol %s\n" sym.sym_name)
                 end
               in
@@ -280,13 +268,9 @@ let create_dll oc objs =
     let b = Buf.create () in
     rdata.data <- `Buf b;
 
-    let relocs = List.map (fun rva -> Future.get rva ()) !relocs in
+    (* careful with list functions: the list of relocs can be very long *)
+    let relocs = List.rev_map (fun rva -> Future.get rva ()) !relocs in
     let relocs = split_relocs page_size relocs in
-    List.iter
-      (fun (base, relocs) ->
-        Printf.printf "relocs from base %lx\n" base;
-        List.iter (fun ofs -> Printf.printf "  offset %x\n" ofs) relocs
-      ) relocs;
     List.iter
       (fun (base, relocs) ->
         let n = List.length relocs in
