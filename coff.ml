@@ -96,7 +96,15 @@ end = struct
   let lazy_int32 b i =
     let pos = b.pos in
     int32 b 0l;
-    add_patch b (fun () -> at b pos (fun () -> int32 b (Lazy.force i)))
+    add_patch b 
+      (fun () ->
+        let i = Lazy.force i in
+        let s = b.buf in
+        s.[pos] <- Char.chr ((Int32.to_int i) land 0xff);
+        s.[pos+1] <- Char.chr ((Int32.to_int (Int32.shift_right i 8)) land 0xff);
+        s.[pos+2] <- Char.chr ((Int32.to_int (Int32.shift_right i 16)) land 0xff);
+        s.[pos+3] <- Char.chr ((Int32.to_int (Int32.shift_right i 24)) land 0xff)
+      )
 
   let future_int32 b ofs =
     let r = ref 0l in
