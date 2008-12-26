@@ -22,7 +22,6 @@ module Buf : sig
   val patch_lazy_int32: t -> int -> int32 Lazy.t -> unit
   val future_int32: t -> int32 Lazy.t -> int32 ref
   val set_future: t -> int32 ref -> unit
-  val at: t -> int -> (unit -> unit) -> unit
 end = struct
   type t = {
       mutable buf: string;
@@ -93,12 +92,6 @@ end = struct
     if r > b.len then ensure b r;
     blit_int32 b.buf b.pos i;
     b.pos <- r
-
-  let at b n f =
-    let pos = b.pos in
-    b.pos <- n;
-    f ();
-    b.pos <- pos
 
   let lazy_int32 b i =
     let pos = b.pos in
