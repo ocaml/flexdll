@@ -56,6 +56,7 @@ type sec_info = {
     sec_info_obj: coff; (* original object *)
     mutable sec_info_sec: section; (* target section in the image *)
     mutable sec_info_ofs: int32; (* offset within the target image *)
+    sec_info_vaddress: int32 Lazy.t;
   }
 
 let create_dll oc objs =
@@ -77,7 +78,6 @@ let create_dll oc objs =
   let locals = Hashtbl.create 8 in
   let relocs = ref [] in
 
-  prerr_endline "step 1";
   List.iter
     (fun obj ->
       List.iter
@@ -105,12 +105,15 @@ let create_dll oc objs =
           l := s :: !l;
           s.sec_pos <- !sec_id;
           incr sec_id;
-          Hashtbl.replace sec_info s.sec_pos
+          let rec info =
             {
              sec_info_obj = obj;
              sec_info_sec = sect;
              sec_info_ofs = 0l;
+             sec_info_vaddress = lazy (Int32.add info.sec_info_ofs sect.vaddress)
            }
+          in
+          Hashtbl.replace sec_info s.sec_pos info
         )
         obj.sections;
 
@@ -118,15 +121,7 @@ let create_dll oc objs =
         (function
           | {sym_name=name; value=ofs; storage=storage; section = `Section s} as sym when s.sec_pos >= 0 ->
               let info = Hashtbl.find sec_info s.sec_pos in
-              let rva =
-                lazy
-                  (Int32.add ofs
-                     (
-                      Int32.add
-                        info.sec_info_ofs
-                        info.sec_info_sec.vaddress
-                     ))
-              in
+              let rva = lazy (Int32.add ofs (Lazy.force info.sec_info_vaddress)) in
               if storage = 2
               then Hashtbl.replace globals name rva
               else begin
@@ -160,7 +155,6 @@ let create_dll oc objs =
     sects := s :: !sects
   in
 
-  prerr_endline "step 2";
   Hashtbl.iter
     (fun name (l, sect) ->
       let data = Buf.create () in
@@ -186,27 +180,18 @@ let create_dll oc objs =
               in
 
               (* rva of the relocation *)
-              let rel_rva =
-                lazy (
-                Int32.add r.addr
-                  (Int32.add
-                     info.sec_info_sec.vaddress
-                     info.sec_info_ofs
-                  ))
-              in
+              let rel_rva = lazy (Int32.add r.addr (Lazy.force info.sec_info_vaddress)) in
 
               let initial = read_int32 sdata (Int32.to_int r.addr) in
-              Buf.at data (sec_ofs + Int32.to_int r.addr)
-                (fun () ->
-                  match r.rtype with
-                  | 0x06 -> (* absolute address *)
-                      relocs := rel_rva :: !relocs;
-                      Buf.lazy_int32 data (lazy (Int32.add (Int32.add initial (Lazy.force rva)) image_base))
-                  | 0x14 -> (* rel32 *)
-                      Buf.lazy_int32 data (lazy (Int32.sub (Int32.add initial (Lazy.force rva)) (Int32.add (Lazy.force rel_rva) 4l)))
-                  | _ ->
-                      assert false
-                )
+              let pos = sec_ofs + Int32.to_int r.addr in
+              match r.rtype with
+              | 0x06 -> (* absolute address *)
+                  relocs := rel_rva :: !relocs;
+                  Buf.patch_lazy_int32 data pos (lazy (Int32.add (Int32.add initial (Lazy.force rva)) image_base))
+              | 0x14 -> (* rel32 *)
+                  Buf.patch_lazy_int32 data pos (lazy (Int32.sub (Int32.add initial (Lazy.force rva)) (Int32.add (Lazy.force rel_rva) 4l)))
+              | _ ->
+                  assert false
             )
             s.relocs
         )
@@ -217,7 +202,6 @@ let create_dll oc objs =
     sections;
 
   (* create the export table *)
-  prerr_endline "create export table";
   let edata =
     let edata = Section.create ".edata" 0x40000040l in
     let b = Buf.create () in
@@ -263,7 +247,6 @@ let create_dll oc objs =
   in
 
   (* create the reloc table *)
-  prerr_endline "create reloc table";
   let rdata =
     let rdata = Section.create ".rdata" 0x40000040l in
     let b = Buf.create () in
@@ -271,7 +254,6 @@ let create_dll oc objs =
 
     (* careful with list functions: the list of relocs can be very long *)
     let relocs = List.rev_map (fun rva -> Lazy.force rva) !relocs in
-    Printf.eprintf "# relocs = %i\n" (List.length relocs);
     let relocs = split_relocs page_size relocs in
     List.iter
       (fun (base, relocs) ->

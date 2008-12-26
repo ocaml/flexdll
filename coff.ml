@@ -19,6 +19,7 @@ module Buf : sig
   val int32: t -> int32 -> unit
   val int16: t -> int -> unit
   val lazy_int32: t -> int32 Lazy.t -> unit
+  val patch_lazy_int32: t -> int -> int32 Lazy.t -> unit
   val future_int32: t -> int32 Lazy.t -> int32 ref
   val set_future: t -> int32 ref -> unit
   val at: t -> int -> (unit -> unit) -> unit
@@ -79,13 +80,19 @@ end = struct
     let r = b.pos + l in
     if r > b.len then ensure b r;
     String.blit s 0 b.buf b.pos l;
-    b.pos <- b.pos + l
+    b.pos <- r
+
+  let blit_int32 s pos i =
+    s.[pos] <- Char.chr ((Int32.to_int i) land 0xff);
+    s.[pos+1] <- Char.chr ((Int32.to_int (Int32.shift_right i 8)) land 0xff);
+    s.[pos+2] <- Char.chr ((Int32.to_int (Int32.shift_right i 16)) land 0xff);
+    s.[pos+3] <- Char.chr ((Int32.to_int (Int32.shift_right i 24)) land 0xff)
 
   let int32 b i =
-    int8 b (Int32.to_int i);
-    int8 b (Int32.to_int (Int32.shift_right i 8));
-    int8 b (Int32.to_int (Int32.shift_right i 16));
-    int8 b (Int32.to_int (Int32.shift_right i 24))
+    let r = b.pos + 4 in
+    if r > b.len then ensure b r;
+    blit_int32 b.buf b.pos i;
+    b.pos <- r
 
   let at b n f =
     let pos = b.pos in
@@ -95,16 +102,13 @@ end = struct
 
   let lazy_int32 b i =
     let pos = b.pos in
-    int32 b 0l;
-    add_patch b 
-      (fun () ->
-        let i = Lazy.force i in
-        let s = b.buf in
-        s.[pos] <- Char.chr ((Int32.to_int i) land 0xff);
-        s.[pos+1] <- Char.chr ((Int32.to_int (Int32.shift_right i 8)) land 0xff);
-        s.[pos+2] <- Char.chr ((Int32.to_int (Int32.shift_right i 16)) land 0xff);
-        s.[pos+3] <- Char.chr ((Int32.to_int (Int32.shift_right i 24)) land 0xff)
-      )
+    let r = b.pos + 4 in
+    if r > b.len then ensure b r;
+    b.pos <- r;
+    add_patch b (fun () -> blit_int32 b.buf pos (Lazy.force i))
+
+  let patch_lazy_int32 b pos i =
+    add_patch b (fun () -> blit_int32 b.buf pos (Lazy.force i))
 
   let future_int32 b ofs =
     let r = ref 0l in
