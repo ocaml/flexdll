@@ -76,6 +76,7 @@ let create_dll oc objs =
   let sym_id = ref 0 in
   let globals = Hashtbl.create 8 in
   let locals = Hashtbl.create 8 in
+  let commons = Hashtbl.create 8 in
   let relocs = ref [] in
 
   List.iter
@@ -123,14 +124,22 @@ let create_dll oc objs =
               let info = Hashtbl.find sec_info s.sec_pos in
               let rva = lazy (Int32.add ofs (Lazy.force info.sec_info_vaddress)) in
               if storage = 2
-              then Hashtbl.replace globals name rva
+              then
+                if Hashtbl.mem globals name
+                then failwith ("Multiply defined symbol: " ^ name)
+                else Hashtbl.replace globals name rva
               else begin
                 sym.sym_pos <- !sym_id;
                 incr sym_id;
                 Hashtbl.replace locals sym.sym_pos rva
               end
-          | _ ->
-              ()
+          | {sym_name=name; storage=2; section=`Num 0; value=size } ->
+              let oldsize =
+                try Hashtbl.find commons name
+                with Not_found -> 0l
+              in
+              Hashtbl.replace commons name (max size oldsize)
+          | _ -> ()
         )
         obj.symbols;
     )
@@ -153,6 +162,24 @@ let create_dll oc objs =
     s.vaddress <- !va;
     va := align (Int32.add !va s.vsize) 0x1000l;
     sects := s :: !sects
+  in
+
+  (* create the uninitialized section data *)
+  let () =
+    let bss = Section.create ".bss" 0xC0000080l in
+    let total = ref 0l in
+    Hashtbl.iter
+      (fun name size ->
+        if not (Hashtbl.mem globals name)
+        then
+          let pos = !total in
+          total := Int32.add !total size;
+          let rva = lazy (Int32.add pos bss.vaddress) in
+          Hashtbl.replace globals name rva
+      )
+      commons;
+    bss.data <- `Uninit (Int32.to_int !total);
+    if !total <> 0l then put_sect bss
   in
 
   Hashtbl.iter
