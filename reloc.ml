@@ -216,7 +216,7 @@ let exportable s =
       if String.length s > 2 && s.[0] = '?' && s.[1] = '?' then false
       else true
 
-let drop_underscore s =
+let drop_underscore obj s =
   match !machine with
   | `x86 ->
       assert (s <> "");
@@ -224,7 +224,7 @@ let drop_underscore s =
         match s.[0] with
         | '_' -> String.sub s 1 (String.length s - 1)
         | '?' -> s
-        | _ -> failwith (Printf.sprintf "Symbol %s doesn't start with _ or ?" s)
+        | _ -> failwith (Printf.sprintf "In %s, symbol %s doesn't start with _ or ?" obj.obj_name s)
       end
   | `x64 ->
       s
@@ -294,7 +294,7 @@ let add_reloc_table x p sname =
       int_to_buf data kind;
 
       (* name *)
-      let name = drop_underscore rel.symbol.sym_name in
+      let name = drop_underscore x rel.symbol.sym_name in
       let pos =
 	try Hashtbl.find str_pos name
 	with Not_found ->
@@ -387,7 +387,7 @@ let add_export_table obj exports symname =
 
        Reloc.abs !machine sect (Int32.of_int (Buffer.length data)) strsym;
        int_to_buf data (Buffer.length strings);
-       Buffer.add_string strings (drop_underscore s);
+       Buffer.add_string strings (drop_underscore obj s);
        Buffer.add_char strings '\000';
     )
     exports;
@@ -423,7 +423,7 @@ let collect_dllexports obj =
     (List.find_all (fun (cmd,args) -> String.uppercase cmd = "EXPORT") dirs)
   in
   match !toolchain with
-  | `MSVC -> List.map drop_underscore l
+  | `MSVC -> List.map (drop_underscore obj) l
   | _ -> l
 
 
@@ -515,7 +515,8 @@ let build_dll link_exe output_file files exts extra_args =
   if main_pgm then add_def (usym "static_symtable")
   else add_def (usym "reloctbl");
 
-  if !machine = `x64 then add_def "__ImageBase";
+  if !machine = `x64 then add_def "__ImageBase"
+  else add_def "___ImageBase";
 
   let aliases = Hashtbl.create 16 in
   let rec normalize name =
@@ -539,7 +540,7 @@ let build_dll link_exe output_file files exts extra_args =
 	List.find_all (fun (cmd,args) -> String.uppercase cmd = c)
 	  dirs)
     in
-    let deflibs = if !builtin_linker then [] else List.flatten (all_args "DEFAULTLIB") in
+    let deflibs = if !builtin_linker || not !use_default_libs then [] else List.flatten (all_args "DEFAULTLIB") in
     List.iter (fun fn ->
 		 let fn = find_file fn in
 		 if not (Hashtbl.mem loaded_filenames fn)
@@ -809,7 +810,7 @@ let build_dll link_exe output_file files exts extra_args =
         in
 	let _impexp = add_temp (Filename.chop_suffix implib ".lib" ^ ".exp") in
 	Printf.sprintf
-	  "link /nologo %s%s%s%s%s /implib:%s /out:%s /defaultlib:msvcrt.lib /subsystem:%s %s %s %s"
+	  "link /nologo %s%s%s%s%s /implib:%s /out:%s /subsystem:%s %s %s %s"
 	  (if !verbose >= 2 then "/verbose " else "")
           (if link_exe = `EXE then "" else "/dll ")
 	  (if main_pgm then "" else "/export:symtbl /export:reloctbl ")

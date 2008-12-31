@@ -12,7 +12,7 @@ CHAINS = mingw cygwin msvc
 
 # Compilers
 
-MSVCC = cl /nologo /MD -D_CRT_SECURE_NO_DEPRECATE
+MSVCC = cl /nologo /MD -D_CRT_SECURE_NO_DEPRECATE /GS-
 CYGCC = gcc 
 MINCC = gcc -mno-cygwin
 OCAMLOPT = ocamlopt
