@@ -1,3 +1,7 @@
+Since 0.14
+- mingw port: put /lib/mingw before /lib
+- preliminary support for a built-in linker
+
 Version 0.13, released on 2008-11-20
 - another technique to work around the lack of response file for gcc: 
   put the command line in an external bash script and apply bash to it

@@ -911,8 +911,8 @@ let setup_toolchain () =
   | `MINGW ->
       search_path :=
 	!dirs @
-	  [ "/lib";
-	    "/lib/mingw";
+	  [ "/lib/mingw";
+            "/lib";
 	    "/lib/w32api";
 	    gcclib () ];
       default_libs :=
