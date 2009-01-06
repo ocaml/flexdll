@@ -610,7 +610,7 @@ let build_dll link_exe output_file files exts extra_args =
         (StrSet.inter n !from_imports);
     StrSet.filter
       (fun s -> match check_prefix "__imp_" s with
-	 | Some s' -> imported := StrSet.add s' !imported; false
+	 | Some s' -> (*Printf.printf "import for %s: %s\n" obj.obj_name s; *) imported := StrSet.add s' !imported; false
 	 | None -> true)
       (StrSet.diff n !defined) in
 
@@ -731,6 +731,8 @@ let build_dll link_exe output_file files exts extra_args =
 
   (* Create the descriptor object *)
   let obj = Coff.create !machine in
+  if not (StrSet.is_empty !imported) then
+      error_imports "descriptor object" !imported;
 
   if not (StrSet.is_empty !imported) then begin
     add_import_table obj (StrSet.elements !imported);
