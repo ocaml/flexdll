@@ -528,7 +528,8 @@ let build_dll link_exe output_file files exts extra_args =
     try
       let r = Hashtbl.find aliases name in
       if r <> name then normalize r else r
-    with Not_found -> name in
+    with Not_found -> name
+  in
 
   (* Collect all the available symbols, including those defined
      in default libraries *)
@@ -610,20 +611,23 @@ let build_dll link_exe output_file files exts extra_args =
 
   let imported_from_implib = ref StrSet.empty in
   let imported = ref StrSet.empty in
+  let normalize name =
+    let name = normalize name in
+    match check_prefix "__imp_" name with
+    | Some s when not (StrSet.mem name !defined) && StrSet.mem s !defined -> s
+    | _ -> name
+  in
   let needed obj = needed normalize StrSet.empty obj in
   let imports obj =
     let n = needed obj in
     imported_from_implib := StrSet.union !imported_from_implib
         (StrSet.inter n !from_imports);
     let undefs = StrSet.diff n !defined in
-    if main_pgm
-    then undefs
-    else
-      StrSet.filter
-        (fun s -> match check_prefix "__imp_" s with
-	| Some s' -> (*Printf.printf "import for %s: %s\n" obj.obj_name s; *) imported := StrSet.add s' !imported; false
-	| None -> true)
-        undefs
+    StrSet.filter
+      (fun s -> match check_prefix "__imp_" s with
+      | Some s' -> (*Printf.printf "import for %s: %s\n" obj.obj_name s; *) imported := StrSet.add s' !imported; false
+      | None -> true)
+      undefs
   in
 
   (* Second step: transitive closure, starting from given objects *)
