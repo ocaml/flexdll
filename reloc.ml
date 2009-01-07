@@ -658,11 +658,15 @@ let build_dll link_exe output_file files exts extra_args =
     reloctbls := reloctbl :: !reloctbls;
     add_reloc_table obj (fun s -> StrSet.mem s.sym_name imps) reloctbl in
 
+  let errors = ref false in
   let error_imports name imps =
-    if main_pgm then
-      failwith (Printf.sprintf "Cannot resolve symbols for %s:\n %s\n"
-		  name
-		  (String.concat "\n " (StrSet.elements imps))) in
+    if main_pgm then begin
+      Printf.eprintf "** Cannot resolve symbols for %s:\n %s\n%!"
+	name
+	(String.concat "\n " (StrSet.elements imps));
+      errors := true
+    end
+  in
 
   let close_obj name imps obj =
     error_imports name imps;
@@ -709,7 +713,6 @@ let build_dll link_exe output_file files exts extra_args =
       then Hashtbl.replace need_lib libname ()
           (* the linker will find this object in this library *)
       else begin
-	error_imports (Printf.sprintf "%s(%s)" libname objname) imps;
         if !explain then
           Printf.printf "Library object %s(%s) needs to be rewritten\n"
             libname objname;
@@ -731,10 +734,9 @@ let build_dll link_exe output_file files exts extra_args =
 
   (* Create the descriptor object *)
   let obj = Coff.create !machine in
-  if not (StrSet.is_empty !imported) then
-      error_imports "descriptor object" !imported;
 
   if not (StrSet.is_empty !imported) then begin
+    (* error_imports "descriptor object" !imported; *)
     add_import_table obj (StrSet.elements !imported);
     add_reloc "descriptor object" obj !imported;
   end;
@@ -742,6 +744,9 @@ let build_dll link_exe output_file files exts extra_args =
   add_export_table obj (StrSet.elements !exported)
     (usym (if main_pgm then "static_symtable" else "symtbl"));
   if not main_pgm then add_master_reloc_table obj !reloctbls (usym "reloctbl");
+
+  if !errors then
+    exit 2;
 
   if !builtin_linker then begin
     let objs = List.map
@@ -754,7 +759,6 @@ let build_dll link_exe output_file files exts extra_args =
     Create_dll.create_dll oc (obj :: objs);
     close_out oc
   end else
-  
 
   let descr = record_obj "descriptor" obj in
   let files =
