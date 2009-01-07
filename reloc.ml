@@ -608,11 +608,16 @@ let build_dll link_exe output_file files exts extra_args =
     let n = needed obj in
     imported_from_implib := StrSet.union !imported_from_implib
         (StrSet.inter n !from_imports);
-    StrSet.filter
-      (fun s -> match check_prefix "__imp_" s with
-	 | Some s' -> (*Printf.printf "import for %s: %s\n" obj.obj_name s; *) imported := StrSet.add s' !imported; false
-	 | None -> true)
-      (StrSet.diff n !defined) in
+    let undefs = StrSet.diff n !defined in
+    if main_pgm
+    then undefs
+    else
+      StrSet.filter
+        (fun s -> match check_prefix "__imp_" s with
+	| Some s' -> (*Printf.printf "import for %s: %s\n" obj.obj_name s; *) imported := StrSet.add s' !imported; false
+	| None -> true)
+        undefs
+  in
 
   (* Second step: transitive closure, starting from given objects *)
 
@@ -736,7 +741,7 @@ let build_dll link_exe output_file files exts extra_args =
   let obj = Coff.create !machine in
 
   if not (StrSet.is_empty !imported) then begin
-    (* error_imports "descriptor object" !imported; *)
+    error_imports "descriptor object" !imported;
     add_import_table obj (StrSet.elements !imported);
     add_reloc "descriptor object" obj !imported;
   end;
