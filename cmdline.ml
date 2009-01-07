@@ -11,6 +11,7 @@ let underscore = ref true
 
 let machine : [ `x86 | `x64 ] ref = ref `x86
 
+let custom_crt = ref false
 let reexport_from_implibs = ref true
 let use_default_libs = ref true
 let subsystem = ref "console"
@@ -166,6 +167,9 @@ let specs = [
 
   "-subsystem", Arg.Set_string subsystem,
   "<id> Set the subsystem (default: console)";
+
+  "-custom-crt", Arg.Set custom_crt,
+  " Use a custom CRT";
 
   "-link", Arg.String (fun s -> extra_args := s :: !extra_args),
   "<option> Next argument is passed verbatim to the linker";

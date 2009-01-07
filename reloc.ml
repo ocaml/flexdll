@@ -16,6 +16,11 @@ open Cmdline
 let search_path = ref []
 let default_libs = ref []
 
+let is_crt_lib = function
+  | "LIBCMT"
+  | "MSVCRT" -> true
+  | fn -> false
+
 let flexdir =
   try
     let s = Sys.getenv "FLEXDIR" in
@@ -542,9 +547,11 @@ let build_dll link_exe output_file files exts extra_args =
     in
     let deflibs = if !builtin_linker || not !use_default_libs then [] else List.flatten (all_args "DEFAULTLIB") in
     List.iter (fun fn ->
-		 let fn = find_file fn in
-		 if not (Hashtbl.mem loaded_filenames fn)
-		 then (Hashtbl.add loaded_filenames fn (); collect_file fn))
+      if !custom_crt && is_crt_lib fn then ()
+      else
+	let fn = find_file fn in
+	if not (Hashtbl.mem loaded_filenames fn)
+	then (Hashtbl.add loaded_filenames fn (); collect_file fn))
       deflibs;
     List.iter
       (fun sym ->
@@ -820,6 +827,10 @@ let build_dll link_exe output_file files exts extra_args =
             temp_file "dyndll_implib" ".lib"
         in
 	let _impexp = add_temp (Filename.chop_suffix implib ".lib" ^ ".exp") in
+        let extra_args =
+          if !custom_crt then "/nodefaultlib:LIBCMT /nodefaultlib:MSVCRT " ^ extra_args
+          else extra_args
+        in
 	Printf.sprintf
 	  "link /nologo %s%s%s%s%s /implib:%s /out:%s /subsystem:%s %s %s %s"
 	  (if !verbose >= 2 then "/verbose " else "")
@@ -918,7 +929,8 @@ let setup_toolchain () =
   | `MSVC ->
       search_path := !dirs @
 	parse_libpath (try Sys.getenv "LIB" with Not_found -> "");
-      default_libs := ["msvcrt.lib"]
+      if not !custom_crt then
+        default_libs := ["msvcrt.lib"]
   | `MINGW ->
       search_path :=
 	!dirs @
