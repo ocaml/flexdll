@@ -12,7 +12,6 @@
 #include <stdio.h>
 #include <string.h>
 #include <windows.h>
-#include <assert.h>
 #include "flexdll.h"
 
 typedef long intnat;
@@ -195,7 +194,8 @@ static void relocate(resolver f, void *data, reloctbl *tbl) {
       *((UINT32*) ptr->addr) = s - (UINT_PTR) (ptr->addr) - 5;
       break;
     default:
-      assert(0);
+      fprintf(stderr, "flexdll: unknown relocation kind");
+      exit(2);
     }
     ptr->kind |= RELOC_DONE;
   }
