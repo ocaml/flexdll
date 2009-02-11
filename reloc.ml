@@ -58,13 +58,25 @@ let read_file fn =
   close_in ic;
   List.rev !r
 
+
 let get_output cmd =
   let fn = Filename.temp_file "flexdll" "" in
-  if (Sys.command (cmd ^ " > " ^ fn) < 0)
-  then failwith ("Cannot run " ^ cmd);
-  let r = read_file fn in
-  Sys.remove fn;
-  r
+  let cmd' = cmd ^ " > " ^ (Filename.quote fn) in
+    if String.length cmd' < 8182 then
+      begin
+	if (Sys.command cmd' < 0)
+	then failwith ("Cannot run " ^ cmd);
+      end
+    else
+      begin
+	let (cfn, oc) = open_temp_file "longcmd" ".sh" in
+	  output_string oc cmd'; close_out oc;
+	  if Sys.command (Printf.sprintf "bash %s" cfn) < 0 
+	  then failwith ("Cannot run " ^ cmd)
+      end;
+    let r = read_file fn in
+      Sys.remove fn; 
+      r
 
 let get_output1 cmd =
   List.hd (get_output cmd)
@@ -142,7 +154,7 @@ let quote_files cmdline lst =
 (* Looking for files *)
 
 let cygpath l =
-  get_output (Printf.sprintf "cygpath -m %s" (String.concat " " l))
+  get_output (Printf.sprintf "cygpath -m %s" (String.concat " " (List.map Filename.quote l)))
 
 let gcclib () =
   let extra = match !toolchain with
