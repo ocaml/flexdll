@@ -1,6 +1,7 @@
 Since 0.14:
 - protects calls to cygpath with long command lines (patch from
   Matthieu Dubuget)
+- always pass msvcrt.lib to link.exe
 
 Version 0.14, released on 2008-28-01
 - mingw port: put /lib/mingw before /lib
