@@ -1,4 +1,4 @@
-Since 0.14:
+Version 0.15, released on 2009-02-25
 - protects calls to cygpath with long command lines (patch from
   Matthieu Dubuget)
 - always pass msvcrt.lib to link.exe
