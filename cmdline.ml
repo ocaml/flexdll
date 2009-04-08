@@ -11,6 +11,7 @@ let underscore = ref true
 
 let machine : [ `x86 | `x64 ] ref = ref `x86
 
+let noexport = ref false
 let custom_crt = ref false
 let reexport_from_implibs = ref true
 let use_default_libs = ref true
@@ -73,6 +74,9 @@ let specs = [
 
   "-noentry", Arg.Set noentry,
   " Do not use the Flexdll entry point (for dll)";
+
+  "-noexport", Arg.Set noexport,
+  " Do not export any symbol";
 
   "-I", Arg.String (fun dir -> dirs := dir :: !dirs),
   "<dir> Add a directory where to search for files";

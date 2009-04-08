@@ -1,3 +1,6 @@
+Version 0.16
+- New -noexport command line option to force an empty symbol table
+
 Version 0.15, released on 2009-02-25
 - protects calls to cygpath with long command lines (patch from
   Matthieu Dubuget)

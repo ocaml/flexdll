@@ -769,7 +769,7 @@ let build_dll link_exe output_file files exts extra_args =
     add_reloc "descriptor object" obj !imported;
   end;
 
-  add_export_table obj (StrSet.elements !exported)
+  add_export_table obj (if !noexport then [] else StrSet.elements !exported)
     (usym (if main_pgm then "static_symtable" else "symtbl"));
   if not main_pgm then add_master_reloc_table obj !reloctbls (usym "reloctbl");
 
