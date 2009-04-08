@@ -71,11 +71,11 @@ let get_output cmd =
       begin
 	let (cfn, oc) = open_temp_file "longcmd" ".sh" in
 	  output_string oc cmd'; close_out oc;
-	  if Sys.command (Printf.sprintf "bash %s" cfn) < 0 
+	  if Sys.command (Printf.sprintf "bash %s" cfn) < 0
 	  then failwith ("Cannot run " ^ cmd)
       end;
     let r = read_file fn in
-      Sys.remove fn; 
+      Sys.remove fn;
       r
 
 let get_output1 cmd =
