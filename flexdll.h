@@ -16,6 +16,11 @@
 #define FLEXDLL_RTLD_LOCAL  0x0000
 #define FLEXDLL_RTLD_NOEXEC 0x0002
 
+#ifdef __cplusplus
+extern "C"
+{
+#endif
+
 void *flexdll_dlopen(const char *, int);
 void *flexdll_dlsym(void *, const char *);
 void flexdll_dlclose(void *);
@@ -23,5 +28,10 @@ char *flexdll_dlerror(void);
 
 void flexdll_dump_exports(void *);
 void flexdll_dump_relocations(void *);
+
+#ifdef __cplusplus
+extern "C"
+{
+#endif
 
 #endif
