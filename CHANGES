@@ -1,5 +1,6 @@
 Since 0.16
 - patch from Lars Nilsson to ease compilation of flexdll.h with C++
+- prefer using XXX.dll.a (import lib) over XXX.a (static lib)
 
 Version 0.16
 - New -noexport command line option to force an empty symbol table
