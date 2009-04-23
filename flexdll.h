@@ -30,8 +30,7 @@ void flexdll_dump_exports(void *);
 void flexdll_dump_relocations(void *);
 
 #ifdef __cplusplus
-extern "C"
-{
+}
 #endif
 
 #endif
