@@ -498,7 +498,7 @@ module Section = struct
     { sec_pos = (-1);
       sec_name = name;
       vsize = int32 buf 8;
-      vaddress = va;
+      vaddress = 0l;
       data = data;
       relocs = relocs;
       sec_opts = int32 buf 36
@@ -526,7 +526,8 @@ module Section = struct
     in
     output_string oc name; emit_zero oc (8 - String.length name);
     emit_int32 oc x.vsize;
-    emit_int32 oc x.vaddress;
+    assert(x.vaddress = 0l);
+    emit_int32 oc 0l;
     emit_int32 oc (Int32.of_int (size x));
     let send_data = match x.data with
       | `String s ->

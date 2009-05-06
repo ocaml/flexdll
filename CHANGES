@@ -1,6 +1,7 @@
-Since 0.16
+Version 0.17
 - patch from Lars Nilsson to ease compilation of flexdll.h with C++
 - prefer using XXX.dll.a (import lib) over XXX.a (static lib)
+- fix bug introduced in commit 136 about virtual addresses
 
 Version 0.16
 - New -noexport command line option to force an empty symbol table

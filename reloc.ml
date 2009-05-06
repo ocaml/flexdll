@@ -216,11 +216,12 @@ let find_file =
 
 let int32_to_buf b i =
   Buffer.add_char b (Char.chr (i land 0xff));
-  Buffer.add_char b (Char.chr ((i asr 8) land 0xff));
-  Buffer.add_char b (Char.chr ((i asr 16) land 0xff));
-  Buffer.add_char b (Char.chr ((i asr 24) land 0xff))
+  Buffer.add_char b (Char.chr ((i lsr 8) land 0xff));
+  Buffer.add_char b (Char.chr ((i lsr 16) land 0xff));
+  Buffer.add_char b (Char.chr ((i lsr 24) land 0xff))
 
 let int_to_buf b i =
+  assert(i >= 0);
   match !machine with
   | `x86 -> int32_to_buf b i
   | `x64 -> int32_to_buf b i; int32_to_buf b 0
