@@ -141,7 +141,9 @@ and section = {
   mutable data:
       [ `String of string | `Uninit of int
     | `Buf of Buf.t
-    | `Lazy of in_channel * int * int ];
+    | `Lazy of in_channel * int * int
+    | `Sxdata of symbol array
+];
   mutable relocs: reloc list;
   sec_opts: int32;
 }
@@ -489,10 +491,14 @@ module Section = struct
     in
 
     let data =
-      if int32_ buf 20 = 0 then `Uninit size
-      else
+      if name = ".sxdata" then
+        let s = read ic (filebase + int32_ buf 20) size in
+        `Sxdata
+          (Array.init (size /4)
+             (fun i -> match symtbl.(int32_ s (i * 4)) with None -> assert false | Some s -> s))
+      else if int32_ buf 20 = 0 then `Uninit size
+      else `String (read ic (filebase + int32_ buf 20) size)
 (*        `Lazy (ic, filebase + int32_ buf 20, size) *)
-        `String (read ic (filebase + int32_ buf 20) size)
     in
 
     { sec_pos = (-1);
@@ -517,6 +523,7 @@ module Section = struct
     | `Lazy (_,_,len) -> len
     | `Uninit len -> len
     | `Buf buf -> Buf.length buf
+    | `Sxdata syms -> Array.length syms * 4
 
   let put strtbl oc x =
     let name =
@@ -538,6 +545,11 @@ module Section = struct
 	  emit_int32 oc 0l; (fun () -> ())
       | `Buf buf ->
 	  delayed_ptr oc (fun () -> Buf.dump oc buf)
+      | `Sxdata syms ->
+          delayed_ptr oc
+            (fun () ->
+              Array.iter (fun sym -> assert(sym.sym_pos >= 0); emit_int32 oc (Int32.of_int sym.sym_pos)) syms
+            )
     in
 
     let send_reloc =
@@ -611,7 +623,7 @@ module Coff = struct
       let sec = List.find (fun s -> s.sec_name = ".drectve") obj.sections in
       match force_section_data sec with
 	| `String s -> parse_directives s
-	| `Uninit _ -> []
+	| `Uninit _ | `Sxdata _ -> []
 	| `Lazy _ | `Buf _ -> assert false
     with Not_found -> []
 

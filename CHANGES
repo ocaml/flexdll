@@ -1,3 +1,6 @@
+Version 0.18
+- support for .sxdata section
+
 Version 0.17
 - patch from Lars Nilsson to ease compilation of flexdll.h with C++
 - prefer using XXX.dll.a (import lib) over XXX.a (static lib)
