@@ -533,7 +533,7 @@ module Section = struct
     in
     output_string oc name; emit_zero oc (8 - String.length name);
     emit_int32 oc x.vsize;
-    assert(x.vaddress = 0l);
+(*    assert(x.vaddress = 0l); *)
     emit_int32 oc 0l;
     emit_int32 oc (Int32.of_int (size x));
     let send_data = match x.data with
