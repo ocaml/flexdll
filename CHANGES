@@ -1,4 +1,4 @@
-Since 0.18
+Version 0.19
 - fix bug introduced in version 0.17 about virtual addresses for the builtin
   linker mode
 
