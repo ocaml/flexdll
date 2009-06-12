@@ -32,8 +32,7 @@ OBJS = version.ml coff.ml cmdline.ml create_dll.ml reloc.ml
 flexlink.exe: $(OBJS)
 	@echo Building flexlink.exe with TOOLCHAIN=$(TOOLCHAIN)
 	rm -f flexlink.exe
-	rc version.rc
-	windres -o version_res.o -i version.res
+	windres version.rc version_res.o
 	$(OCAMLOPT) -o flexlink.exe -ccopt "-link version_res.o" $(LINKFLAGS) $(OBJS)
 
 flexdll_msvc.obj: flexdll.h flexdll.c
