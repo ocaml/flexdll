@@ -1,5 +1,6 @@
 Since 0.19
 - (build) Avoid the use of the rc tool
+- (dist) add version.rc to the source release
 - Allow "/link XXX" as an equivalent to "-link XXX" (or "/linkXXX")
 
 Version 0.19

@@ -83,7 +83,7 @@ package_src:
 	rm -Rf flexdll
 	mkdir flexdll
 	mkdir flexdll/test
-	cp -a *.ml Makefile $(COMMON_FILES) flexdll/
+	cp -a *.ml Makefile $(COMMON_FILES) version.rc flexdll/
 	cp -aR test/Makefile test/*.c flexdll/test/
 	tar czf $(PACKAGE) flexdll
 	rm -Rf flexdll
