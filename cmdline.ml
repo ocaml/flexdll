@@ -211,6 +211,7 @@ let parse_cmdline () =
 
   let rec tr = function
     | (("-defaultlib"|"-link") as d) :: x :: rest -> d :: x :: tr rest
+    | "/link" :: x :: rest -> "-link" :: x :: tr rest
     | s :: rest when String.length s > 2 && tosplit (String.sub s 0 2) ->
         String.sub s 0 2 :: String.sub s 2 (String.length s - 2) :: tr rest
     | s :: rest when String.length s >= 5 && String.sub s 0 5 = "/link" ->
