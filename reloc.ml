@@ -868,8 +868,16 @@ let build_dll link_exe output_file files exts extra_args =
           files descr
 	  extra_args
     | `CYGWIN ->
+        let def_file =
+          if main_pgm then ""
+          else
+            let def_file, oc = open_temp_file "flexlink" ".def" in
+            Printf.fprintf oc "EXPORTS\n  reloctbl\n  symtbl\n";
+            close_out oc;
+            Filename.quote def_file
+        in
 	Printf.sprintf
-	  "gcc %s%s -L. %s %s -o %s %s %s %s"
+	  "gcc %s%s -L. %s %s -o %s %s %s %s %s"
 	  (if link_exe = `EXE then "" else "-shared ")
 	  (if main_pgm then "" else if !noentry then "-Wl,-e0 " else "-Wl,-e_FlexDLLiniter@12 ")
 	  (mk_dirs_opt "-I")
@@ -877,10 +885,19 @@ let build_dll link_exe output_file files exts extra_args =
 	  (Filename.quote output_file)
 	  descr
 	  files
+          def_file
 	  extra_args
     | `MINGW ->
+        let def_file =
+          if main_pgm then ""
+          else
+            let def_file, oc = open_temp_file "flexlink" ".def" in
+            Printf.fprintf oc "EXPORTS\n  reloctbl\n  symtbl\n";
+            close_out oc;
+            Filename.quote def_file
+        in
 	Printf.sprintf
-	  "gcc -mno-cygwin -m%s %s%s -L. %s %s -o %s %s %s %s %s"
+	  "gcc -mno-cygwin -m%s %s%s -L. %s %s -o %s %s %s %s %s %s"
           !subsystem
 	  (if link_exe = `EXE then "" else "-shared ")
 	  (if main_pgm then "" else if !noentry then "-Wl,-e0 " else "-Wl,-e_FlexDLLiniter@12 ")
@@ -889,6 +906,7 @@ let build_dll link_exe output_file files exts extra_args =
 	  (Filename.quote output_file)
 	  descr
 	  files
+          def_file
           (if !implib then "-Wl,--out-implib=" ^ Filename.quote (Filename.chop_extension output_file ^ ".a") else "")
 	  extra_args
     | `LIGHTLD ->
