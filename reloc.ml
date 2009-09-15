@@ -848,6 +848,16 @@ let build_dll link_exe output_file files exts extra_args =
           if !custom_crt then "/nodefaultlib:LIBCMT /nodefaultlib:MSVCRT " ^ extra_args
           else "msvcrt.lib " ^ extra_args
         in
+
+        let extra_args =
+          if !machine = `x64 then "/base:0x10000 " ^ extra_args else extra_args
+        in
+        (* Flexdll requires that all images (main programs and all the DLLs) are
+           not too far away. This is needed because of the 32-bit relative relocations
+           (e.g. function calls). It seems that passing such a /base argument to link.exe
+           gives some hope that this will be the case. Problems observed otherwise
+           with the Windows 7 SDK in 64-bit mode. *)
+
 	Printf.sprintf
 	  "link /nologo %s%s%s%s%s /implib:%s /out:%s /subsystem:%s %s %s %s"
 	  (if !verbose >= 2 then "/verbose " else "")
