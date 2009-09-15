@@ -26,7 +26,7 @@ static int flexdll_init() {
   func *sym = 0;
   char *s = getenv("FLEXDLL_RELOCATE");
   if (!s) { fprintf(stderr, "Cannot find FLEXDLL_RELOCATE\n"); return FALSE; }
-  sscanf(s,"%08lx",&sym);
+  sscanf(s,"%p",&sym);
   if (sym && sym(&reloctbl)) return TRUE;
   return FALSE;
 }

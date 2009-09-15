@@ -38,6 +38,7 @@ int main(int argc, char **argv)
     if (NULL == handle) { printf("error: %s\n", flexdll_dlerror()); exit(2); }
 
     torun = flexdll_dlsym(handle, "torun");
+    printf("Now running %p...\n", torun); fflush(stdout);
     if (torun) torun();
   }
   exit(0);

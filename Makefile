@@ -18,7 +18,7 @@ MINCC = gcc -mno-cygwin
 OCAMLOPT = ocamlopt
 #OCAMLOPT = FLEXLINKFLAGS=-real-manifest ocamlopt
 #LINKFLAGS = unix.cmxa
-LINKFLAGS =
+LINKFLAGS = -ccopt "-link version_res.o"
 
 support:
 	for i in $(CHAINS); do $(MAKE) build_$$i ; done 
@@ -33,7 +33,7 @@ flexlink.exe: $(OBJS)
 	@echo Building flexlink.exe with TOOLCHAIN=$(TOOLCHAIN)
 	rm -f flexlink.exe
 	windres version.rc version_res.o
-	$(OCAMLOPT) -o flexlink.exe -ccopt "-link version_res.o" $(LINKFLAGS) $(OBJS)
+	$(OCAMLOPT) -o flexlink.exe $(LINKFLAGS) $(OBJS)
 
 flexdll_msvc.obj: flexdll.h flexdll.c
 	$(MSVCC) -c /Fo"flexdll_msvc.obj" flexdll.c
@@ -53,17 +53,20 @@ flexdll_initer_cygwin.o: flexdll_initer.c
 flexdll_initer_msvc.obj: flexdll_initer.c
 	$(MSVCC) -c /Fo"flexdll_initer_msvc.obj" flexdll_initer.c
 
-demo_msvc: flexlink.exe flexdll_msvc.obj
+demo_msvc: flexlink.exe flexdll_msvc.obj flexdll_initer_msvc.obj
 	(cd test && $(MAKE) clean demo CHAIN=msvc CC="$(MSVCC)" O=obj)
 
-demo_cygwin: flexlink.exe flexdll_cygwin.o
+demo_cygwin: flexlink.exe flexdll_cygwin.o flexdll_initer_cygwin.o
 	(cd test && $(MAKE) clean demo CHAIN=cygwin CC="$(CYGCC)" O=o)
 
-demo_mingw: flexlink.exe flexdll_mingw.o
+demo_mingw: flexlink.exe flexdll_mingw.o flexdll_initer_mingw.o
 	(cd test && $(MAKE) clean demo CHAIN=mingw CC="$(MINCC)" O=o)
 
-demo_msvc64:  flexlink.exe flexdll_msvc.obj
+demo_msvc64:  flexlink.exe flexdll_msvc.obj flexdll_initer_msvc.obj
 	(cd test && $(MAKE) clean demo CHAIN=msvc CC="$(MSVCC)" O=obj EXTRA_OPTS="-x64 bufferoverflowu.lib")
+
+demo_msvc64_sdk7:  flexlink.exe flexdll_msvc.obj flexdll_initer_msvc.obj
+	(cd test && $(MAKE) clean demo CHAIN=msvc CC="$(MSVCC)" O=obj EXTRA_OPTS="-x64")
 
 clean:
 	rm -f *.obj *.o *.lib *.a *.exe *.cmx *.dll *.exp *.cmi *~

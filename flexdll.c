@@ -112,15 +112,15 @@ static void dump_reloctbl(reloctbl *tbl) {
   nonwr *wr;
 
   if (!tbl) { printf("No relocation table\n"); return; }
-  printf("Dynamic relocation table found at %lx\n", tbl);
+  printf("Dynamic relocation table found at %p\n", tbl);
 
   for (wr = tbl->nonwr; wr->last != 0; wr++)
-    printf(" Non-writable relocation in zone %08lx -> %08lx\n",
+    printf(" Non-writable relocation in zone %p -> %p\n",
 	   wr->first,
 	   wr->last);
 
   for (ptr = tbl->entries; ptr->kind; ptr++)
-    printf(" %08lx (kind:%04lx) (now:%08lx)  %s\n",
+    printf(" %p (kind:%04lx) (now:%p)  %s\n",
 	   ptr->addr,
 	   ptr->kind,
 	   *((uintnat*) ptr->addr),
@@ -146,10 +146,10 @@ static void allow_write(char *begin, char *end, uintnat new, UINT_PTR *old) {
   begin -= (uintnat) begin % pagesize;
   res = VirtualProtect(begin, end - begin, new, (uintnat*) old);
   if (0 == res) {
-    fprintf(stderr, "natdynlink: VirtualProtect failed (%s), begin = 0x%08lx, end = 0x%08lx\n", ll_dlerror(), begin, end);
+    fprintf(stderr, "natdynlink: VirtualProtect failed (%s), begin = 0x%p, end = 0x%p\n", ll_dlerror(), begin, end);
     exit(2);
   }
-  /* printf("%08lx -> %08lx\n", *old, new); */
+  /* printf("%p -> %p\n", *old, new); */
 }
 
 /* Avoid the use of snprintf */
@@ -185,13 +185,31 @@ static void relocate(resolver f, void *data, reloctbl *tbl) {
       *(ptr->addr) += s;
       break;
     case RELOC_REL32:
-      *((UINT32*) ptr->addr) = s - (UINT_PTR) (ptr->addr) - 4;
+      s -= (INT_PTR)(ptr -> addr) + 4;
+      if (s != (INT32) s) {
+        printf("flexdll error: cannot relocate, target is too far: %p\n", s);
+        fflush(stdout);
+        exit(1);
+      }
+      *((UINT32*) ptr->addr) = s;
       break;
     case RELOC_REL32_4:
-      *((UINT32*) ptr->addr) = s - (UINT_PTR) (ptr->addr) - 8;
+      s -= (INT_PTR)(ptr -> addr) + 8;
+      if (s != (INT32) s) {
+        printf("flexdll error: cannot relocate, target is too far: %p\n", s);
+        fflush(stdout);
+        exit(1);
+      }
+      *((UINT32*) ptr->addr) = s;
       break;
     case RELOC_REL32_1:
-      *((UINT32*) ptr->addr) = s - (UINT_PTR) (ptr->addr) - 5;
+      s -= (INT_PTR)(ptr -> addr) + 5;
+      if (s != (INT32) s) {
+        printf("flexdll error: cannot relocate, target is too far: %p\n", s);
+        fflush(stdout);
+        exit(1);
+      }
+      *((UINT32*) ptr->addr) = s;
       break;
     default:
       fprintf(stderr, "flexdll: unknown relocation kind");
@@ -216,7 +234,7 @@ static void dump_symtbl(symtbl *tbl)
   int i;
 
   if (!tbl) { printf("No symbol table\n"); return; }
-  printf("Dynamic symbol at %lx (size = %i)\n", tbl, tbl->size); fflush(stdout);
+  printf("Dynamic symbol at %p (size = %i)\n", tbl, tbl->size); fflush(stdout);
 
   for (i = 0; i < tbl->size; i++) {
     printf("[%i] ", i); fflush(stdout);
@@ -302,7 +320,7 @@ void *flexdll_dlopen(const char *file, int mode) {
   error = 0;
   if (!file) return &main_unit;
 
-  sprintf(flexdll_relocate_env,"FLEXDLL_RELOCATE=%08lx",&flexdll_relocate);
+  sprintf(flexdll_relocate_env,"FLEXDLL_RELOCATE=%p",&flexdll_relocate);
   putenv(flexdll_relocate_env);
 
   handle = ll_dlopen(file, exec);

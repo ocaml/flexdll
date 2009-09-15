@@ -2,7 +2,7 @@ extern int x;
 
 void torun() {
   api("plug2.torun();");
-
+  /*
   dump_x();
   // printf("XXX\n");
   printf("x = %d\n", x);
@@ -10,4 +10,5 @@ void torun() {
   printf("x = %d\n", x);
   dump_x();
   //  printf("XXX\n");
+  */
 }
