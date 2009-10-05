@@ -45,7 +45,7 @@ static int flexdll_init() {
 
 BOOL WINAPI entry(HINSTANCE, DWORD, LPVOID);
 
-BOOL WINAPI FlexDLLiniter(HINSTANCE hinstDLL, DWORD fdwReason, 
+BOOL WINAPI FlexDLLiniter(HINSTANCE hinstDLL, DWORD fdwReason,
 			  LPVOID lpReserved) {
   if (fdwReason == DLL_PROCESS_ATTACH && !flexdll_init())
     return FALSE;

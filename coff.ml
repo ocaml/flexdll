@@ -163,6 +163,7 @@ type coff = {
 
 let (++) = Int32.add
 let (&&&) = Int32.logand
+let (|||) = Int32.logor
 let (>>>) = Int32.shift_right_logical
 
 let filter f l =
@@ -552,15 +553,28 @@ module Section = struct
             )
     in
 
+    let nrelocs = List.length x.relocs in
+    let many_relocs = nrelocs > 0xffff in
+
     let send_reloc =
       if x.relocs = [] then (emit_int32 oc 0l; fun () -> ())
-      else delayed_ptr oc (fun () -> List.iter (Reloc.put oc) x.relocs)
+      else delayed_ptr oc
+          (fun () ->
+            if many_relocs then begin
+              emit_int32 oc (Int32.of_int nrelocs);
+              emit_int32 oc 0l;
+              emit_int16 oc 0
+            end;
+            List.iter (Reloc.put oc) x.relocs
+          )
     in
 
     emit_int32 oc 0l;
-    emit_int16 oc (List.length x.relocs);
+    if many_relocs then emit_int16 oc 0xffff
+    else emit_int16 oc nrelocs;
     emit_int16 oc 0;
-    emit_int32 oc x.sec_opts;
+    let sec_opts = if many_relocs then x.sec_opts ||| 0x01000000l else x.sec_opts in
+    emit_int32 oc sec_opts;
 
     send_data, send_reloc
 end

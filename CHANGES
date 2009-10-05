@@ -4,6 +4,7 @@ Since 0.19
 - Allow "/link XXX" as an equivalent to "-link XXX" (or "/linkXXX")
 - Use an explicit .def file under MinGW and Cygwin to force the two symbols reloctbl and symtbl to be exported
 - Fixes for x64
+- Allow to write sections with more than 0xffff relocations
 
 Version 0.19
 - fix bug introduced in version 0.17 about virtual addresses for the builtin
