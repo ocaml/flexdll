@@ -1,4 +1,4 @@
-VERSION = 0.19
+VERSION = 0.20
 all: flexlink.exe support
 
 .PHONY: version.ml
@@ -102,6 +102,7 @@ upload_src: package_src upload
 # Binary package
 
 PACKAGE_BIN = flexdll-bin-$(VERSION)$(PACKAGE_BIN_SUFFIX).zip
+INSTALLER = flexdll-$(VERSION)$(PACKAGE_BIN_SUFFIX)-setup.exe
 
 package_bin:
 	$(MAKE) clean all
@@ -133,3 +134,17 @@ PREFIX = "C:\Program Files\flexdll"
 install:
 	mkdir -p $(PREFIX)
 	cp $(COMMON_FILES) flexlink.exe flexdll_*.obj flexdll_*.o $(PREFIX)
+
+installer:
+	rm -rf flexdll_install_files
+	mkdir flexdll_install_files
+	(cd flexdll_install_files && unzip ../$(PACKAGE_BIN))
+	/cygdrive/c/Program\ Files/NSIS/makensis installer.nsi
+	mv flexdll_setup.exe $(INSTALLER)
+
+upload_installer:
+	rsync $(INSTALLER) $(URL)
+
+
+upload_all:
+	$(MAKE) upload_src upload_bin installer upload_installer

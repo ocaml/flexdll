@@ -1,10 +1,11 @@
-Since 0.19
+Version 0.20
 - (build) Avoid the use of the rc tool
 - (dist) add version.rc to the source release
 - Allow "/link XXX" as an equivalent to "-link XXX" (or "/linkXXX")
 - Use an explicit .def file under MinGW and Cygwin to force the two symbols reloctbl and symtbl to be exported
 - Fixes for x64
 - Allow to write sections with more than 0xffff relocations
+- Create a Win32 installer
 
 Version 0.19
 - fix bug introduced in version 0.17 about virtual addresses for the builtin
