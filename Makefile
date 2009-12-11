@@ -92,7 +92,7 @@ package_src:
 	rm -Rf flexdll
 
 upload:
-	rsync $(PACKAGE) CHANGES $(URL)
+	rsync $(PACKAGE) CHANGES LICENSE $(URL)
 
 upload_dev:
 	$(MAKE) VERSION=dev upload_src
