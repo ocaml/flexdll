@@ -1,6 +1,8 @@
 VERSION = 0.20
 all: flexlink.exe support
 
+include $(shell cygpath -ad "$(shell ocamlopt -where)/Makefile.config")
+
 .PHONY: version.ml
 version.ml:
 	echo "let version = \"$(VERSION)\"" > version.ml
@@ -18,7 +20,12 @@ MINCC = gcc -mno-cygwin
 OCAMLOPT = ocamlopt
 #OCAMLOPT = FLEXLINKFLAGS=-real-manifest ocamlopt
 #LINKFLAGS = unix.cmxa
+
+ifeq ($(SYSTEM), win64)
+LINKFLAGS=
+else
 LINKFLAGS = -ccopt "-link version_res.o"
+endif
 
 support:
 	for i in $(CHAINS); do $(MAKE) build_$$i ; done 
@@ -117,8 +124,6 @@ upload_bin: package_bin do_upload_bin
 
 upload_bin_64:
 	PACKAGE_BIN_SUFFIX=-amd64 $(MAKE) upload_bin
-
-include $(shell cygpath -ad "$(shell ocamlopt -where)/Makefile.config")
 
 show_toolchain:
 	@echo Toolchain for the visible ocamlopt: $(TOOLCHAIN)
