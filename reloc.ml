@@ -125,7 +125,9 @@ let run_command cmdline cmd =
     | `MSVC when !verbose < 1 -> cmd ^ " >NUL"
     | _ -> cmd
   in
-  if cmdline.too_long then begin
+  (* note: for Cygwin, using bash allow to follow symlinks to find
+     gcc... *)
+  if cmdline.too_long || !toolchain = `CYGWIN then begin
     (* Dump the command in a text file and apply bash to it. *)
     let (fn, oc) = open_temp_file "longcmd" "" in
     output_string oc cmd;

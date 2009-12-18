@@ -1,3 +1,7 @@
+Version 0.21
+- always use bash to call external commands under Cygwin (to make it work
+  when gcc is a symlink)
+
 Version 0.20
 - (build) Avoid the use of the rc tool
 - (dist) add version.rc to the source release
