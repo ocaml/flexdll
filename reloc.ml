@@ -59,27 +59,27 @@ let read_file fn =
   List.rev !r
 
 
-let get_output cmd =
+let get_output ?(use_bash = false) cmd =
   let fn = Filename.temp_file "flexdll" "" in
   let cmd' = cmd ^ " > " ^ (Filename.quote fn) in
-    if String.length cmd' < 8182 then
+    if String.length cmd' < 8182 && not use_bash then
       begin
-	if (Sys.command cmd' < 0)
+	if (Sys.command cmd' <> 0)
 	then failwith ("Cannot run " ^ cmd);
       end
     else
       begin
 	let (cfn, oc) = open_temp_file "longcmd" ".sh" in
 	  output_string oc cmd'; close_out oc;
-	  if Sys.command (Printf.sprintf "bash %s" cfn) < 0
+	  if Sys.command (Printf.sprintf "bash %s" cfn) <> 0
 	  then failwith ("Cannot run " ^ cmd)
       end;
     let r = read_file fn in
       Sys.remove fn;
       r
 
-let get_output1 cmd =
-  List.hd (get_output cmd)
+let get_output1 ?use_bash cmd =
+  List.hd (get_output ?use_bash cmd)
 
 
 (* Preparing command line *)
@@ -163,7 +163,7 @@ let gcclib () =
   | `MINGW -> "-mno-cygwin "
   | _ -> ""
   in
-  Filename.dirname (get_output1 (Printf.sprintf "gcc %s-print-libgcc-file-name" extra))
+  Filename.dirname (get_output1 ~use_bash:(!toolchain = `CYGWIN) (Printf.sprintf "gcc %s-print-libgcc-file-name" extra))
 
 let file_exists fn =
   if Sys.file_exists fn && not (Sys.is_directory fn) then Some fn
