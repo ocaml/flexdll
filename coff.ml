@@ -406,7 +406,7 @@ module Symbol = struct
 	  (* section def *)
           output_string oc (String.sub s.auxs 0 12);
           emit_int16 oc s'.sec_pos;
-          output_string oc (String.sub s.auxs 14 4)
+          output_string oc (String.sub s.auxs 14 (String.length s.auxs - 14))
       | { storage = 3; extra_info = `Section s' } ->
 	  (* section def *)
           Printf.eprintf "!!! section symbol not supported (symbol: %s -> section:%s)\n%!" s.sym_name s'.sec_name;

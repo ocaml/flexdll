@@ -1,3 +1,6 @@
+Since 0.21
+- fix a bug when emitting IMAGE_COMDAT_SELECT_ASSOCIATIVE symbols
+
 Version 0.21
 - always use bash to call external commands under Cygwin (to make it work
   when gcc is a symlink)
