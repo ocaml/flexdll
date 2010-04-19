@@ -178,6 +178,12 @@ let specs = [
   "-link", Arg.String (fun s -> extra_args := s :: !extra_args),
   "<option> Next argument is passed verbatim to the linker";
 
+  "-D", Arg.String (fun _ -> ()),
+  "<symbol> (Ignored)";
+
+  "-U", Arg.String (fun _ -> ()),
+  "<symbol> (Ignored)";
+
   "--", Arg.Rest (fun s -> extra_args := s :: !extra_args),
   " Following arguments are passed verbatim to the linker";
 ]
@@ -205,7 +211,7 @@ let flexlinkflags =
 let parse_cmdline () =
   (* Split -lXXX, -LXXX and -IXXX options *)
   let tosplit = function
-    | "-l" | "-L" | "-I" -> true
+    | "-l" | "-L" | "-I" | "-D" | "-U" -> true
     | _ -> false
   in
 
