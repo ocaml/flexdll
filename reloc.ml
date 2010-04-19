@@ -146,7 +146,7 @@ let quote_files cmdline lst =
   let s =
     String.concat " "
       (List.map (fun f -> if f = "" then f else Filename.quote f) lst) in
-  if String.length s >= 4096 then
+  if String.length s >= 1024 then
     if cmdline.may_use_response_file then Filename.quote (build_diversion lst)
     else (cmdline.too_long <- true; s)
   else

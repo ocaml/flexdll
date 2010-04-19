@@ -1,3 +1,7 @@
+Version 0.23
+- ignore -D and -U flags (OCaml PR #4979)
+- change limit before using a response file (OCaml PR #4645)
+
 Version 0.22
 - fix a bug when emitting IMAGE_COMDAT_SELECT_ASSOCIATIVE symbols
 
