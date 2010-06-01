@@ -502,7 +502,6 @@ let dll_exports fn = match !toolchain with
 
 let build_dll link_exe output_file files exts extra_args =
   let main_pgm = link_exe <> `DLL in
-  let usym s = if !underscore then "_" ^ s else s in
 
   (* fully resolve filenames, eliminate duplicates *)
   let _,files =

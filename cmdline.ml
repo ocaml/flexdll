@@ -247,3 +247,5 @@ let parse_cmdline () =
       "Please specify an output file (-help to get some usage information)\n";
     exit 1
   end
+
+let usym s = if !underscore then "_" ^ s else s

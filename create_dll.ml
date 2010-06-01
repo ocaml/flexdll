@@ -211,14 +211,17 @@ let create_dll oc objs =
 
               let initial = read_int32 sdata (Int32.to_int r.addr) in
               let pos = sec_ofs + Int32.to_int r.addr in
-              match r.rtype with
-              | 0x06 -> (* absolute address *)
+              match !Cmdline.machine, r.rtype with
+              | `x86, 0x06
+              | `x64, 0x01 -> (* absolute address *)
                   relocs := rel_rva :: !relocs;
                   Buf.patch_lazy_int32 data pos (lazy (Int32.add (Int32.add initial (Lazy.force rva)) image_base))
-              | 0x14 -> (* rel32 *)
+              | `x86, 0x14
+              | `x64, 0x04 -> (* rel32 *)
                   Buf.patch_lazy_int32 data pos (lazy (Int32.sub (Int32.add initial (Lazy.force rva)) (Int32.add (Lazy.force rel_rva) 4l)))
-              | _ ->
-                  assert false
+              | _, k ->
+                  Printf.ksprintf failwith "Unsupport relocation kind %04x for %s"
+                    k r.symbol.sym_name
             )
             s.relocs
         )
@@ -251,7 +254,7 @@ let create_dll oc objs =
     Buf.string b dllname;
     Buf.int8 b 0;
     Buf.set_future b exp_tbl;
-    List.iter (fun s -> Buf.lazy_int32 b (rva_of_global ("_" ^ s)))
+    List.iter (fun s -> Buf.lazy_int32 b (rva_of_global (Cmdline.usym s)))
       export_symbols;
     Buf.set_future b name_ptr_tbl;
     let export_symbols_ofs =
@@ -301,7 +304,7 @@ let create_dll oc objs =
 
   output_string oc "PE\000\000";
   (* coff header *)
-  emit_int16 oc 0x14c; (* machine: i386 *)
+  emit_int16 oc (match !Cmdline.machine with `x86 -> 0x14c | `x64 -> 0x8664);
   emit_int16 oc (List.length !sects); (* number of sections *)
   emit_int32 oc 0l; (* date *)
   emit_int32 oc 0l; (* ptr to symbol table *)
