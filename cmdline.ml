@@ -99,6 +99,9 @@ let specs = [
 			  | _ -> assert false)),
   " Choose which linker to use";
 
+  "-x64", Arg.Unit (fun () -> machine := `x64; underscore := false; toolchain := `MSVC64),
+  " (Deprecated)";
+
   "-defaultlib", Arg.String (fun s -> exts := s :: !exts),
   "<obj> External object (no export, no import)";
 
