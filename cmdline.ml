@@ -18,7 +18,7 @@ let use_default_libs = ref true
 let subsystem = ref "console"
 let explain = ref false
 let builtin_linker = ref false
-let toolchain : [ `MSVC | `MINGW | `CYGWIN | `LIGHTLD ] ref = ref `MSVC
+let toolchain : [ `MSVC | `MSVC64 | `MINGW | `CYGWIN | `LIGHTLD ] ref = ref `MSVC
 let save_temps = ref false
 let show_exports = ref false
 let show_imports = ref false
@@ -87,13 +87,16 @@ let specs = [
   "-l", Arg.String (fun s -> files := ("-l" ^ s) :: !files),
   "<lib> Library file";
 
-  "-chain", Arg.Symbol (["msvc";"cygwin";"mingw";"ld"],
-			(function
-			   | "msvc" -> toolchain := `MSVC
-			   | "cygwin" -> toolchain := `CYGWIN
-			   | "mingw" -> toolchain := `MINGW
-                           | "ld" -> toolchain := `LIGHTLD
-			   | _ -> assert false)),
+  "-chain", Arg.Symbol (["msvc";"msvc64";"cygwin";"mingw";"ld"],
+			(fun s ->
+                          machine := `x86; underscore := true;
+                          toolchain := match s with
+			  | "msvc" -> `MSVC
+			  | "msvc64" -> machine := `x64; underscore := false; `MSVC64
+			  | "cygwin" -> `CYGWIN
+			  | "mingw" -> `MINGW
+                          | "ld" -> `LIGHTLD
+			  | _ -> assert false)),
   " Choose which linker to use";
 
   "-defaultlib", Arg.String (fun s -> exts := s :: !exts),
@@ -139,7 +142,7 @@ let specs = [
   " Use the generated manifest (default behavior)";
 
   "-default-manifest", Arg.Clear real_manifest,
-  " Use the default manifest";
+  " Use the default manifest (default.manifest/default_amd64.manifest)";
 
   "-export", Arg.String (fun s -> defexports := s :: !defexports),
   "<sym> Explicitly export a symbol";
@@ -162,9 +165,6 @@ let specs = [
 
   "-builtin", Arg.Set builtin_linker,
   " Use built-in linker to produce a dll";
-
-  "-x64", Arg.Unit (fun () -> machine := `x64; underscore := false),
-  " x86_64 mode";
 
   "-explain", Arg.Set explain,
   " Explain why library objects are linked";

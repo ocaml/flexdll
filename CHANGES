@@ -1,3 +1,9 @@
+Version 0.24
+- add new toolchain msvc64; replace the old combination "-chain msvc -x64" (-x64 has been removed)
+- change build system to create a single binary version of flexdll that includes both the 32-bit and 64-bit
+  version for MSVC's support objects
+- switch to Visual Studio 2008 (to compile the binary distribution and for the default manifests)
+
 Version 0.23
 - ignore -D and -U flags (OCaml PR #4979)
 - change limit before using a response file (OCaml PR #4645)

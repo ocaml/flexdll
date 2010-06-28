@@ -111,7 +111,7 @@ type cmdline = {
 
 let new_cmdline () =
   let rf = match !toolchain with
-  | `MSVC | `LIGHTLD -> true
+  | `MSVC | `MSVC64 | `LIGHTLD -> true
   | `MINGW | `CYGWIN -> false
   in
   {
@@ -122,7 +122,7 @@ let new_cmdline () =
 let run_command cmdline cmd =
   let cmd_quiet =
     match !toolchain with
-    | `MSVC when !verbose < 1 -> cmd ^ " >NUL"
+    | `MSVC | `MSVC64 when !verbose < 1 -> cmd ^ " >NUL"
     | _ -> cmd
   in
   (* note: for Cygwin, using bash allow to follow symlinks to find
@@ -443,7 +443,7 @@ let collect_dllexports obj =
     (List.find_all (fun (cmd,args) -> String.uppercase cmd = "EXPORT") dirs)
   in
   match !toolchain with
-  | `MSVC -> List.map (drop_underscore obj) l
+  | `MSVC | `MSVC64 -> List.map (drop_underscore obj) l
   | _ -> l
 
 
@@ -490,7 +490,7 @@ let parse_dll_exports fn =
 
 
 let dll_exports fn = match !toolchain with
-  | `MSVC | `LIGHTLD ->
+  | `MSVC | `MSVC64 | `LIGHTLD ->
       failwith "Creation of import library not supported for this toolchain"
   | `CYGWIN | `MINGW ->
       let dmp = temp_file "dyndll" ".dmp" in
@@ -671,7 +671,7 @@ let build_dll link_exe output_file files exts extra_args =
     if !builtin_linker then ""
     else begin
       let fn = temp_file "dyndll"
-        (if !toolchain = `MSVC then ".obj" else ".o") in
+        (if !toolchain = `MSVC || !toolchain = `MSVC64 then ".obj" else ".o") in
       let oc = open_out_bin fn in
       Coff.put oc obj;
       close_out oc;
@@ -833,7 +833,7 @@ let build_dll link_exe output_file files exts extra_args =
   end;
 
   let cmd = match !toolchain with
-    | `MSVC ->
+    | `MSVC | `MSVC64 ->
 	(* Putting the file the descriptor object at the beginning
 	   with MSVC compilers seems to break Stack overflow recovery
 	   in OCaml. No idea why. *)
@@ -942,7 +942,13 @@ let build_dll link_exe output_file files exts extra_args =
     then begin
       let fn =
         if !real_manifest then manifest_file
-        else Filename.concat flexdir "default.manifest"
+        else
+          let default_manifest =
+            match !machine with
+            | `x86 -> "default.manifest"
+            | `x64 -> "default_amd64.manifest"
+          in
+          Filename.concat flexdir default_manifest
       in
       let mcmd =
 	Printf.sprintf "mt -nologo -outputresource:%s -manifest %s"
@@ -972,7 +978,7 @@ let setup_toolchain () =
 	    gcclib () ];
       default_libs := ["-lkernel32"; "-luser32"; "-ladvapi32";
 		       "-lshell32"; "-lcygwin"; "-lgcc"]
-  | `MSVC ->
+  | `MSVC | `MSVC64 ->
       search_path := !dirs @
 	parse_libpath (try Sys.getenv "LIB" with Not_found -> "");
       if not !custom_crt then
@@ -995,9 +1001,9 @@ let setup_toolchain () =
 let compile_if_needed file =
   if Filename.check_suffix file ".c" then begin
     let tmp_obj = temp_file "dyndll"
-      (if !toolchain = `MSVC then ".obj" else ".o") in
+      (if !toolchain = `MSVC || !toolchain = `MSVC64 then ".obj" else ".o") in
     let cmd = match !toolchain with
-      | `MSVC ->
+      | `MSVC | `MSVC64 ->
 	  Printf.sprintf
 	    "cl /c /MD /nologo /Fo%s %s %s"
 	    (Filename.quote tmp_obj)
@@ -1046,6 +1052,7 @@ let all_files () =
   let f = Filename.concat flexdir in
   let tc = match !toolchain with
   | `MSVC -> "msvc.obj"
+  | `MSVC64 -> "msvc64.obj"
   | `CYGWIN -> "cygwin.o"
   | `MINGW | `LIGHTLD -> "mingw.o" in
   if !exe_mode <> `DLL then
@@ -1065,7 +1072,7 @@ let main () =
       | _, `Yes -> true
       | _, `No -> false
       | (`CYGWIN|`MINGW), `None -> (Sys.command "cygpath -v 2>NUL >NUL" = 0)
-      | (`MSVC|`LIGHTLD), `None -> false
+      | (`MSVC|`MSVC64|`LIGHTLD), `None -> false
     end;
 
 
