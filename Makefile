@@ -166,7 +166,7 @@ installer:
 	rm -rf flexdll_install_files
 	mkdir flexdll_install_files
 	(cd flexdll_install_files && unzip ../$(PACKAGE_BIN))
-	/cygdrive/c/Program\ Files/NSIS/makensis installer.nsi
+	/cygdrive/c/Program\ Files\ \(x86\)/NSIS/makensis installer.nsi
 	mv flexdll_setup.exe $(INSTALLER)
 
 upload_installer:
