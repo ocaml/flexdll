@@ -1,3 +1,6 @@
+Version 0.25
+- fix a bug with archive member names that contain a slash
+
 Version 0.24
 - add new toolchain msvc64; replace the old combination "-chain msvc -x64" (-x64 has been removed)
 - change build system to create a single binary version of flexdll that includes both the 32-bit and 64-bit
