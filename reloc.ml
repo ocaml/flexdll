@@ -1071,7 +1071,8 @@ let main () =
       match !toolchain, !cygpath_arg with
       | _, `Yes -> true
       | _, `No -> false
-      | (`CYGWIN|`MINGW), `None -> (Sys.command "cygpath -v 2>NUL >NUL" = 0)
+      | `CYGWIN, `None -> (Sys.command "cygpath -v 2>/dev/null >/dev/null" = 0)
+      | `MINGW, `None -> (Sys.command "cygpath -v 2>NUL >NUL" = 0)
       | (`MSVC|`MSVC64|`LIGHTLD), `None -> false
     end;
 

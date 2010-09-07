@@ -320,8 +320,8 @@ void *flexdll_dlopen(const char *file, int mode) {
   error = 0;
   if (!file) return &main_unit;
 
-  sprintf(flexdll_relocate_env,"FLEXDLL_RELOCATE=%p",&flexdll_relocate);
-  putenv(flexdll_relocate_env);
+  sprintf(flexdll_relocate_env,"%p",&flexdll_relocate);
+  setenv("FLEXDLL_RELOCATE", flexdll_relocate_env, 1);
 
   handle = ll_dlopen(file, exec);
   if (!handle) { if (!error) error = 1; return NULL; }
