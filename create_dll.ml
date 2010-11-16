@@ -60,7 +60,7 @@ type sec_info = {
   }
 
 let create_dll oc objs =
-  let image_base = 0x10000000l in
+  let image_base = 0x10000l in
   let page_size = 0x1000l in
   let dllname = "foo.dll" in
 
@@ -304,26 +304,38 @@ let create_dll oc objs =
 
   output_string oc "PE\000\000";
   (* coff header *)
-  emit_int16 oc (match !Cmdline.machine with `x86 -> 0x14c | `x64 -> 0x8664);
+  let machine = !Cmdline.machine in
+  let disp_mach ~x86 ~x64 =
+    match machine with `x86 -> x86 | `x64 -> x64
+  in
+  let emit_int32_64 x =
+    emit_int32 oc x;
+    if machine = `x64 then emit_int32 oc 0l
+  in
+  emit_int16 oc (disp_mach ~x86:0x14c ~x64:0x8664);
   emit_int16 oc (List.length !sects); (* number of sections *)
   emit_int32 oc 0l; (* date *)
   emit_int32 oc 0l; (* ptr to symbol table *)
   emit_int32 oc 0l; (* number of symbols *)
-  emit_int16 oc (28 + 68 + 8 * 16); (* size of optional headers *)
-  emit_int16 oc 0x2102; (* flags: exec, 32-bit, dll *)
+  emit_int16 oc ((disp_mach ~x86:28 ~x64:24) + (disp_mach ~x86:68 ~x64:88) + 8 * 16); (* size of optional headers *)
+  emit_int16 oc
+    (disp_mach
+       ~x86:0x2102 (* flags: exec, 32-bit, dll *)
+       ~x64:0x2022 (* flags: exec, large address aware(?), dll *)
+    );
 
   (* optional header *)
   (*   standard fields *)
-  emit_int16 oc 0x10b; (* magic: pe32 *)
+  emit_int16 oc (disp_mach ~x86:0x10b ~x64:0x20b); (* magic: pe32/pe32+ *)
   emit_int16 oc 8; (* linker version *)
   emit_int32 oc 0l; (* size of code *)
   emit_int32 oc 0l; (* size of initialized data *)
   emit_int32 oc 0l; (* size of uninitialized data *)
   emit_int32 oc 0l; (* entry point *)
   emit_int32 oc 0x1000l; (* base of code *)
-  emit_int32 oc 0x1000l; (* base of data *)
+  if machine = `x86 then emit_int32 oc 0x1000l; (* base of data *)
   (*   windows-specific fields *)
-  emit_int32 oc image_base; (* image base *)
+  emit_int32_64 image_base; (* image base *)
   emit_int32 oc 0x1000l; (* section alignment *)
   emit_int32 oc 0x200l; (* file alignment *)
   emit_int32 oc 0x04l; (* OS version *)
@@ -336,10 +348,10 @@ let create_dll oc objs =
   emit_int32 oc 0l; (* checksum *)
   emit_int16 oc 3; (* subsystem: windows CUI *)
   emit_int16 oc 0x400; (* characteristics: no EH *)
-  emit_int32 oc 0x100000l; (* size of stack commit *)
-  emit_int32 oc 0x1000l; (* size of stack commit *)
-  emit_int32 oc 0x100000l; (* size of heap commit *)
-  emit_int32 oc 0x1000l; (* size of heap commit *)
+  emit_int32_64 0x100000l; (* size of stack reserve *)
+  emit_int32_64 0x1000l; (* size of stack commit *)
+  emit_int32_64 0x100000l; (* size of heap reserve *)
+  emit_int32_64 0x1000l; (* size of heap commit *)
   emit_int32 oc 0l; (* loader flags *)
   emit_int32 oc 16l; (* number of directories *)
 

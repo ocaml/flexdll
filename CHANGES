@@ -1,4 +1,5 @@
 Since 0.25
+- fix for Win64 (use a PE32+ optional header, and a lower base address)
 - use setenv instead of putenv for FLEXDLL_RELOCATE (thanks to Yasutaka Atarashi)
 - use /dev/null instead of NUL for Cygwin (thanks to Yasutaka Atarashi)
 
