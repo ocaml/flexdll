@@ -61,16 +61,16 @@ flexlink.exe: $(OBJS)
 	$(OCAMLOPT) -o flexlink.exe $(LINKFLAGS) $(OBJS)
 
 flexdll_msvc.obj: flexdll.h flexdll.c
-	$(MSVC_PREFIX) $(MSVCC) -c /Fo"flexdll_msvc.obj" flexdll.c
+	$(MSVC_PREFIX) $(MSVCC) /DMSVC -c /Fo"flexdll_msvc.obj" flexdll.c
 
 flexdll_msvc64.obj: flexdll.h flexdll.c
-	$(MSVC64_PREFIX) $(MSVCC64) -c /Fo"flexdll_msvc64.obj" flexdll.c
+	$(MSVC64_PREFIX) $(MSVCC64) /DMSVC  -c /Fo"flexdll_msvc64.obj" flexdll.c
 
 flexdll_cygwin.o: flexdll.h flexdll.c
-	$(CYGCC) -c -o flexdll_cygwin.o flexdll.c
+	$(CYGCC) -c -DCYGWIN -o flexdll_cygwin.o flexdll.c
 
 flexdll_mingw.o: flexdll.h flexdll.c
-	$(MINCC) -c -o flexdll_mingw.o flexdll.c
+	$(MINCC) -c -DMINGW -o flexdll_mingw.o flexdll.c
 
 flexdll_initer_msvc.obj: flexdll_initer.c
 	$(MSVC_PREFIX) $(MSVCC) -c /Fo"flexdll_initer_msvc.obj" flexdll_initer.c
