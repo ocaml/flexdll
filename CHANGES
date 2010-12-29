@@ -1,4 +1,5 @@
 
+
 Version 0.26
 - fix for Win64 (use a PE32+ optional header, and a lower base address)
 - use _putenv_s instead of putenv for FLEXDLL_RELOCATE (thanks to Yasutaka Atarashi)
