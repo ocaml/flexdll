@@ -377,12 +377,16 @@ void *flexdll_wdlopen(const wchar_t *file, int mode) {
   error = 0;
   if (!file) return &main_unit;
 
-#ifdef CYGWIN
+  /* putenv() only modifies CRT's copy of the environment. That works for
+     one shared CRT lib, but fails when parent/child process CRTs are
+     different. Actually, GetEnvironmentVariable/SetEnvironmentVariable is
+     enough but we preserve the legacy method for backward compatibility */
   sprintf(flexdll_relocate_env,"%p",relocate);
+  SetEnvironmentVariable("FLEXDLL_RELOCATE", flexdll_relocate_env);
+#ifdef CYGWIN
   setenv("FLEXDLL_RELOCATE", flexdll_relocate_env, 1);
 #else
 #if __STDC_SECURE_LIB__ >= 200411L
-  sprintf(flexdll_relocate_env,"%p",relocate);
   _putenv_s("FLEXDLL_RELOCATE", flexdll_relocate_env);
 #else
   {

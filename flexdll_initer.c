@@ -24,8 +24,16 @@ extern int reloctbl;
 
 static int flexdll_init() {
   func *sym = 0;
-  char *s = getenv("FLEXDLL_RELOCATE");
-  if (!s) { fprintf(stderr, "Cannot find FLEXDLL_RELOCATE\n"); return FALSE; }
+  char *s, buf[256];
+  DWORD len = GetEnvironmentVariable("FLEXDLL_RELOCATE", buf, sizeof(buf));
+  if (len > 0 && len <= sizeof(buf)) {
+    s = buf;
+  }
+  else {
+    /* fallback to the legacy method */
+    s = getenv("FLEXDLL_RELOCATE");
+    if (!s) { fprintf(stderr, "Cannot find FLEXDLL_RELOCATE\n"); return FALSE; }
+  }
   sscanf(s,"%p",&sym);
   /* sym = 0 means "loaded not for execution" */
   if (!sym || sym(&reloctbl)) return TRUE;
