@@ -987,6 +987,7 @@ let setup_toolchain () =
       search_path :=
 	!dirs @
 	  [ "/lib/mingw";
+            "/usr/i686-pc-mingw32/sys-root/mingw/lib";
             "/lib";
 	    "/lib/w32api";
 	    gcclib () ];
