@@ -1,4 +1,5 @@
-
+Since 0.26
+- support for objects with more than 65536 relocations
 
 Version 0.26
 - fix for Win64 (use a PE32+ optional header, and a lower base address)

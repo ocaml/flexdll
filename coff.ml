@@ -478,15 +478,22 @@ module Section = struct
     in
     let va = int32 buf 12 in
 
-    if (int32 buf 36 &&& 0x01000000l <> 0l)
-    then (Printf.printf "More relocs!\n"; assert false);
-
+    let nrelocs = int16 buf 32 in
+    let more_relocs = int32 buf 36 &&& 0x01000000l <> 0l in
+    let base_relocs = filebase + int32_ buf 24 in
+    let base_relocs, nrelocs =
+      if more_relocs then begin
+        let buf_first_reloc = read ic base_relocs 4 in
+        let n = int32_ buf_first_reloc 0 in
+        base_relocs + 10, n - 1
+      end else
+        base_relocs, nrelocs
+    in
 
     let relocs =
-      let base = filebase + int32_ buf 24 in
       let r = ref [] in
-      for i = 0 to (int16 buf 32) - 1 do
-	r := Reloc.get symtbl va ic (base + 10 * i) :: !r
+      for i = 0 to nrelocs - 1 do
+	r := Reloc.get symtbl va ic (base_relocs + 10 * i) :: !r
       done;
       !r
     in
