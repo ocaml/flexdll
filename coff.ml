@@ -630,7 +630,9 @@ module Coff = struct
 	| ' ' -> (cmd, String.sub s i0 (i - i0) :: args) :: aux0 (i+1)
 	| ',' -> aux2 cmd (String.sub s i0 (i - i0) :: args) (i+1)
 	| _   -> aux4 cmd args i0 (i+1)
-    and aux5 cmd args i = match s.[i] with
+    and aux5 cmd args i =
+      if i = l then (cmd, args) :: []
+      else match s.[i] with
       | ' ' -> (cmd,args) :: aux0 (i+1)
       | ',' -> aux2 cmd args (i+1)
       | _   -> raise Exit
