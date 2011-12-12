@@ -16,6 +16,9 @@ open Cmdline
 let search_path = ref []
 let default_libs = ref []
 
+let gcc = ref "gcc"
+let objdump = ref "objdump"
+
 let is_crt_lib = function
   | "LIBCMT"
   | "MSVCRT" -> true
@@ -112,7 +115,7 @@ type cmdline = {
 let new_cmdline () =
   let rf = match !toolchain with
   | `MSVC | `MSVC64 | `LIGHTLD -> true
-  | `MINGW | `CYGWIN -> false
+  | `MINGW | `MINGW64 | `CYGWIN -> false
   in
   {
    may_use_response_file = rf;
@@ -157,13 +160,6 @@ let quote_files cmdline lst =
 
 let cygpath l =
   get_output (Printf.sprintf "cygpath -m %s" (String.concat " " (List.map Filename.quote l)))
-
-let gcclib () =
-  let extra = match !toolchain with
-  | `MINGW -> "-mno-cygwin "
-  | _ -> ""
-  in
-  Filename.dirname (get_output1 ~use_bash:(!toolchain = `CYGWIN) (Printf.sprintf "gcc %s-print-libgcc-file-name" extra))
 
 let file_exists fn =
   if Sys.file_exists fn && not (Sys.is_directory fn) then Some fn
@@ -301,6 +297,7 @@ let add_reloc_table x p sname =
         | `x64, 0x04 -> 0x0001 (* rel32 *)
         | `x64, 0x05 -> 0x0004 (* rel32_1 *)
         | `x64, 0x08 -> 0x0003 (* rel32_4 *)
+	| `x64, 0x06 -> 0x0005 (* rel32_2 *)
         | `x86, (0x0a | 0x0b) -> 0x0100 (* debug relocs: ignore *)
 	| _, k  ->
             let msg =
@@ -492,9 +489,9 @@ let parse_dll_exports fn =
 let dll_exports fn = match !toolchain with
   | `MSVC | `MSVC64 | `LIGHTLD ->
       failwith "Creation of import library not supported for this toolchain"
-  | `CYGWIN | `MINGW ->
+  | `CYGWIN | `MINGW | `MINGW64 ->
       let dmp = temp_file "dyndll" ".dmp" in
-      if cmd_verbose (Printf.sprintf "objdump -p %s > %s" fn dmp) <> 0
+      if cmd_verbose (Printf.sprintf "%s -p %s > %s" !objdump fn dmp) <> 0
       then failwith "Error while extracting exports from a DLL";
       parse_dll_exports dmp
 
@@ -888,7 +885,8 @@ let build_dll link_exe output_file files exts extra_args =
             Filename.quote def_file
         in
 	Printf.sprintf
-	  "gcc %s%s -L. %s %s -o %s %s %s %s %s"
+	  "%s %s%s -L. %s %s -o %s %s %s %s %s"
+          !gcc
 	  (if link_exe = `EXE then "" else "-shared ")
 	  (if main_pgm then "" else if !noentry then "-Wl,-e0 " else "-Wl,-e_FlexDLLiniter@12 ")
 	  (mk_dirs_opt "-I")
@@ -898,7 +896,7 @@ let build_dll link_exe output_file files exts extra_args =
 	  files
           def_file
 	  extra_args
-    | `MINGW ->
+    | `MINGW | `MINGW64 ->
         let def_file =
           if main_pgm then ""
           else
@@ -908,10 +906,11 @@ let build_dll link_exe output_file files exts extra_args =
             Filename.quote def_file
         in
 	Printf.sprintf
-	  "gcc -mno-cygwin -m%s %s%s -L. %s %s -o %s %s %s %s %s %s"
+	  "%s -m%s %s%s -L. %s %s -o %s %s %s %s %s %s"
+          !gcc
           !subsystem
 	  (if link_exe = `EXE then "" else "-shared ")
-	  (if main_pgm then "" else if !noentry then "-Wl,-e0 " else "-Wl,-e_FlexDLLiniter@12 ")
+	  (if main_pgm then "" else if !noentry then "-Wl,-e0 " else if !machine = `x86 then "-Wl,-e_FlexDLLiniter@12 " else "-Wl,-eFlexDLLiniter ")
 	  (mk_dirs_opt "-I")
 	  (mk_dirs_opt "-L")
 	  (Filename.quote output_file)
@@ -965,17 +964,36 @@ let build_dll link_exe output_file files exts extra_args =
 
 
 let setup_toolchain () =
+  let mingw_libs pre =
+    gcc := pre ^ "-gcc";
+    objdump := pre ^ "-objdump";
+    search_path :=
+      !dirs @
+      [
+       Filename.dirname (get_output1 (!gcc ^ " -print-libgcc-file-name"));
+       get_output1 (!gcc ^ " -print-sysroot") ^ "/mingw/lib";
+      ];
+    default_libs :=
+      ["-lmingw32"; "-lgcc"; "-lmoldname"; "-lmingwex"; "-lmsvcrt";
+       "-luser32"; "-lkernel32"; "-ladvapi32"; "-lshell32" ];
+    if !exe_mode = `EXE then default_libs := "crt2.o" :: !default_libs
+    else default_libs := "dllcrt2.o" :: !default_libs
+  in
   match !toolchain with
   | _ when !builtin_linker ->
       search_path := !dirs;
       add_flexdll_obj := false;
       noentry := true
   | `CYGWIN ->
+      gcc := "gcc";
+      objdump := "objdump";
       search_path :=
 	!dirs @
-	  [ "/lib";
-	    "/lib/w32api";
-	    gcclib () ];
+	  [
+           "/lib";
+	   "/lib/w32api";
+           Filename.dirname (get_output1 ~use_bash:true "gcc -print-libgcc-file-name");
+	  ];
       default_libs := ["-lkernel32"; "-luser32"; "-ladvapi32";
 		       "-lshell32"; "-lcygwin"; "-lgcc"]
   | `MSVC | `MSVC64 ->
@@ -984,18 +1002,9 @@ let setup_toolchain () =
       if not !custom_crt then
         default_libs := ["msvcrt.lib"]
   | `MINGW ->
-      search_path :=
-	!dirs @
-	  [ "/lib/mingw";
-            "/usr/i686-pc-mingw32/sys-root/mingw/lib";
-            "/lib";
-	    "/lib/w32api";
-	    gcclib () ];
-      default_libs :=
-	["-lmingw32"; "-lgcc"; "-lmoldname"; "-lmingwex"; "-lmsvcrt";
-	 "-luser32"; "-lkernel32"; "-ladvapi32"; "-lshell32" ];
-      if !exe_mode = `EXE then default_libs := "crt2.o" :: !default_libs
-      else default_libs := "dllcrt2.o" :: !default_libs
+      mingw_libs Version.mingw_prefix
+  | `MINGW64 ->
+      mingw_libs Version.mingw64_prefix
   | `LIGHTLD ->
       search_path := !dirs
 
@@ -1016,12 +1025,13 @@ let compile_if_needed file =
 	    (Filename.quote tmp_obj)
 	    (mk_dirs_opt "-I")
 	    file
-      | `MINGW ->
+      | `MINGW | `MINGW64 ->
 	  Printf.sprintf
-	    "gcc -mno-cygwin -c -o %s %s %s"
+	    "%s -c -o %s %s %s"
+            !gcc
 	    (Filename.quote tmp_obj)
 	    (mk_dirs_opt "-I")
-	    file
+            (Filename.quote file)
       | `LIGHTLD ->
           failwith "Compilation of C code is not supported for this toolchain"
     in
@@ -1055,6 +1065,7 @@ let all_files () =
   | `MSVC -> "msvc.obj"
   | `MSVC64 -> "msvc64.obj"
   | `CYGWIN -> "cygwin.o"
+  | `MINGW64 -> "mingw64.o"
   | `MINGW | `LIGHTLD -> "mingw.o" in
   if !exe_mode <> `DLL then
     if !add_flexdll_obj then f ("flexdll_" ^ tc) :: files
@@ -1072,8 +1083,12 @@ let main () =
       match !toolchain, !cygpath_arg with
       | _, `Yes -> true
       | _, `No -> false
-      | `CYGWIN, `None -> (Sys.command "cygpath -v 2>/dev/null >/dev/null" = 0)
-      | `MINGW, `None -> (Sys.command "cygpath -v 2>NUL >NUL" = 0)
+      | (`MINGW|`MINGW64|`CYGWIN), `None ->
+          begin match Sys.os_type with
+          | "Unix" | "Cygwin" -> Sys.command "cygpath -v 2>/dev/null >/dev/null" = 0
+          | "Win32" -> Sys.command "cygpath -v 2>NUL >NUL" = 0
+          | _ -> assert false
+          end
       | (`MSVC|`MSVC64|`LIGHTLD), `None -> false
     end;
 

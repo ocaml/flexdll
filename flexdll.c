@@ -21,6 +21,7 @@ typedef unsigned long uintnat;
 #define RELOC_ABS       0x0002
 #define RELOC_REL32_4   0x0003
 #define RELOC_REL32_1   0x0004
+#define RELOC_REL32_2   0x0005
 #define RELOC_DONE      0x0100
 
 typedef struct { UINT_PTR kind; char *name; UINT_PTR *addr; } reloc_entry;
@@ -143,7 +144,7 @@ static void allow_write(char *begin, char *end, uintnat new, UINT_PTR *old) {
     pagesize = si.dwPageSize;
   }
 
-  begin -= (uintnat) begin % pagesize;
+  begin -= (size_t) begin % pagesize;
   res = VirtualProtect(begin, end - begin, new, (uintnat*) old);
   if (0 == res) {
     fprintf(stderr, "natdynlink: VirtualProtect failed (%s), begin = 0x%p, end = 0x%p\n", ll_dlerror(), begin, end);
@@ -204,6 +205,15 @@ static void relocate(resolver f, void *data, reloctbl *tbl) {
       break;
     case RELOC_REL32_1:
       s -= (INT_PTR)(ptr -> addr) + 5;
+      if (s != (INT32) s) {
+        printf("flexdll error: cannot relocate, target is too far: %p\n", s);
+        fflush(stdout);
+        exit(1);
+      }
+      *((UINT32*) ptr->addr) = s;
+      break;
+    case RELOC_REL32_2:
+      s -= (INT_PTR)(ptr -> addr) + 6;
       if (s != (INT32) s) {
         printf("flexdll error: cannot relocate, target is too far: %p\n", s);
         fflush(stdout);
