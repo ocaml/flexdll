@@ -1,3 +1,6 @@
+Since 0.27
+- new option '-stack' to set the stack reserve
+
 Version 0.27
 - support for mingw64; the mingw toolcgain now relies on the 32-bit version of mingw64;
   the old "gcc -mno-cygwin" is no longer supporte.

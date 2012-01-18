@@ -41,6 +41,7 @@ let use_cygpath = ref true
 let cygpath_arg : [`Yes | `No | `None] ref = ref `None
 let implib = ref false
 let deffile = ref None
+let stack_reserve = ref None
 
 let usage_msg =
   Printf.sprintf
@@ -178,6 +179,9 @@ let specs = [
 
   "-custom-crt", Arg.Set custom_crt,
   " Use a custom CRT";
+
+  "-stack", Arg.String (fun s -> try stack_reserve := Some (Int32.of_string s) with _ -> raise (Arg.Bad "integer argument expected for -stack")),
+  "<int> Set the stack reserve in the resulting image";
 
   "-link", Arg.String (fun s -> extra_args := s :: !extra_args),
   "<option> Next argument is passed verbatim to the linker";

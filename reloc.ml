@@ -959,6 +959,11 @@ let build_dll link_exe output_file files exts extra_args =
       if Sys.command mcmd <> 0 then
 	failwith "Error while merging the manifest";
       safe_remove manifest_file;
+    end;
+
+    begin match !stack_reserve with
+    | Some x -> Stacksize.set_stack_reserve output_file x
+    | None -> ()
     end
   end
 
