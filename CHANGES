@@ -1,5 +1,7 @@
-Since 0.27
+Version 0.28
 - new option '-stack' to set the stack reserve
+- new option '-patch' (to be used in conjunction with -stack and -o to
+  patch the an existing image)
 
 Version 0.27
 - support for mingw64; the mingw toolcgain now relies on the 32-bit version of mingw64;

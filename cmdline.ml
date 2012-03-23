@@ -34,7 +34,7 @@ let exts = ref []
 let output_file = ref ""
 let exe_mode : [`DLL | `EXE | `MAINDLL] ref = ref `DLL
 let extra_args = ref []
-let dump_mode = ref false
+let mode : [`NORMAL | `DUMP | `PATCH] ref = ref `NORMAL
 let defexports = ref []
 let noentry = ref false
 let use_cygpath = ref true
@@ -45,7 +45,7 @@ let stack_reserve = ref None
 
 let usage_msg =
   Printf.sprintf
-    "FlexDLL version %s\n\nUsage:\n  flexlink -o <result.dll> file1.obj file2.obj ... -- <extra linker arguments>\n"
+    "FlexDLL version %s\n\nUsage:\n  flexlink -o <result.dll/exe> file1.obj file2.obj ... -- <extra linker arguments>\n"
     Version.version
 
 let footer =
@@ -128,8 +128,11 @@ let specs = [
   "-dry", Arg.Set dry_mode,
   " Show the linker command line, do not actually run it";
 
-  "-dump", Arg.Set dump_mode,
+  "-dump", Arg.Unit (fun () -> mode := `DUMP),
   " Only dump the content of object files";
+
+  "-patch", Arg.Unit (fun () -> mode := `PATCH),
+  " Only patch the target image (to be used with -stack)";
 
   "-nocygpath", Arg.Unit (fun () -> cygpath_arg := `No),
   " Do not use cygpath (default for msvc, mingw)";
@@ -250,7 +253,7 @@ let parse_cmdline () =
 
   Arg.parse_argv (Array.of_list args) (Arg.align specs)
     (fun x -> files := x :: !files) usage_msg;
-  if !output_file = "" && not !dump_mode then begin
+  if !output_file = "" && !mode <> `DUMP then begin
     Printf.eprintf
       "Please specify an output file (-help to get some usage information)\n";
     exit 1

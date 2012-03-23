@@ -496,6 +496,10 @@ let dll_exports fn = match !toolchain with
       parse_dll_exports dmp
 
 
+let patch_output output_file =
+  match !stack_reserve with
+  | Some x -> Stacksize.set_stack_reserve output_file x
+  | None -> ()
 
 let build_dll link_exe output_file files exts extra_args =
   let main_pgm = link_exe <> `DLL in
@@ -961,10 +965,7 @@ let build_dll link_exe output_file files exts extra_args =
       safe_remove manifest_file;
     end;
 
-    begin match !stack_reserve with
-    | Some x -> Stacksize.set_stack_reserve output_file x
-    | None -> ()
-    end
+    patch_output output_file
   end
 
 
@@ -1108,11 +1109,13 @@ let main () =
     end
    );
   let files = all_files () in
-  if !dump_mode then List.iter dump files
-  else
-    build_dll !exe_mode !output_file files !exts
-      (String.concat " " (List.map Filename.quote (List.rev !extra_args)))
-
+  match !mode with
+  | `DUMP -> List.iter dump files
+  | `NORMAL ->
+      build_dll !exe_mode !output_file files !exts
+        (String.concat " " (List.map Filename.quote (List.rev !extra_args)))
+  | `PATCH ->
+      patch_output !output_file
 
 let () =
   try main ()
