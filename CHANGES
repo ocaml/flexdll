@@ -1,3 +1,6 @@
+After 0.28
+- use "cygpath -S", not "cygpath -v" which no longer exists
+
 Version 0.28
 - new option '-stack' to set the stack reserve
 - new option '-patch' (to be used in conjunction with -stack and -o to

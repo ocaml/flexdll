@@ -1091,8 +1091,10 @@ let main () =
       | _, `No -> false
       | (`MINGW|`MINGW64|`CYGWIN), `None ->
           begin match Sys.os_type with
-          | "Unix" | "Cygwin" -> Sys.command "cygpath -v 2>/dev/null >/dev/null" = 0
-          | "Win32" -> Sys.command "cygpath -v 2>NUL >NUL" = 0
+          | "Unix" | "Cygwin" ->
+              Sys.command "cygpath -S 2>/dev/null >/dev/null" = 0
+          | "Win32" ->
+              Sys.command "cygpath -S 2>NUL >NUL" = 0
           | _ -> assert false
           end
       | (`MSVC|`MSVC64|`LIGHTLD), `None -> false
