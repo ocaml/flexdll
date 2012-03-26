@@ -1,4 +1,4 @@
-After 0.28
+Version 0.29
 - use "cygpath -S", not "cygpath -v" which no longer exists
 
 Version 0.28
