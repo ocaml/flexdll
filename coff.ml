@@ -140,7 +140,7 @@ and section = {
   mutable vaddress: int32;
   mutable data:
       [ `String of string | `Uninit of int
-    | `Buf of Buf.t
+    | `Buf of Buf.t list
     | `Lazy of in_channel * int * int
     | `Sxdata of symbol array
 ];
@@ -530,7 +530,7 @@ module Section = struct
     | `String s -> String.length s
     | `Lazy (_,_,len) -> len
     | `Uninit len -> len
-    | `Buf buf -> Buf.length buf
+    | `Buf bufs -> List.fold_left (fun s b -> s + Buf.length b) 0 bufs
     | `Sxdata syms -> Array.length syms * 4
 
   let put strtbl oc x =
@@ -551,8 +551,8 @@ module Section = struct
 	  delayed_ptr oc (fun () -> copy_data ic pos oc len)
       | `Uninit len ->
 	  emit_int32 oc 0l; (fun () -> ())
-      | `Buf buf ->
-	  delayed_ptr oc (fun () -> Buf.dump oc buf)
+      | `Buf bufs ->
+	  delayed_ptr oc (fun () -> List.iter (Buf.dump oc) bufs)
       | `Sxdata syms ->
           delayed_ptr oc
             (fun () ->

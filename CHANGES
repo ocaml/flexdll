@@ -1,3 +1,6 @@
+Version 0.30
+- Allow the internal linker to create large DLLs (>= 16Mb)
+
 Version 0.29
 - use "cygpath -S", not "cygpath -v" which no longer exists
 
