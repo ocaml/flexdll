@@ -869,7 +869,7 @@ module Lib = struct
     !objects,!imports
 
   let is_lib ic =
-    in_channel_length ic > String.length magic_lib
+    in_channel_length ic >= String.length magic_lib
     && read ic 0 (String.length magic_lib) = magic_lib
 
   let obj_ofs ic =
