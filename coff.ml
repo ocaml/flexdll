@@ -568,7 +568,8 @@ module Section = struct
       else delayed_ptr oc
           (fun () ->
             if many_relocs then begin
-              emit_int32 oc (Int32.of_int nrelocs);
+              emit_int32 oc (Int32.of_int (nrelocs + 1));
+              (* +1 because this slot counts as well! *)
               emit_int32 oc 0l;
               emit_int16 oc 0
             end;
