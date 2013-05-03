@@ -187,6 +187,7 @@ static void relocate(resolver f, void *data, reloctbl *tbl) {
       break;
     case RELOC_REL32:
       s -= (INT_PTR)(ptr -> addr) + 4;
+      s += *((INT32*) ptr -> addr);
       if (s != (INT32) s) {
         printf("flexdll error: cannot relocate, target is too far: %p\n", s);
         fflush(stdout);
@@ -196,6 +197,7 @@ static void relocate(resolver f, void *data, reloctbl *tbl) {
       break;
     case RELOC_REL32_4:
       s -= (INT_PTR)(ptr -> addr) + 8;
+      s += *((INT32*) ptr -> addr);
       if (s != (INT32) s) {
         printf("flexdll error: cannot relocate, target is too far: %p\n", s);
         fflush(stdout);
@@ -205,6 +207,7 @@ static void relocate(resolver f, void *data, reloctbl *tbl) {
       break;
     case RELOC_REL32_1:
       s -= (INT_PTR)(ptr -> addr) + 5;
+      s += *((INT32*) ptr -> addr);
       if (s != (INT32) s) {
         printf("flexdll error: cannot relocate, target is too far: %p\n", s);
         fflush(stdout);
@@ -214,6 +217,7 @@ static void relocate(resolver f, void *data, reloctbl *tbl) {
       break;
     case RELOC_REL32_2:
       s -= (INT_PTR)(ptr -> addr) + 6;
+      s += *((INT32*) ptr -> addr);
       if (s != (INT32) s) {
         printf("flexdll error: cannot relocate, target is too far: %p\n", s);
         fflush(stdout);

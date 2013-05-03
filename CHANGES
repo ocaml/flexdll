@@ -1,3 +1,8 @@
+Version 0.31
+- Fix bug when relocation counter > 0xffff
+- Fix bug with REL32 relocations on non-zero base in DLLs
+- Fix bug with empty .a files
+
 Version 0.30
 - Allow the internal linker to create large DLLs (>= 16Mb)
 
