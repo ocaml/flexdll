@@ -1,3 +1,7 @@
+Since then:
+- Support for "@respfiles" arguments (for long command lines).
+  Used to be implemented by OCaml runtime system.
+
 Version 0.31
 - Fix bug when relocation counter > 0xffff
 - Fix bug with REL32 relocations on non-zero base in DLLs
