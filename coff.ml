@@ -117,7 +117,7 @@ end
 
 type symbol = {
   mutable sym_pos: int;
-  sym_name: string;
+  mutable sym_name: string;
   mutable value: int32;
   mutable section: [ `Num of int | `Section of section ];
   stype: int;
@@ -135,7 +135,7 @@ and reloc = {
 
 and section = {
   mutable sec_pos: int;
-  sec_name: string;
+  mutable sec_name: string;
   mutable vsize: int32;
   mutable vaddress: int32;
   mutable data:
@@ -145,7 +145,7 @@ and section = {
     | `Sxdata of symbol array
 ];
   mutable relocs: reloc list;
-  sec_opts: int32;
+  mutable sec_opts: int32;
 }
 
 type coff = {

@@ -334,6 +334,15 @@ let add_reloc_table x p sname =
     ) else true
   in
   let section sec =
+    if sec.sec_opts &&& 0x1000l <> 0l && has_prefix ".rdata$.refptr." sec.sec_name then
+      begin
+        (* under Cygwin64, gcc introduces mergable (link once) COMDAT sections to store
+           indirection pointers to external darta symbols.  Since we don't deal with such section
+           properly, we turn them into regular data section, thus loosing sharing (but we don't care). *)
+        sec.sec_opts <- 0xc0500040l;
+        sec.sec_name <- Printf.sprintf ".flexrefptrsection%i" (Oo.id (object end));
+      end;
+
     let min = ref Int32.max_int and max = ref Int32.min_int in
     let sym = lazy (let s = Symbol.intern sec 0l in
 		    syms := s :: !syms;
@@ -550,6 +559,15 @@ let build_dll link_exe output_file files exts extra_args =
      in default libraries *)
   let collected = Hashtbl.create 8 in
   let rec collect_defined_obj obj =
+    List.iter
+     (fun sym ->
+       (* see comments on Cygwin64 COMDATA sections.  Here we give a unique name to the internal symbol.
+          We use ?? to ensure the symbol is not exported in flexdll export table (see exportable function) *)
+       if has_prefix ".refptr." sym.sym_name then
+         sym.sym_name <- Printf.sprintf "??flexrefptr%i" (Oo.id (object end))
+     )
+     obj.symbols;
+
     List.iter (fun (x,y) ->
 		 if !verbose >= 2 then
 		   Printf.printf "alias %s -> %s\n"
@@ -641,7 +659,7 @@ let build_dll link_exe output_file files exts extra_args =
     StrSet.filter
       (fun s -> match check_prefix "__imp_" s with
       | Some s' -> (*Printf.printf "import for %s: %s\n" obj.obj_name s; *) imported := StrSet.add s' !imported; false
-      | None -> true)
+      | None -> s <> "environ"  (* special hack for Cygwin64 *) )
       undefs
   in
 
@@ -889,7 +907,7 @@ let build_dll link_exe output_file files exts extra_args =
             Filename.quote def_file
         in
         let extra_args =
-          if !machine = `x64 then "-Xlinker --image-base -Xlinker 0x50000 " ^ extra_args else extra_args
+          if !machine = `x64 then "-Xlinker --image-base -Xlinker 0x10000 " ^ extra_args else extra_args
         in
 	Printf.sprintf
 	  "%s %s%s -L. %s %s -o %s %s %s %s %s"

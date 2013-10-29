@@ -25,7 +25,7 @@ typedef unsigned long uintnat;
 #define RELOC_DONE      0x0100
 
 typedef struct { UINT_PTR kind; char *name; UINT_PTR *addr; } reloc_entry;
-typedef struct { char *first; char *last; UINT_PTR old; } nonwr;
+typedef struct { char *first; char *last; DWORD old; } nonwr;
 typedef struct { nonwr *nonwr; reloc_entry entries[]; } reloctbl;
 typedef struct { void *addr; char *name; } dynsymbol;
 typedef struct { UINT_PTR size; dynsymbol entries[]; } symtbl;
@@ -134,7 +134,7 @@ static void dump_master_reloctbl(reloctbl **ptr) {
   while (*ptr) dump_reloctbl(*ptr++);
 }
 
-static void allow_write(char *begin, char *end, uintnat new, UINT_PTR *old) {
+static void allow_write(char *begin, char *end, DWORD new, PDWORD old) {
   static long int pagesize = 0;
   int res;
   SYSTEM_INFO si;
@@ -145,9 +145,9 @@ static void allow_write(char *begin, char *end, uintnat new, UINT_PTR *old) {
   }
 
   begin -= (size_t) begin % pagesize;
-  res = VirtualProtect(begin, end - begin, new, (PDWORD) old);
+  res = VirtualProtect(begin, end - begin, new, old);
   if (0 == res) {
-    fprintf(stderr, "natdynlink: VirtualProtect failed (%s), begin = 0x%p, end = 0x%p\n", ll_dlerror(), begin, end);
+    fprintf(stderr, "natdynlink: VirtualProtect failed (%s), begin = 0x%p, end = 0x%p, new = %x\n", ll_dlerror(), begin, end, new);
     exit(2);
   }
   /* printf("%p -> %p\n", *old, new); */
@@ -167,6 +167,10 @@ static void relocate(resolver f, void *data, reloctbl *tbl) {
   reloc_entry *ptr;
   nonwr *wr;
   INT_PTR s;
+  /*
+  DWORD old;
+  MEMORY_BASIC_INFORMATION info;
+  */
 
   if (!tbl) return;
 
@@ -175,6 +179,18 @@ static void relocate(resolver f, void *data, reloctbl *tbl) {
 
   for (ptr = tbl->entries; ptr->kind; ptr++) {
     if (ptr->kind & RELOC_DONE) continue;
+
+    /*
+    assert(VirtualQuery(ptr->addr, &info, sizeof(info)) == sizeof(info));
+    printf("p = %p, base = %p, allocBase = %p, allocProtect = %x, state = %x, protect = %x, type = %x\n",  ptr->addr, info.BaseAddress, info.AllocationBase, info.AllocationProtect, info.State, info.Protect, info.Type);
+
+    allow_write(ptr->addr,ptr->addr+4,PAGE_EXECUTE_WRITECOPY,&old);
+
+    assert(VirtualQuery(ptr->addr, &info, sizeof(info)) == sizeof(info));
+    printf("p = %p, base = %p, allocBase = %p, allocProtect = %x, state = %x, protect = %x, type = %x\n",  ptr->addr, info.BaseAddress, info.AllocationBase, info.AllocationProtect, info.State, info.Protect, info.Type);
+    */
+
+
     s = (UINT_PTR) f(data,ptr->name);
     if (!s) {
       error = 2;
@@ -230,6 +246,12 @@ static void relocate(resolver f, void *data, reloctbl *tbl) {
       exit(2);
     }
     ptr->kind |= RELOC_DONE;
+
+    /*
+    allow_write(ptr->addr,ptr->addr+4,old,&old);
+    assert(VirtualQuery(ptr->addr, &info, sizeof(info)) == sizeof(info));
+    printf("p = %p, base = %p, allocBase = %p, allocProtect = %x, state = %x, protect = %x, type = %x\n",  ptr->addr, info.BaseAddress, info.AllocationBase, info.AllocationProtect, info.State, info.Protect, info.Type);
+    */
   }
 
   /* Restore permissions. Should do it also in case of failure... */
