@@ -115,7 +115,7 @@ type cmdline = {
 let new_cmdline () =
   let rf = match !toolchain with
   | `MSVC | `MSVC64 | `LIGHTLD -> true
-  | `MINGW | `MINGW64 | `CYGWIN -> false
+  | `MINGW | `MINGW64 | `CYGWIN | `CYGWIN64 -> false
   in
   {
    may_use_response_file = rf;
@@ -130,7 +130,7 @@ let run_command cmdline cmd =
   in
   (* note: for Cygwin, using bash allow to follow symlinks to find
      gcc... *)
-  if cmdline.too_long || !toolchain = `CYGWIN then begin
+  if cmdline.too_long || !toolchain = `CYGWIN || !toolchain = `CYGWIN64 then begin
     (* Dump the command in a text file and apply bash to it. *)
     let (fn, oc) = open_temp_file "longcmd" "" in
     output_string oc cmd;
@@ -489,7 +489,7 @@ let parse_dll_exports fn =
 let dll_exports fn = match !toolchain with
   | `MSVC | `MSVC64 | `LIGHTLD ->
       failwith "Creation of import library not supported for this toolchain"
-  | `CYGWIN | `MINGW | `MINGW64 ->
+  | `CYGWIN | `CYGWIN64 | `MINGW | `MINGW64 ->
       let dmp = temp_file "dyndll" ".dmp" in
       if cmd_verbose (Printf.sprintf "%s -p %s > %s" !objdump fn dmp) <> 0
       then failwith "Error while extracting exports from a DLL";
@@ -879,7 +879,7 @@ let build_dll link_exe output_file files exts extra_args =
           !subsystem
           files descr
 	  extra_args
-    | `CYGWIN ->
+    | `CYGWIN | `CYGWIN64 ->
         let def_file =
           if main_pgm then ""
           else
@@ -892,7 +892,7 @@ let build_dll link_exe output_file files exts extra_args =
 	  "%s %s%s -L. %s %s -o %s %s %s %s %s"
           !gcc
 	  (if link_exe = `EXE then "" else "-shared ")
-	  (if main_pgm then "" else if !noentry then "-Wl,-e0 " else "-Wl,-e_FlexDLLiniter@12 ")
+	  (if main_pgm then "" else if !noentry then "-Wl,-e0 " else if !machine = `x86 then "-Wl,-e_FlexDLLiniter@12 " else "-Wl,-eFlexDLLiniter ")
 	  (mk_dirs_opt "-I")
 	  (mk_dirs_opt "-L")
 	  (Filename.quote output_file)
@@ -990,7 +990,7 @@ let setup_toolchain () =
       search_path := !dirs;
       add_flexdll_obj := false;
       noentry := true
-  | `CYGWIN ->
+  | `CYGWIN | `CYGWIN64 ->
       gcc := "gcc";
       objdump := "objdump";
       search_path :=
@@ -1025,7 +1025,7 @@ let compile_if_needed file =
 	    (Filename.quote tmp_obj)
 	    (mk_dirs_opt "/I")
 	    file
-      | `CYGWIN ->
+      | `CYGWIN | `CYGWIN64 ->
 	  Printf.sprintf
 	    "gcc -c -o %s %s %s"
 	    (Filename.quote tmp_obj)
@@ -1071,6 +1071,7 @@ let all_files () =
   | `MSVC -> "msvc.obj"
   | `MSVC64 -> "msvc64.obj"
   | `CYGWIN -> "cygwin.o"
+  | `CYGWIN64 -> "cygwin64.o"
   | `MINGW64 -> "mingw64.o"
   | `MINGW | `LIGHTLD -> "mingw.o" in
   if !exe_mode <> `DLL then
@@ -1089,7 +1090,7 @@ let main () =
       match !toolchain, !cygpath_arg with
       | _, `Yes -> true
       | _, `No -> false
-      | (`MINGW|`MINGW64|`CYGWIN), `None ->
+      | (`MINGW|`MINGW64|`CYGWIN|`CYGWIN64), `None ->
           begin match Sys.os_type with
           | "Unix" | "Cygwin" ->
               Sys.command "cygpath -S 2>/dev/null >/dev/null" = 0

@@ -145,7 +145,7 @@ static void allow_write(char *begin, char *end, uintnat new, UINT_PTR *old) {
   }
 
   begin -= (size_t) begin % pagesize;
-  res = VirtualProtect(begin, end - begin, new, (uintnat*) old);
+  res = VirtualProtect(begin, end - begin, new, (PDWORD) old);
   if (0 == res) {
     fprintf(stderr, "natdynlink: VirtualProtect failed (%s), begin = 0x%p, end = 0x%p\n", ll_dlerror(), begin, end);
     exit(2);
