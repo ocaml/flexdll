@@ -39,7 +39,10 @@ end = struct
   let ensure b n =
     let len = ref b.len in
     let pos = b.pos in
+    if n > Sys.max_string_length then
+     failwith (Printf.sprintf "Cannot grow string buffer to len %i.\n" n);
     while n > !len do len := !len * 2 done;
+    if !len > Sys.max_string_length then len := Sys.max_string_length;
     let nbuf = String.create !len in
     String.blit b.buf 0 nbuf 0 pos;
     b.buf <- nbuf;

@@ -65,7 +65,7 @@ OBJS = version.ml coff.ml cmdline.ml create_dll.ml reloc.ml
 flexlink.exe: $(OBJS) version_res.o
 	@echo Building flexlink.exe with TOOLCHAIN=$(TOOLCHAIN)
 	rm -f flexlink.exe
-	$(OCAMLOPT) -w -105 -o flexlink.exe $(LINKFLAGS) $(OBJS)
+	$(OCAMLOPT) -g -w -105 -o flexlink.exe $(LINKFLAGS) $(OBJS)
 
 version_res.o: version.rc
 	windres version.rc version_res.o
