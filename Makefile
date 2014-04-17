@@ -54,6 +54,7 @@ LINKFLAGS = -ccopt "-link version_res.o"
 support:
 	for i in $(CHAINS); do $(MAKE) build_$$i ; done 
 
+build_gnat: flexdll_gnat.o flexdll_initer_gnat.o
 build_msvc: flexdll_msvc.obj flexdll_initer_msvc.obj
 build_msvc64: flexdll_msvc64.obj flexdll_initer_msvc64.obj
 build_cygwin: flexdll_cygwin.o flexdll_initer_cygwin.o 
@@ -83,6 +84,9 @@ flexdll_cygwin.o: flexdll.h flexdll.c
 flexdll_mingw.o: flexdll.h flexdll.c
 	$(MINCC) -c -DMINGW -o flexdll_mingw.o flexdll.c
 
+flexdll_gnat.o: flexdll.h flexdll.c
+	gcc -c -o flexdll_gnat.o flexdll.c
+
 flexdll_mingw64.o: flexdll.h flexdll.c
 	$(MIN64CC) -c -DMINGW -o flexdll_mingw64.o flexdll.c
 
@@ -97,6 +101,9 @@ flexdll_initer_cygwin.o: flexdll_initer.c
 
 flexdll_initer_mingw.o: flexdll_initer.c
 	$(MINCC) -c -o flexdll_initer_mingw.o flexdll_initer.c
+
+flexdll_initer_gnat.o: flexdll_initer.c
+	gcc -c -o flexdll_initer_gnat.o flexdll_initer.c
 
 flexdll_initer_mingw64.o: flexdll_initer.c
 	$(MIN64CC) -c -o flexdll_initer_mingw64.o flexdll_initer.c

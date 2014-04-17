@@ -62,12 +62,12 @@ let read_file fn =
   List.rev !r
 
 
-let get_output ?(use_bash = false) cmd =
+let get_output ?(use_bash = false) ?(accept_error=false) cmd =
   let fn = Filename.temp_file "flexdll" "" in
   let cmd' = cmd ^ " > " ^ (Filename.quote fn) in
     if String.length cmd' < 8182 && not use_bash then
       begin
-	if (Sys.command cmd' <> 0)
+	if (Sys.command cmd' <> 0) && not accept_error
 	then failwith ("Cannot run " ^ cmd);
       end
     else
@@ -115,7 +115,7 @@ type cmdline = {
 let new_cmdline () =
   let rf = match !toolchain with
   | `MSVC | `MSVC64 | `LIGHTLD -> true
-  | `MINGW | `MINGW64 | `CYGWIN | `CYGWIN64 -> false
+  | `MINGW | `MINGW64 | `GNAT | `CYGWIN | `CYGWIN64 -> false
   in
   {
    may_use_response_file = rf;
@@ -498,7 +498,7 @@ let parse_dll_exports fn =
 let dll_exports fn = match !toolchain with
   | `MSVC | `MSVC64 | `LIGHTLD ->
       failwith "Creation of import library not supported for this toolchain"
-  | `CYGWIN | `CYGWIN64 | `MINGW | `MINGW64 ->
+  | `GNAT | `CYGWIN | `CYGWIN64 | `MINGW | `MINGW64 ->
       let dmp = temp_file "dyndll" ".dmp" in
       if cmd_verbose (Printf.sprintf "%s -p %s > %s" !objdump fn dmp) <> 0
       then failwith "Error while extracting exports from a DLL";
@@ -921,7 +921,7 @@ let build_dll link_exe output_file files exts extra_args =
 	  files
           def_file
 	  extra_args
-    | `MINGW | `MINGW64 ->
+    | `MINGW | `MINGW64 | `GNAT ->
         let def_file =
           if main_pgm then ""
           else
@@ -989,6 +989,29 @@ let build_dll link_exe output_file files exts extra_args =
     patch_output output_file
   end
 
+let ends_with s suf =
+  let rec aux s suf suflen offset i =
+    i >= suflen || (s.[i + offset] = suf.[i]
+                   && aux s suf suflen offset (i+1)) in
+  let slen = String.length s in
+  let suflen = String.length suf in
+  slen >= suflen && aux s suf suflen (slen - suflen) 0
+
+let strip s =
+  let rec search i s =
+    if s.[i] = ' ' then search (i+1) s
+    else String.sub s i (String.length s - i)
+  in
+  search 0 s
+
+let read_gnatls () =
+   (* This function is used by the GNAT toolchain to compute the include
+      directory. gnatls actually returns with an error code different to 0, so
+      we need to accept the error here. *)
+   let str_l = get_output ~accept_error:true ("gnatls -v") in
+   let ada_include =
+     List.hd (List.filter (fun s -> ends_with s "adainclude") str_l) in
+   Filename.dirname (strip ada_include)
 
 let setup_toolchain () =
   let mingw_libs pre =
@@ -1032,6 +1055,20 @@ let setup_toolchain () =
       mingw_libs Version.mingw_prefix
   | `MINGW64 ->
       mingw_libs Version.mingw64_prefix
+  | `GNAT ->
+   (* This is a plain copy of the mingw version, but we do not change the
+      prefix and use "gnatls" to compute the include dir. *)
+    search_path :=
+      !dirs @
+      [
+       Filename.dirname (get_output1 (!gcc ^ " -print-libgcc-file-name"));
+       read_gnatls ();
+      ];
+    default_libs :=
+      ["-lmingw32"; "-lgcc"; "-lmoldname"; "-lmingwex"; "-lmsvcrt";
+       "-luser32"; "-lkernel32"; "-ladvapi32"; "-lshell32" ];
+    if !exe_mode = `EXE then default_libs := "crt2.o" :: !default_libs
+    else default_libs := "dllcrt2.o" :: !default_libs
   | `LIGHTLD ->
       search_path := !dirs
 
@@ -1052,7 +1089,7 @@ let compile_if_needed file =
 	    (Filename.quote tmp_obj)
 	    (mk_dirs_opt "-I")
 	    file
-      | `MINGW | `MINGW64 ->
+      | `MINGW | `MINGW64 | `GNAT ->
 	  Printf.sprintf
 	    "%s -c -o %s %s %s"
             !gcc
@@ -1094,6 +1131,7 @@ let all_files () =
   | `CYGWIN -> "cygwin.o"
   | `CYGWIN64 -> "cygwin64.o"
   | `MINGW64 -> "mingw64.o"
+  | `GNAT    -> "gnat.o"
   | `MINGW | `LIGHTLD -> "mingw.o" in
   if !exe_mode <> `DLL then
     if !add_flexdll_obj then f ("flexdll_" ^ tc) :: files
@@ -1111,7 +1149,7 @@ let main () =
       match !toolchain, !cygpath_arg with
       | _, `Yes -> true
       | _, `No -> false
-      | (`MINGW|`MINGW64|`CYGWIN|`CYGWIN64), `None ->
+      | (`GNAT|`MINGW|`MINGW64|`CYGWIN|`CYGWIN64), `None ->
           begin match Sys.os_type with
           | "Unix" | "Cygwin" ->
               Sys.command "cygpath -S 2>/dev/null >/dev/null" = 0
