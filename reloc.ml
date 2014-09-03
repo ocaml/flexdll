@@ -379,9 +379,10 @@ let add_reloc_table x p sname =
 (* Create a table for import symbols __imp_XXX *)
 
 let add_import_table obj imports =
+  let ptr_size = match !machine with `x86 -> 4 | `x64 -> 8 in
   let sect = Section.create ".imptbl" 0xc0300040l in
   obj.sections <- sect :: obj.sections;
-  sect.data <- `String (String.make (4 * List.length imports) '\000');
+  sect.data <- `String (String.make (ptr_size * List.length imports) '\000');
   ignore
     (List.fold_left
        (fun i s ->
@@ -389,7 +390,7 @@ let add_import_table obj imports =
 	  obj.symbols <-
 	    sym :: Symbol.export ("__imp_" ^ s) sect (Int32.of_int i) ::
 	    obj.symbols;
-	  Reloc.abs !machine sect (Int32.of_int i) sym; i + 4)
+	  Reloc.abs !machine sect (Int32.of_int i) sym; i + ptr_size)
        0 imports)
 
 
