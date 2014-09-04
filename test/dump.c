@@ -15,7 +15,8 @@
 
 typedef void torun();
 
-void api(char *msg){ printf("API: %s\n", msg); }
+void api1(char *msg){ printf("API1: %s\n", msg); }
+void api2(char *msg){ printf("API2: %s\n", msg); }
 
 int main(int argc, char **argv)
 {

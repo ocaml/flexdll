@@ -43,7 +43,7 @@ static char error_buffer[256];
 
 /* Emulate a low-level dlopen-like interface */
 
-#ifdef __CYGWIN32__
+#ifdef __CYGWIN__
 
 /* Under Cygwin, use the dlopen interface to allow POSIX paths */
 
