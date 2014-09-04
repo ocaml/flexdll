@@ -136,7 +136,7 @@ demo_cygwin: flexlink.exe flexdll_cygwin.o flexdll_initer_cygwin.o
 	(cd test && $(MAKE) clean demo CHAIN=cygwin CC="$(CYGCC)" O=o)
 
 demo_cygwin64: flexlink.exe flexdll_cygwin64.o flexdll_initer_cygwin64.o
-	(cd test && $(MAKE) clean demo CHAIN=cygwin64 CC="$(CYG64CC)" O=o)
+	(cd test && $(MAKE) clean demo CHAIN=cygwin64 CC="$(CYG64CC)" O=o RUN="PATH=\"/cygdrive/c/cygwin64/bin:$(PATH)\"")
 
 demo_mingw: flexlink.exe flexdll_mingw.o flexdll_initer_mingw.o
 	(cd test && $(MAKE) clean demo CHAIN=mingw CC="$(MINCC)" O=o)

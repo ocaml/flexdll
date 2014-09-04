@@ -10,11 +10,12 @@
 #O = o
 #CHAIN = mingw
 
-FLEXLINK = ../flexlink.exe -chain $(CHAIN) -merge-manifest $(EXTRA_OPTS)
+RUN=
+FLEXLINK = $(RUN) ../flexlink.exe -chain $(CHAIN) -merge-manifest $(EXTRA_OPTS)
 
 .PHONY: demo
 demo: dump.exe plug1.dll plug2.dll
-	./dump.exe plug1.dll plug2.dll
+	$(RUN) ./dump.exe plug1.dll plug2.dll
 
 dump.exe: dump.$(O)
 	$(FLEXLINK) -exe -o dump.exe dump.$(O)
