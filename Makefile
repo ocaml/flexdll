@@ -9,6 +9,11 @@ MINCC = $(MINGW_PREFIX)-gcc
 MINGW64_PREFIX = x86_64-w64-mingw32
 MIN64CC = $(MINGW64_PREFIX)-gcc
 
+CYGWIN_PREFIX = i686-pc-cygwin
+CYGCC = $(CYGWIN_PREFIX)-gcc
+
+CYGWIN64_PREFIX = x86_64-pc-cygwin
+CYG64CC = $(CYGWIN64_PREFIX)-gcc
 
 .PHONY: version.ml
 version.ml:
@@ -40,7 +45,6 @@ show_root:
 
 MSVCC = $(MSVCC_ROOT)/cl.exe /nologo /MD -D_CRT_SECURE_NO_DEPRECATE /GS-
 MSVCC64 = $(MSVCC_ROOT)/amd64/cl.exe /nologo /MD -D_CRT_SECURE_NO_DEPRECATE /GS-
-CYGCC = gcc 
 OCAMLOPT = ocamlopt
 #OCAMLOPT = FLEXLINKFLAGS=-real-manifest ocamlopt
 #LINKFLAGS = unix.cmxa
@@ -59,7 +63,7 @@ LINKFLAGS = -cclib "-link $(RES)"
 endif
 
 support:
-	for i in $(CHAINS); do $(MAKE) build_$$i ; done 
+	for i in $(CHAINS); do $(MAKE) build_$$i; done 
 
 build_gnat: flexdll_gnat.o flexdll_initer_gnat.o
 build_msvc: flexdll_msvc.obj flexdll_initer_msvc.obj
@@ -92,7 +96,7 @@ flexdll_cygwin.o: flexdll.h flexdll.c
 	$(CYGCC) -c -DCYGWIN -o flexdll_cygwin.o flexdll.c
 
 flexdll_cygwin64.o: flexdll.h flexdll.c
-	$(CYGCC) -c -DCYGWIN -o flexdll_cygwin64.o flexdll.c
+	$(CYG64CC) -c -DCYGWIN -o flexdll_cygwin64.o flexdll.c
 
 flexdll_mingw.o: flexdll.h flexdll.c
 	$(MINCC) -c -DMINGW -o flexdll_mingw.o flexdll.c
@@ -113,7 +117,7 @@ flexdll_initer_cygwin.o: flexdll_initer.c
 	$(CYGCC) -c -o flexdll_initer_cygwin.o flexdll_initer.c
 
 flexdll_initer_cygwin64.o: flexdll_initer.c
-	$(CYGCC) -c -o flexdll_initer_cygwin64.o flexdll_initer.c
+	$(CYG64CC) -c -o flexdll_initer_cygwin64.o flexdll_initer.c
 
 flexdll_initer_mingw.o: flexdll_initer.c
 	$(MINCC) -c -o flexdll_initer_mingw.o flexdll_initer.c
@@ -132,7 +136,7 @@ demo_cygwin: flexlink.exe flexdll_cygwin.o flexdll_initer_cygwin.o
 	(cd test && $(MAKE) clean demo CHAIN=cygwin CC="$(CYGCC)" O=o)
 
 demo_cygwin64: flexlink.exe flexdll_cygwin64.o flexdll_initer_cygwin64.o
-	(cd test && $(MAKE) clean demo CHAIN=cygwin64 CC="$(CYGCC)" O=o)
+	(cd test && $(MAKE) clean demo CHAIN=cygwin64 CC="$(CYG64CC)" O=o)
 
 demo_mingw: flexlink.exe flexdll_mingw.o flexdll_initer_mingw.o
 	(cd test && $(MAKE) clean demo CHAIN=mingw CC="$(MINCC)" O=o)
