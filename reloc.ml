@@ -393,6 +393,25 @@ let add_import_table obj imports =
 	  Reloc.abs !machine sect (Int32.of_int i) sym; i + ptr_size)
        0 imports)
 
+(* Create a table for jmp *__imp_XXX thunks *)
+
+let add_jmp_table obj imports =
+  let sect = Section.create ".text" 0x60400020l in
+  obj.sections <- sect :: obj.sections;
+  let inst = "\xff\x25\x00\x00\x00\x00\x90\x90" (* indirect jmp instruction *) in
+  let inst_size = String.length inst in
+  let data = String.create (inst_size * (List.length imports)) in
+  sect.data <- `String data;
+  let reloc = match !machine with `x86 -> Reloc.abs | `x64 -> Reloc.rel32 in
+  ignore
+    (List.fold_left
+       (fun i s ->
+	 String.blit inst 0 data i inst_size;
+	 let sym = Symbol.extern ("__imp_" ^ s) in
+	 obj.symbols <- sym :: Symbol.export s sect (Int32.of_int i) :: obj.symbols;
+	 reloc !machine sect (Int32.of_int (i + 2)) sym;
+	 i + inst_size)
+       0 imports)
 
 (* Create a table that lists exported symbols (adress,name) *)
 
@@ -513,6 +532,7 @@ let patch_output output_file =
 
 let build_dll link_exe output_file files exts extra_args =
   let main_pgm = link_exe <> `DLL in
+  let use_jmptbl = match !use_jmptbl with None -> !machine = `x64 | Some x -> x in
 
   (* fully resolve filenames, eliminate duplicates *)
   let _,files =
@@ -699,6 +719,14 @@ let build_dll link_exe output_file files exts extra_args =
     end
   in
 
+  let add_import name imps =
+    if !show_imports && not (StrSet.is_empty imps) then (
+      Printf.printf "** Symbols directed to jmp thunk for %s:\n" name;
+      StrSet.iter print_endline imps
+    );
+    StrSet.iter (fun s -> imported := StrSet.add s !imported) imps
+  in
+
   let add_reloc name obj imps =
     if !show_imports && not (StrSet.is_empty imps) then (
       Printf.printf "** Imported symbols for %s:\n" name;
@@ -706,7 +734,10 @@ let build_dll link_exe output_file files exts extra_args =
     );
     let reloctbl = Symbol.gen_sym () in
     reloctbls := reloctbl :: !reloctbls;
-    add_reloc_table obj (fun s -> StrSet.mem s.sym_name imps) reloctbl in
+    add_reloc_table obj
+      (fun s -> (Symbol.is_extern s) && (StrSet.mem s.sym_name imps))
+      reloctbl
+  in
 
   let errors = ref false in
   let error_imports name imps =
@@ -720,7 +751,10 @@ let build_dll link_exe output_file files exts extra_args =
 
   let close_obj name imps obj =
     error_imports name imps;
-    add_reloc name obj imps;
+    if use_jmptbl then
+      add_import name imps
+    else
+      add_reloc name obj imps;
     record_obj name obj in
 
   let dll_exports = ref StrSet.empty in
@@ -787,7 +821,11 @@ let build_dll link_exe output_file files exts extra_args =
 
   if not (StrSet.is_empty !imported) then begin
     error_imports "descriptor object" !imported;
-    add_import_table obj (StrSet.elements !imported);
+    let imports = StrSet.elements !imported in
+    add_import_table obj imports;
+    if use_jmptbl then begin
+      add_jmp_table obj imports
+    end;
     add_reloc "descriptor object" obj !imported;
   end;
 
