@@ -154,7 +154,7 @@ clean:
 
 ## Packaging
 
-COMMON_FILES = LICENSE README CHANGES flexdll.h flexdll.c flexdll_initer.c default.manifest default_amd64.manifest
+COMMON_FILES = LICENSE README.md CHANGES flexdll.h flexdll.c flexdll_initer.c default.manifest default_amd64.manifest
 URL = frisch@frisch.fr:www/flexdll/
 
 # Source packages
