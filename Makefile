@@ -1,4 +1,4 @@
-VERSION = 0.31
+VERSION = 0.32
 all: flexlink.exe support
 
 include $(shell cygpath -ad "$(shell ocamlopt -where)/Makefile.config")

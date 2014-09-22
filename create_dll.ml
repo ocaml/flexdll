@@ -32,7 +32,10 @@ let discard_section s =
 let sect_data s =
   match force_section_data s with
   | `String data -> data
-  | _ -> assert false
+  | `Buf _ -> assert false
+  | `Lazy _ -> assert false
+  | `Sxdata _ -> assert false
+  | `Uninit _ -> assert false
 
 let split_relocs page_size relocs =
   let relocs = List.sort compare relocs in
