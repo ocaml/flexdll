@@ -1,3 +1,6 @@
+Version 0.32
+- Turn 'too far' messages into proper errors, avoid terminating the process
+
 Version 0.31
 - Support for "@respfiles" arguments (for long command lines).
   Used to be implemented by OCaml runtime system.

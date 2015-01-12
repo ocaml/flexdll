@@ -205,9 +205,9 @@ static void relocate(resolver f, void *data, reloctbl *tbl) {
       s -= (INT_PTR)(ptr -> addr) + 4;
       s += *((INT32*) ptr -> addr);
       if (s != (INT32) s) {
-        printf("flexdll error: cannot relocate RELOC_REL32, target is too far: %p  %p\n", s, (INT32) s);
-        fflush(stdout);
-        exit(1);
+        sprintf(error_buffer, "flexdll error: cannot relocate RELOC_REL32, target is too far: %p  %p", s, (INT32) s);
+        error = 3;
+        return;
       }
       *((UINT32*) ptr->addr) = s;
       break;
@@ -215,9 +215,9 @@ static void relocate(resolver f, void *data, reloctbl *tbl) {
       s -= (INT_PTR)(ptr -> addr) + 8;
       s += *((INT32*) ptr -> addr);
       if (s != (INT32) s) {
-        printf("flexdll error: cannot relocate RELOC_REL32_4, target is too far: %p %p\n", s, (INT32) s);
-        fflush(stdout);
-        exit(1);
+        sprintf(error_buffer, "flexdll error: cannot relocate RELOC_REL32_4, target is too far: %p  %p", s, (INT32) s);
+        error = 3;
+        return;
       }
       *((UINT32*) ptr->addr) = s;
       break;
@@ -225,9 +225,9 @@ static void relocate(resolver f, void *data, reloctbl *tbl) {
       s -= (INT_PTR)(ptr -> addr) + 5;
       s += *((INT32*) ptr -> addr);
       if (s != (INT32) s) {
-        printf("flexdll error: cannot relocate RELOC_REL32_1, target is too far: %p %p\n", s, (INT32) s);
-        fflush(stdout);
-        exit(1);
+        sprintf(error_buffer, "flexdll error: cannot relocate RELOC_REL32_1, target is too far: %p  %p", s, (INT32) s);
+        error = 3;
+        return;
       }
       *((UINT32*) ptr->addr) = s;
       break;
@@ -235,9 +235,9 @@ static void relocate(resolver f, void *data, reloctbl *tbl) {
       s -= (INT_PTR)(ptr -> addr) + 6;
       s += *((INT32*) ptr -> addr);
       if (s != (INT32) s) {
-        printf("flexdll error: cannot relocate RELOC_REL32_2, target is too far: %p %p\n", s, (INT32) s);
-        fflush(stdout);
-        exit(1);
+        sprintf(error_buffer, "flexdll error: cannot relocate RELOC_REL32_2, target is too far: %p  %p", s, (INT32) s);
+        error = 3;
+        return;
       }
       *((UINT32*) ptr->addr) = s;
       break;
