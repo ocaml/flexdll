@@ -179,7 +179,7 @@ let create_dll oc objs =
     let total = ref 0l in
     Hashtbl.iter
       (fun name size ->
-        if not (Hashtbl.mem globals name)
+        if not (Hashtbl.mem globals name) && size > 0l
         then
           let pos = !total in
           total := Int32.add !total size;
@@ -191,67 +191,69 @@ let create_dll oc objs =
     if !total <> 0l then put_sect bss
   in
 
-  Hashtbl.iter
-    (fun name (l, sect) ->
-      let sect_len = ref 0 in
-      let mk_sect s =
-        let buf = Buf.create () in
-        let info = Hashtbl.find sec_info s.sec_pos in
-        let sec_ofs = !sect_len in
-        info.sec_info_ofs <- Int32.of_int sec_ofs;
-        let sdata = sect_data s in
-        sect_len := !sect_len + String.length sdata;
-        Buf.string buf sdata;
+  let treat_sect name (l, sect) =
+    let sect_len = ref 0 in
+    let mk_sect s =
+      let buf = Buf.create () in
+      let info = Hashtbl.find sec_info s.sec_pos in
+      let sec_ofs = !sect_len in
+      info.sec_info_ofs <- Int32.of_int sec_ofs;
+      let sdata = sect_data s in
+      sect_len := !sect_len + String.length sdata;
+      Buf.string buf sdata;
 
-        let mk_reloc r =
-          (* rva of the target symbol *)
-          let sym = r.symbol in
-          let rva =
-            if Symbol.is_extern sym || Symbol.is_export sym then rva_of_global sym.sym_name
-            else if sym.sym_pos >= 0 then rva_of_local sym.sym_pos
-            else begin
-              Symbol.dump sym;
-              failwith (Printf.sprintf "Cannot resolve symbol %s\n" sym.sym_name)
-            end
-          in
+      let mk_reloc r =
+        (* rva of the target symbol *)
+        let sym = r.symbol in
+        let rva =
+          if Symbol.is_extern sym || Symbol.is_export sym then rva_of_global sym.sym_name
+          else if sym.sym_pos >= 0 then rva_of_local sym.sym_pos
+          else begin
+            Symbol.dump sym;
+            failwith (Printf.sprintf "Cannot resolve symbol %s\n" sym.sym_name)
+          end
+        in
 
-          (* rva of the relocation *)
-          let rel_rva = lazy (Int32.add r.addr (Lazy.force info.sec_info_vaddress)) in
+        (* rva of the relocation *)
+        let rel_rva = lazy (Int32.add r.addr (Lazy.force info.sec_info_vaddress)) in
 
-          let pos = Int32.to_int r.addr in
-          let initial = read_int32 sdata pos in
-          match !Cmdline.machine, r.rtype with
-          | `x86, 0x06 (* IMAGE_REL_I386_DIR32 *)
-          | `x64, 0x02 (* IMAGE_REL_AMD64_ADDR32 *) ->
-              (* 32-bit VA *)
-              relocs := (rel_rva, `R32) :: !relocs;
-              Buf.patch_lazy_int32 buf pos (lazy (Int32.add (Int32.add initial (Lazy.force rva)) image_base))
+        let pos = Int32.to_int r.addr in
+        let initial = read_int32 sdata pos in
+        match !Cmdline.machine, r.rtype with
+        | `x86, 0x06 (* IMAGE_REL_I386_DIR32 *)
+        | `x64, 0x02 (* IMAGE_REL_AMD64_ADDR32 *) ->
+            (* 32-bit VA *)
+            relocs := (rel_rva, `R32) :: !relocs;
+            Buf.patch_lazy_int32 buf pos (lazy (Int32.add (Int32.add initial (Lazy.force rva)) image_base))
 
-          | `x64, 0x01 (* IMAGE_REL_AMD64_ADDR64 *) ->
-              (* 64-bit VA *)
+        | `x64, 0x01 (* IMAGE_REL_AMD64_ADDR64 *) ->
+            (* 64-bit VA *)
             assert(read_int32 sdata (pos + 4) = 0l);
             relocs := (rel_rva, `R64) :: !relocs;
             Buf.patch_lazy_int32 buf pos (lazy (Int32.add (Int32.add initial (Lazy.force rva)) image_base))
 
-          | `x86, 0x14 (* IMAGE_REL_I386_REL32 *)
-          | `x64, 0x04 (* IMAGE_REL_AMD64_REL32 *) ->
-              Buf.patch_lazy_int32 buf pos (lazy (Int32.sub (Int32.add initial (Lazy.force rva)) (Int32.add (Lazy.force rel_rva) 4l)))
-          | _, k ->
-              Printf.ksprintf failwith "Unsupport relocation kind %04x for %s"
-                k r.symbol.sym_name
-        in
-        List.iter mk_reloc s.relocs;
-        buf
+        | `x86, 0x14 (* IMAGE_REL_I386_REL32 *)
+        | `x64, 0x04 (* IMAGE_REL_AMD64_REL32 *) ->
+            Buf.patch_lazy_int32 buf pos (lazy (Int32.sub (Int32.add initial (Lazy.force rva)) (Int32.add (Lazy.force rel_rva) 4l)))
+        | _, k ->
+            Printf.ksprintf failwith "Unsupport relocation kind %04x for %s"
+              k r.symbol.sym_name
       in
-      let bufs = List.map mk_sect !l in
-      sect.data <- `Buf bufs;
-      put_sect sect
-    )
+      List.iter mk_reloc s.relocs;
+      buf
+    in
+    let bufs = List.map mk_sect !l in
+    sect.data <- `Buf bufs;
+    put_sect sect
+  in
+
+  Hashtbl.iter
+    (fun name x -> treat_sect name x)
     sections;
 
   (* create the export table *)
   let edata =
-    let edata = Section.create ".edata" 0x40000040l in
+    let edata = Section.create ".dllexp" 0x40000040l in
     let b = Buf.create () in
     edata.data <- `Buf [b];
     let vaddress = lazy edata.vaddress in
@@ -296,7 +298,7 @@ let create_dll oc objs =
 
   (* create the reloc table *)
   let rdata =
-    let rdata = Section.create ".rdata" 0x40000040l in
+    let rdata = Section.create ".reloc" 0x40000040l in
     let b = Buf.create () in
     rdata.data <- `Buf [b];
 
