@@ -199,8 +199,16 @@ let create_dll oc objs =
       let sec_ofs = !sect_len in
       info.sec_info_ofs <- Int32.of_int sec_ofs;
       let sdata = sect_data s in
-      sect_len := !sect_len + String.length sdata;
+      let slen = String.length sdata in
+
+      let pad =
+        if slen mod 16 = 0 then 0
+        else 16 - slen mod 16
+      in
+      sect_len := !sect_len + String.length sdata + pad;
       Buf.string buf sdata;
+      if pad > 0 then
+        Buf.string buf (String.make pad '\000');
 
       let mk_reloc r =
         (* rva of the target symbol *)
