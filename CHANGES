@@ -1,4 +1,7 @@
-Version 0.32
+Next version
+- Fix bug with empty sections in "-builtin" mode
+
+Version 0.33
 - Turn 'too far' messages into proper errors, avoid terminating the process
 
 Version 0.31

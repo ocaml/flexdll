@@ -35,7 +35,13 @@ let sect_data s =
   | `Buf _ -> assert false
   | `Lazy _ -> assert false
   | `Sxdata _ -> assert false
-  | `Uninit _ -> assert false
+  | `Uninit 0 -> ""
+  | `Uninit size ->
+      failwith
+        (Printf.sprintf
+           "uninitialized section %s (size %d): not supported"
+           s.sec_name size
+        )
 
 let split_relocs page_size relocs =
   let relocs = List.sort compare relocs in
