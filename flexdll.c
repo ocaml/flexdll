@@ -420,6 +420,7 @@ char *flexdll_dlerror() {
   case 0: return NULL;
   case 1: error = 0; return ll_dlerror();
   case 2: error = 0; return error_buffer;
+  case 3: error = 0; return error_buffer;
   }
   return NULL;
 }
