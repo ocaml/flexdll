@@ -654,6 +654,13 @@ let build_dll link_exe output_file files exts extra_args =
 
   let imported_from_implib = ref StrSet.empty in
   let imported = ref StrSet.empty in
+  let normalize name =
+    let name = normalize name in
+    match check_prefix "__imp_" name with
+    | Some s when not !builtin_linker && not (StrSet.mem name !defined) && StrSet.mem s !defined -> s
+            (* The builtin DLL linker doesn't create __imp_X symbols automatically. *)
+    | _ -> name
+  in
   let needed obj = needed normalize StrSet.empty obj in
   let imports obj =
     let n = needed obj in
