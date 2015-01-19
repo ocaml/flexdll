@@ -1,5 +1,6 @@
 Next version
 - Fix bug with empty sections in "-builtin" mode
+- -builtin: Generate proper ADDR64 instead of HIGHLOW (32-bit) relocations in the dll
 
 Version 0.33
 - Turn 'too far' messages into proper errors, avoid terminating the process

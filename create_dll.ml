@@ -44,16 +44,16 @@ let sect_data s =
         )
 
 let split_relocs page_size relocs =
-  let relocs = List.sort compare relocs in
+  let relocs = List.sort (fun (i, _) (j, _) -> compare i j) relocs in
   let blocks = ref [] and current_block = ref (ref []) and current_base = ref (-1l) in
   List.iter
-    (fun rva ->
+    (fun (rva, k) ->
       let base = Int32.mul (Int32.div rva page_size) page_size in
       let ofs = Int32.to_int (Int32.sub rva base) in
-      if base = !current_base then (!current_block) := ofs :: !(!current_block)
+      if base = !current_base then (!current_block) := (ofs, k) :: !(!current_block)
       else begin
         current_base := base;
-        current_block := ref [ofs];
+        current_block := ref [(ofs, k)];
         blocks := (base, !current_block) :: !blocks
       end
     )
@@ -218,15 +218,23 @@ let create_dll oc objs =
           (* rva of the relocation *)
           let rel_rva = lazy (Int32.add r.addr (Lazy.force info.sec_info_vaddress)) in
 
-          let initial = read_int32 sdata (Int32.to_int r.addr) in
           let pos = Int32.to_int r.addr in
+          let initial = read_int32 sdata pos in
           match !Cmdline.machine, r.rtype with
-          | `x86, 0x06
-          | `x64, 0x01 -> (* absolute address *)
-              relocs := rel_rva :: !relocs;
+          | `x86, 0x06 (* IMAGE_REL_I386_DIR32 *)
+          | `x64, 0x02 (* IMAGE_REL_AMD64_ADDR32 *) ->
+              (* 32-bit VA *)
+              relocs := (rel_rva, `R32) :: !relocs;
               Buf.patch_lazy_int32 buf pos (lazy (Int32.add (Int32.add initial (Lazy.force rva)) image_base))
-          | `x86, 0x14
-          | `x64, 0x04 -> (* rel32 *)
+
+          | `x64, 0x01 (* IMAGE_REL_AMD64_ADDR64 *) ->
+              (* 64-bit VA *)
+            assert(read_int32 sdata (pos + 4) = 0l);
+            relocs := (rel_rva, `R64) :: !relocs;
+            Buf.patch_lazy_int32 buf pos (lazy (Int32.add (Int32.add initial (Lazy.force rva)) image_base))
+
+          | `x86, 0x14 (* IMAGE_REL_I386_REL32 *)
+          | `x64, 0x04 (* IMAGE_REL_AMD64_REL32 *) ->
               Buf.patch_lazy_int32 buf pos (lazy (Int32.sub (Int32.add initial (Lazy.force rva)) (Int32.add (Lazy.force rel_rva) 4l)))
           | _, k ->
               Printf.ksprintf failwith "Unsupport relocation kind %04x for %s"
@@ -293,7 +301,7 @@ let create_dll oc objs =
     rdata.data <- `Buf [b];
 
     (* careful with list functions: the list of relocs can be very long *)
-    let relocs = List.rev_map (fun rva -> Lazy.force rva) !relocs in
+    let relocs = List.rev_map (fun (rva, k) -> (Lazy.force rva, k)) !relocs in
     let relocs = split_relocs page_size relocs in
     List.iter
       (fun (base, relocs) ->
@@ -303,7 +311,14 @@ let create_dll oc objs =
         Buf.int32 b base;
         Buf.int32 b (Int32.of_int size);
         List.iter
-          (fun ofs -> Buf.int16 b (ofs lor 0x3000)) (* HIGHLOW reloc *)
+          (fun (ofs, k) ->
+             let k =
+               match k with
+               | `R32 -> 0x3000 (* IMAGE_REL_BASED_HIGHLOW *)
+               | `R64 -> 0xA000 (* IMAGE_REL_BASED_DIR64 *)
+             in
+             Buf.int16 b (ofs lor k)
+          )
           relocs;
         if n mod 2 = 1 then Buf.int16 b 0
       )

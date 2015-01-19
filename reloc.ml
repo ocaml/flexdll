@@ -67,15 +67,15 @@ let get_output ?(use_bash = false) ?(accept_error=false) cmd =
   let cmd' = cmd ^ " > " ^ (Filename.quote fn) in
     if String.length cmd' < 8182 && not use_bash then
       begin
-	if (Sys.command cmd' <> 0) && not accept_error
-	then failwith ("Cannot run " ^ cmd);
+        if (Sys.command cmd' <> 0) && not accept_error
+        then failwith ("Cannot run " ^ cmd);
       end
     else
       begin
-	let (cfn, oc) = open_temp_file "longcmd" ".sh" in
-	  output_string oc cmd'; close_out oc;
-	  if Sys.command (Printf.sprintf "bash %s" cfn) <> 0
-	  then failwith ("Cannot run " ^ cmd)
+        let (cfn, oc) = open_temp_file "longcmd" ".sh" in
+          output_string oc cmd'; close_out oc;
+          if Sys.command (Printf.sprintf "bash %s" cfn) <> 0
+          then failwith ("Cannot run " ^ cmd)
       end;
     let r = read_file fn in
       Sys.remove fn;
@@ -171,17 +171,17 @@ let rec find_file_in = function
   | [] -> None
   | fn::rest ->
       match file_exists fn with
-	| Some x -> Some x
-	| None -> find_file_in rest
+        | Some x -> Some x
+        | None -> find_file_in rest
 
 let find_file fn =
   let l =
     List.flatten
       (List.map
-	 (fun dir ->
-	    let fn = Filename.concat dir fn in
-	    [ fn; fn ^ ".lib"; fn ^ ".dll.a"; fn ^ ".a" ]
-	 ) (""::!search_path)) in
+         (fun dir ->
+            let fn = Filename.concat dir fn in
+            [ fn; fn ^ ".lib"; fn ^ ".dll.a"; fn ^ ".a" ]
+         ) (""::!search_path)) in
   match find_file_in l with
     | Some x -> Some x
     | None -> if !use_cygpath then find_file_in (cygpath l) else None
@@ -196,14 +196,14 @@ let find_file =
       try Hashtbl.find memo (k ^ ".lib")
       with Not_found ->
         let fn =
-	  if String.length fn > 2 && String.sub fn 0 2 = "-l" then
-	    "lib" ^ (String.sub fn 2 (String.length fn - 2))
-	  else fn in
+          if String.length fn > 2 && String.sub fn 0 2 = "-l" then
+            "lib" ^ (String.sub fn 2 (String.length fn - 2))
+          else fn in
         let r =
-	  match find_file fn with
-	  | Some fn -> fn
-	  | None ->
-	      failwith (Printf.sprintf "Cannot find file %S" fn)
+          match find_file fn with
+          | Some fn -> fn
+          | None ->
+              failwith (Printf.sprintf "Cannot find file %S" fn)
         in
         Hashtbl.add memo k r;
         Hashtbl.add memo (k ^ ".lib") r;
@@ -259,8 +259,8 @@ let parse_libpath s =
     if l >= n then []
     else
       try
-	let i = String.index_from s l ';' in
-	String.sub s l (i - l) :: aux (succ i)
+        let i = String.index_from s l ';' in
+        String.sub s l (i - l) :: aux (succ i)
       with Not_found -> [ String.sub s l (n - l) ]
   in
   aux 0
@@ -291,15 +291,23 @@ let add_reloc_table x p sname =
     if p rel.symbol then (
       (* kind *)
       let kind = match !machine, rel.rtype with
-	| `x86, 0x06
-        | `x64, 0x01 -> 0x0002 (* absolute, native size (32/64) *)
-	| `x86, 0x14
-        | `x64, 0x04 -> 0x0001 (* rel32 *)
+        | `x86, 0x06 (* IMAGE_REL_I386_DIR32 *)
+        | `x64, 0x01 (* IMAGE_REL_AMD64_ADDR64 *) ->
+            0x0002 (* absolute, native size (32/64) *)
+
+        | `x86, 0x14 (* IMAGE_REL_I386_REL32 *)
+        | `x64, 0x04 (* IMAGE_REL_AMD64_REL32 *) ->
+            0x0001 (* rel32 *)
+
         | `x64, 0x05 -> 0x0004 (* rel32_1 *)
         | `x64, 0x08 -> 0x0003 (* rel32_4 *)
-	| `x64, 0x06 -> 0x0005 (* rel32_2 *)
-        | `x86, (0x0a | 0x0b) -> 0x0100 (* debug relocs: ignore *)
-	| _, k  ->
+        | `x64, 0x06 -> 0x0005 (* rel32_2 *)
+
+        | `x86, (0x0a (* IMAGE_REL_I386_SECTION *) |
+                 0x0b (* IMAGE_REL_I386_SECREL*) ) ->
+            0x0100 (* debug relocs: ignore *)
+
+        | _, k  ->
             let msg =
               Printf.sprintf "Unsupported relocation kind %04x for %s"
                 k rel.symbol.sym_name
@@ -313,19 +321,19 @@ let add_reloc_table x p sname =
       (* name *)
       let name = drop_underscore x rel.symbol.sym_name in
       let pos =
-	try Hashtbl.find str_pos name
-	with Not_found ->
-	  let pos = Buffer.length strings in
-	  Hashtbl.add str_pos name pos;
-	  Buffer.add_string strings name;
-	  Buffer.add_char strings '\000';
-	  pos
+        try Hashtbl.find str_pos name
+        with Not_found ->
+          let pos = Buffer.length strings in
+          Hashtbl.add str_pos name pos;
+          Buffer.add_string strings name;
+          Buffer.add_char strings '\000';
+          pos
       in
       Reloc.abs !machine sect (Int32.of_int (Buffer.length data)) strsym;
       int_to_buf data pos;
 
       Reloc.abs !machine sect (Int32.of_int (Buffer.length data))
-	(Lazy.force secsym);
+        (Lazy.force secsym);
       int_to_buf data (Int32.to_int rel.addr);
 
       if rel.addr <= !min then min := rel.addr;
@@ -345,8 +353,8 @@ let add_reloc_table x p sname =
 
     let min = ref Int32.max_int and max = ref Int32.min_int in
     let sym = lazy (let s = Symbol.intern sec 0l in
-		    syms := s :: !syms;
-		    s) in
+                    syms := s :: !syms;
+                    s) in
 
     sec.relocs <- filter (reloc sec sym min max) sec.relocs;
     if (sec.sec_opts &&& 0x80000000l = 0l) && !min <= !max then
@@ -386,11 +394,11 @@ let add_import_table obj imports =
   ignore
     (List.fold_left
        (fun i s ->
-	  let sym = Symbol.extern s in
-	  obj.symbols <-
-	    sym :: Symbol.export ("__imp_" ^ s) sect (Int32.of_int i) ::
-	    obj.symbols;
-	  Reloc.abs !machine sect (Int32.of_int i) sym; i + ptr_size)
+          let sym = Symbol.extern s in
+          obj.symbols <-
+            sym :: Symbol.export ("__imp_" ^ s) sect (Int32.of_int i) ::
+            obj.symbols;
+          Reloc.abs !machine sect (Int32.of_int i) sym; i + ptr_size)
        0 imports)
 
 
@@ -419,7 +427,8 @@ let add_export_table obj exports symname =
     )
     exports;
   strsym.value <- Int32.of_int (Buffer.length data);
-  sect.data <- `String (Buffer.contents data ^ Buffer.contents strings);
+  let s = Buffer.contents data ^ Buffer.contents strings in
+  sect.data <- `String s;
   obj.sections <- sect :: obj.sections
 
 (* A master relocation table points to all the relocation tables
@@ -517,20 +526,20 @@ let build_dll link_exe output_file files exts extra_args =
   (* fully resolve filenames, eliminate duplicates *)
   let _,files =
     List.fold_left (fun (seen,accu) fn ->
-		      let fn = find_file fn in
+                      let fn = find_file fn in
                       let k = String.lowercase fn in
-		      if StrSet.mem k seen then (seen, accu)
-		      else (StrSet.add k seen, fn :: accu)
-		   ) (StrSet.empty,[]) files in
+                      if StrSet.mem k seen then (seen, accu)
+                      else (StrSet.add k seen, fn :: accu)
+                   ) (StrSet.empty,[]) files in
   let files = List.rev files in
 
   (* load given files *)
   let loaded_filenames : (string,unit) Hashtbl.t = Hashtbl.create 16 in
   let files = List.map (fun fn ->
-			  if Lib.is_dll fn then
-			    fn,`Lib ([], dll_exports fn)
-			  else
-			    fn, Lib.read fn) files in
+                          if Lib.is_dll fn then
+                            fn,`Lib ([], dll_exports fn)
+                          else
+                            fn, Lib.read fn) files in
 
   List.iter (fun (fn,_) -> Hashtbl.add loaded_filenames fn ()) files;
 
@@ -570,28 +579,28 @@ let build_dll link_exe output_file files exts extra_args =
      obj.symbols;
 
     List.iter (fun (x,y) ->
-		 if !verbose >= 2 then
-		   Printf.printf "alias %s -> %s\n"
-		     x y;
-		 Hashtbl.add aliases x y) (Coff.aliases obj);
+                 if !verbose >= 2 then
+                   Printf.printf "alias %s -> %s\n"
+                     x y;
+                 Hashtbl.add aliases x y) (Coff.aliases obj);
     let dirs = Coff.directives obj in
     let all_args c =
       List.map snd (
-	List.find_all (fun (cmd,args) -> String.uppercase cmd = c)
-	  dirs)
+        List.find_all (fun (cmd,args) -> String.uppercase cmd = c)
+          dirs)
     in
     let deflibs = if !builtin_linker || not !use_default_libs then [] else List.flatten (all_args "DEFAULTLIB") in
     List.iter (fun fn ->
       if !custom_crt && is_crt_lib fn then ()
       else
-	let fn = find_file fn in
-	if not (Hashtbl.mem loaded_filenames fn)
-	then (Hashtbl.add loaded_filenames fn (); collect_file fn))
+        let fn = find_file fn in
+        if not (Hashtbl.mem loaded_filenames fn)
+        then (Hashtbl.add loaded_filenames fn (); collect_file fn))
       deflibs;
     List.iter
       (fun sym ->
-	 if Symbol.is_defin sym
-	 then add_def sym.sym_name
+         if Symbol.is_defin sym
+         then add_def sym.sym_name
       )
       obj.symbols
   and collect_file fn =
@@ -604,16 +613,16 @@ let build_dll link_exe output_file files exts extra_args =
   and collect_defined fn = function
     | `Obj obj -> collect_defined_obj obj
     | `Lib (objs,imports) ->
-	List.iter (fun (_,obj) -> collect_defined_obj obj) objs;
-	List.iter
-	  (fun (s,_) ->
-	    if !verbose >= 2 then
-	       Printf.printf "lib %s import symbol %s\n%!" fn s;
+        List.iter (fun (_,obj) -> collect_defined_obj obj) objs;
+        List.iter
+          (fun (s,_) ->
+            if !verbose >= 2 then
+               Printf.printf "lib %s import symbol %s\n%!" fn s;
             from_imports := StrSet.add s !from_imports;
             add_def s;
-	    add_def ("__imp_" ^ s)
+            add_def ("__imp_" ^ s)
           )
-	  imports
+          imports
   in
   List.iter (fun (fn,x) ->
     Hashtbl.replace collected (String.lowercase fn) ();
@@ -679,11 +688,11 @@ let build_dll link_exe output_file files exts extra_args =
   List.iter
     (function
        | (_,`Lib (_,l)) ->
-	   exported := List.fold_left
-	     (fun accu (s,_) ->
-		if exportable s then StrSet.add s accu
-		else accu
-	     ) !exported l
+           exported := List.fold_left
+             (fun accu (s,_) ->
+                if exportable s then StrSet.add s accu
+                else accu
+             ) !exported l
        | _ -> ()) files;
 *)
 
@@ -712,8 +721,8 @@ let build_dll link_exe output_file files exts extra_args =
   let error_imports name imps =
     if main_pgm then begin
       Printf.eprintf "** Cannot resolve symbols for %s:\n %s\n%!"
-	name
-	(String.concat "\n " (StrSet.elements imps));
+        name
+        (String.concat "\n " (StrSet.elements imps));
       errors := true
     end
   in
@@ -745,7 +754,7 @@ let build_dll link_exe output_file files exts extra_args =
   and link_libobj (libname,objname,obj) =
     if Hashtbl.mem libobjects (libname,objname) then ()
     else (Hashtbl.replace libobjects (libname,objname) (obj,imports obj);
-	  link_obj (Printf.sprintf "%s(%s)" libname objname) obj) in
+          link_obj (Printf.sprintf "%s(%s)" libname objname) obj) in
 
   let redirect = Hashtbl.create 16 in
   List.iter
@@ -814,9 +823,9 @@ let build_dll link_exe output_file files exts extra_args =
   let files =
     List.flatten
       (List.map
-	 (fun (fn,d) ->
-	   let all = Hashtbl.find_all redirect fn in
-	   if all = [] then [fn]
+         (fun (fn,d) ->
+           let all = Hashtbl.find_all redirect fn in
+           if all = [] then [fn]
            else
              match d with
              | `Lib _ when Hashtbl.mem need_lib fn -> all @ [fn]
@@ -828,7 +837,7 @@ let build_dll link_exe output_file files exts extra_args =
                For mingw, it is necessary to put the library after
                extracted objects. *)
          )
-	 files
+         files
       )
     @ exts in
 
@@ -854,17 +863,17 @@ let build_dll link_exe output_file files exts extra_args =
 
   let cmd = match !toolchain with
     | `MSVC | `MSVC64 ->
-	(* Putting the file the descriptor object at the beginning
-	   with MSVC compilers seems to break Stack overflow recovery
-	   in OCaml. No idea why. *)
+        (* Putting the file the descriptor object at the beginning
+           with MSVC compilers seems to break Stack overflow recovery
+           in OCaml. No idea why. *)
 
-	let implib =
+        let implib =
           if !implib then
             Filename.chop_extension output_file ^ ".lib"
           else
             temp_file "dyndll_implib" ".lib"
         in
-	let _impexp = add_temp (Filename.chop_suffix implib ".lib" ^ ".exp") in
+        let _impexp = add_temp (Filename.chop_suffix implib ".lib" ^ ".exp") in
         let extra_args =
           if !custom_crt then "/nodefaultlib:LIBCMT /nodefaultlib:MSVCRT " ^ extra_args
           else "msvcrt.lib " ^ extra_args
@@ -879,12 +888,12 @@ let build_dll link_exe output_file files exts extra_args =
            gives some hope that this will be the case. Problems observed otherwise
            with the Windows 7 SDK in 64-bit mode. *)
 
-	Printf.sprintf
-	  "link /nologo %s%s%s%s%s /implib:%s /out:%s /subsystem:%s %s %s %s"
-	  (if !verbose >= 2 then "/verbose " else "")
+        Printf.sprintf
+          "link /nologo %s%s%s%s%s /implib:%s /out:%s /subsystem:%s %s %s %s"
+          (if !verbose >= 2 then "/verbose " else "")
           (if link_exe = `EXE then "" else "/dll ")
-	  (if main_pgm then "" else "/export:symtbl /export:reloctbl ")
-	  (if main_pgm then "" else if !noentry then "/noentry " else
+          (if main_pgm then "" else "/export:symtbl /export:reloctbl ")
+          (if main_pgm then "" else if !noentry then "/noentry " else
           let s =
             match !machine with
             | `x86 -> "FlexDLLiniter@12"
@@ -892,12 +901,12 @@ let build_dll link_exe output_file files exts extra_args =
           in
           Printf.sprintf "/entry:%s " s
           )
-	  (mk_dirs_opt "/libpath:")
-	  (Filename.quote implib)
-	  (Filename.quote output_file)
+          (mk_dirs_opt "/libpath:")
+          (Filename.quote implib)
+          (Filename.quote output_file)
           !subsystem
           files descr
-	  extra_args
+          extra_args
     | `CYGWIN | `CYGWIN64 ->
         let def_file =
           if main_pgm then ""
@@ -910,18 +919,18 @@ let build_dll link_exe output_file files exts extra_args =
         let extra_args =
           if !machine = `x64 then "-Xlinker --image-base -Xlinker 0x10000 " ^ extra_args else extra_args
         in
-	Printf.sprintf
-	  "%s %s%s -L. %s %s -o %s %s %s %s %s"
+        Printf.sprintf
+          "%s %s%s -L. %s %s -o %s %s %s %s %s"
           !gcc
-	  (if link_exe = `EXE then "" else "-shared ")
-	  (if main_pgm then "" else if !noentry then "-Wl,-e0 " else if !machine = `x86 then "-Wl,-e_FlexDLLiniter@12 " else "-Wl,-eFlexDLLiniter ")
-	  (mk_dirs_opt "-I")
-	  (mk_dirs_opt "-L")
-	  (Filename.quote output_file)
-	  descr
-	  files
+          (if link_exe = `EXE then "" else "-shared ")
+          (if main_pgm then "" else if !noentry then "-Wl,-e0 " else if !machine = `x86 then "-Wl,-e_FlexDLLiniter@12 " else "-Wl,-eFlexDLLiniter ")
+          (mk_dirs_opt "-I")
+          (mk_dirs_opt "-L")
+          (Filename.quote output_file)
+          descr
+          files
           def_file
-	  extra_args
+          extra_args
     | `MINGW | `MINGW64 | `GNAT ->
         let def_file =
           if main_pgm then ""
@@ -931,31 +940,31 @@ let build_dll link_exe output_file files exts extra_args =
             close_out oc;
             Filename.quote def_file
         in
-	Printf.sprintf
-	  "%s -m%s %s%s -L. %s %s -o %s %s %s %s %s %s"
+        Printf.sprintf
+          "%s -m%s %s%s -L. %s %s -o %s %s %s %s %s %s"
           !gcc
           !subsystem
-	  (if link_exe = `EXE then "" else "-shared ")
-	  (if main_pgm then "" else if !noentry then "-Wl,-e0 " else if !machine = `x86 then "-Wl,-e_FlexDLLiniter@12 " else "-Wl,-eFlexDLLiniter ")
-	  (mk_dirs_opt "-I")
-	  (mk_dirs_opt "-L")
-	  (Filename.quote output_file)
-	  descr
-	  files
+          (if link_exe = `EXE then "" else "-shared ")
+          (if main_pgm then "" else if !noentry then "-Wl,-e0 " else if !machine = `x86 then "-Wl,-e_FlexDLLiniter@12 " else "-Wl,-eFlexDLLiniter ")
+          (mk_dirs_opt "-I")
+          (mk_dirs_opt "-L")
+          (Filename.quote output_file)
+          descr
+          files
           def_file
           (if !implib then "-Wl,--out-implib=" ^ Filename.quote (Filename.chop_extension output_file ^ ".a") else "")
-	  extra_args
+          extra_args
     | `LIGHTLD ->
         no_merge_manifest := true;
-	Printf.sprintf
-	  "ld %s%s -o %s %s %s %s %s"
-	  (if link_exe = `EXE then "" else "--shared ")
-	  (if main_pgm then "" else if !noentry then "-e0 " else "-e FlexDLLiniter@12 ")
-	  (Filename.quote output_file)
-	  descr
-	  files
+        Printf.sprintf
+          "ld %s%s -o %s %s %s %s %s"
+          (if link_exe = `EXE then "" else "--shared ")
+          (if main_pgm then "" else if !noentry then "-e0 " else "-e FlexDLLiniter@12 ")
+          (Filename.quote output_file)
+          descr
+          files
           (if !implib then "--out-implib " ^ Filename.quote (Filename.chop_extension output_file ^ ".a") else "")
-	  extra_args
+          extra_args
   in
   if !verbose >= 1 || !dry_mode then Printf.printf "+ %s\n%!" cmd;
   if not !dry_mode then begin
@@ -976,14 +985,14 @@ let build_dll link_exe output_file files exts extra_args =
           Filename.concat flexdir default_manifest
       in
       let mcmd =
-	Printf.sprintf "mt -nologo -outputresource:%s -manifest %s"
-	  (Filename.quote (if link_exe = `EXE then output_file
-			   else output_file ^ ";#2"))
-	  (Filename.quote fn)
+        Printf.sprintf "mt -nologo -outputresource:%s -manifest %s"
+          (Filename.quote (if link_exe = `EXE then output_file
+                           else output_file ^ ";#2"))
+          (Filename.quote fn)
       in
       if !verbose >= 1 then Printf.printf "+ %s\n%!" mcmd;
       if Sys.command mcmd <> 0 then
-	failwith "Error while merging the manifest";
+        failwith "Error while merging the manifest";
       safe_remove manifest_file;
     end;
 
@@ -1039,17 +1048,17 @@ let setup_toolchain () =
       gcc := "gcc";
       objdump := "objdump";
       search_path :=
-	!dirs @
-	  [
+        !dirs @
+          [
            "/lib";
-	   "/lib/w32api";
+           "/lib/w32api";
            Filename.dirname (get_output1 ~use_bash:true "gcc -print-libgcc-file-name");
-	  ];
+          ];
       default_libs := ["-lkernel32"; "-luser32"; "-ladvapi32";
-		       "-lshell32"; "-lcygwin"; "-lgcc"]
+                       "-lshell32"; "-lcygwin"; "-lgcc"]
   | `MSVC | `MSVC64 ->
       search_path := !dirs @
-	parse_libpath (try Sys.getenv "LIB" with Not_found -> "");
+        parse_libpath (try Sys.getenv "LIB" with Not_found -> "");
       if not !custom_crt then
         default_libs := ["msvcrt.lib"]
   | `MINGW ->
@@ -1079,23 +1088,23 @@ let compile_if_needed file =
       (if !toolchain = `MSVC || !toolchain = `MSVC64 then ".obj" else ".o") in
     let cmd = match !toolchain with
       | `MSVC | `MSVC64 ->
-	  Printf.sprintf
-	    "cl /c /MD /nologo /Fo%s %s %s"
-	    (Filename.quote tmp_obj)
-	    (mk_dirs_opt "/I")
-	    file
+          Printf.sprintf
+            "cl /c /MD /nologo /Fo%s %s %s"
+            (Filename.quote tmp_obj)
+            (mk_dirs_opt "/I")
+            file
       | `CYGWIN | `CYGWIN64 ->
-	  Printf.sprintf
-	    "gcc -c -o %s %s %s"
-	    (Filename.quote tmp_obj)
-	    (mk_dirs_opt "-I")
-	    file
+          Printf.sprintf
+            "gcc -c -o %s %s %s"
+            (Filename.quote tmp_obj)
+            (mk_dirs_opt "-I")
+            file
       | `MINGW | `MINGW64 | `GNAT ->
-	  Printf.sprintf
-	    "%s -c -o %s %s %s"
+          Printf.sprintf
+            "%s -c -o %s %s %s"
             !gcc
-	    (Filename.quote tmp_obj)
-	    (mk_dirs_opt "-I")
+            (Filename.quote tmp_obj)
+            (mk_dirs_opt "-I")
             (Filename.quote file)
       | `LIGHTLD ->
           failwith "Compilation of C code is not supported for this toolchain"
@@ -1112,14 +1121,14 @@ let dump fn =
   match Lib.read fn with
   | `Lib (objs,imports) ->
       List.iter
-	(fun (n,o) ->
-	  Printf.printf "** %s(%s):\n" fn n;
-	  Coff.dump o
-	)
-	objs;
+        (fun (n,o) ->
+          Printf.printf "** %s(%s):\n" fn n;
+          Coff.dump o
+        )
+        objs;
       List.iter
-	(fun (s,i) -> Printf.printf "** import: %s (%i)\n" s i)
-	imports
+        (fun (s,i) -> Printf.printf "** import: %s (%i)\n" s i)
+        imports
   | `Obj o ->
       Coff.dump o
 
@@ -1184,11 +1193,11 @@ let () =
   try main ()
   with
     | Failure s ->
-	Printf.eprintf "** Fatal error: %s\n" s;
-	exit 2
+        Printf.eprintf "** Fatal error: %s\n" s;
+        exit 2
     | Invalid_argument s ->
-	Printf.eprintf "** Fatal error: invalid argument (%s)\n" s;
-	exit 2
+        Printf.eprintf "** Fatal error: invalid argument (%s)\n" s;
+        exit 2
     | Arg.Help s ->
         Printf.printf "%s\n%s\n" s footer;
         exit 0
@@ -1196,5 +1205,5 @@ let () =
         Printf.eprintf "%s\n%s\n" s footer;
         exit 2
     | exn ->
-	Printf.eprintf "** Error: %s\n" (Printexc.to_string exn);
-	exit 2
+        Printf.eprintf "** Error: %s\n" (Printexc.to_string exn);
+        exit 2
