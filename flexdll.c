@@ -175,7 +175,7 @@ static void relocate(resolver f, void *data, reloctbl *tbl) {
   if (!tbl) return;
 
   for (wr = tbl->nonwr; wr->last != 0; wr++)
-    allow_write(wr->first,wr->last + 4,PAGE_EXECUTE_WRITECOPY,&wr->old);
+    allow_write(wr->first,wr->last + sizeof(UINT_PTR),PAGE_EXECUTE_WRITECOPY,&wr->old);
 
   for (ptr = tbl->entries; ptr->kind; ptr++) {
     if (ptr->kind & RELOC_DONE) continue;
@@ -420,6 +420,7 @@ char *flexdll_dlerror() {
   case 0: return NULL;
   case 1: error = 0; return ll_dlerror();
   case 2: error = 0; return error_buffer;
+  case 3: error = 0; return error_buffer;
   }
   return NULL;
 }
