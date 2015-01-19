@@ -654,12 +654,6 @@ let build_dll link_exe output_file files exts extra_args =
 
   let imported_from_implib = ref StrSet.empty in
   let imported = ref StrSet.empty in
-  let normalize name =
-    let name = normalize name in
-    match check_prefix "__imp_" name with
-    | Some s when not (StrSet.mem name !defined) && StrSet.mem s !defined -> s
-    | _ -> name
-  in
   let needed obj = needed normalize StrSet.empty obj in
   let imports obj =
     let n = needed obj in
@@ -815,7 +809,7 @@ let build_dll link_exe output_file files exts extra_args =
         ) files
     in
     let oc = open_out_bin output_file in
-    Create_dll.create_dll oc (obj :: objs);
+    Create_dll.create_dll oc (List.rev (obj :: objs));
     close_out oc
   end else
 
