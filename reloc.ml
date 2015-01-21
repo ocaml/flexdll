@@ -817,10 +817,12 @@ let build_dll link_exe output_file files exts extra_args =
     Printf.printf "** __imp symbols:\n";
     StrSet.iter print_endline !imported;
 *)
-    let undef_imports = StrSet.diff !imported defined in
-    error_imports "descriptor object" undef_imports;
     add_import_table obj (StrSet.elements !imported);
-    add_reloc "descriptor object" obj undef_imports;
+    let undef_imports = StrSet.diff !imported defined in
+    if not (StrSet.is_empty undef_imports) then begin
+      error_imports "descriptor object" undef_imports;
+      add_reloc "descriptor object" obj undef_imports;
+    end
   end;
 
   add_export_table obj (if !noexport then [] else StrSet.elements !exported)
