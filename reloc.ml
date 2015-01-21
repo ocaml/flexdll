@@ -276,7 +276,7 @@ module StrSet = Set.Make(String)
    by their name). It also lists segments that are normally write-protected
    and that must be de-protected to enable the patching process. *)
 
-let add_reloc_table obj p =
+let add_reloc_table obj obj_name p =
   let sname = Symbol.gen_sym () in (* symbol pointing to the reloc table *)
   let sect = Section.create ".reltbl" 0xc0300040l in
   let data = Buffer.create 1024 in
@@ -299,13 +299,13 @@ let add_reloc_table obj p =
         | `x64, 0x01 (* IMAGE_REL_AMD64_ADDR64 *) ->
             0x0002 (* absolute, native size (32/64) *)
 
-        | `x86, 0x14 (* IMAGE_REL_I386_REL32 *)
-        | `x64, 0x04 (* IMAGE_REL_AMD64_REL32 *) ->
+        | `x64, 0x04 (* IMAGE_REL_AMD64_REL32 *)
+        | `x86, 0x14 (* IMAGE_REL_I386_REL32 *) when not !no_rel_relocs ->
             0x0001 (* rel32 *)
 
-        | `x64, 0x05 -> 0x0004 (* rel32_1 *)
-        | `x64, 0x08 -> 0x0003 (* rel32_4 *)
-        | `x64, 0x06 -> 0x0005 (* rel32_2 *)
+        | `x64, 0x05 when not !no_rel_relocs -> 0x0004 (* rel32_1 *)
+        | `x64, 0x08 when not !no_rel_relocs-> 0x0003 (* rel32_4 *)
+        | `x64, 0x06 when not !no_rel_relocs-> 0x0005 (* rel32_2 *)
 
         | `x86, (0x0a (* IMAGE_REL_I386_SECTION *) |
                  0x0b (* IMAGE_REL_I386_SECREL*) ) ->
@@ -313,8 +313,8 @@ let add_reloc_table obj p =
 
         | _, k  ->
             let msg =
-              Printf.sprintf "Unsupported relocation kind %04x for %s"
-                k rel.symbol.sym_name
+              Printf.sprintf "Unsupported relocation kind %04x for %s in %s"
+                k rel.symbol.sym_name obj_name
             in
             failwith msg
 (*            Printf.eprintf "%s\n" msg;
@@ -722,7 +722,7 @@ let build_dll link_exe output_file files exts extra_args =
       Printf.printf "** Imported symbols for %s:\n" name;
       StrSet.iter print_endline imps
     );
-    let sym = add_reloc_table obj (fun s -> StrSet.mem s.sym_name imps) in
+    let sym = add_reloc_table obj name (fun s -> StrSet.mem s.sym_name imps) in
     reloctbls := sym :: !reloctbls
   in
 
