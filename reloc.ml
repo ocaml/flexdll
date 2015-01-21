@@ -395,15 +395,17 @@ let add_import_table obj imports =
   let sect = Section.create ".imptbl" 0xc0300040l in
   obj.sections <- sect :: obj.sections;
   sect.data <- `String (String.make (ptr_size * List.length imports) '\000');
-  ignore
-    (List.fold_left
-       (fun i s ->
-          let sym = Symbol.extern s in
-          obj.symbols <-
-            sym :: Symbol.export ("__imp_" ^ s) sect (Int32.of_int i) ::
-            obj.symbols;
-          Reloc.abs !machine sect (Int32.of_int i) sym; i + ptr_size)
-       0 imports)
+  let i = ref 0 in
+  List.iter
+    (fun s ->
+       let sym = Symbol.extern s in
+       obj.symbols <-
+         sym :: Symbol.export ("__imp_" ^ s) sect (Int32.of_int !i) ::
+         obj.symbols;
+       Reloc.abs !machine sect (Int32.of_int !i) sym;
+       i := !i + ptr_size
+    )
+    imports
 
 
 (* Create a table that lists exported symbols (adress,name) *)
@@ -466,17 +468,6 @@ let collect_dllexports obj =
   | `MSVC | `MSVC64 -> List.map (drop_underscore obj) l
   | _ -> l
 
-
-
-let exports accu obj =
-  List.fold_left
-    (fun accu sym ->
-       if Symbol.is_defin sym && exportable sym.sym_name
-       then StrSet.add sym.sym_name accu
-       else accu)
-    accu obj.symbols
-
-
 let collect f l =
   List.fold_left
     (fun accu x -> match f x with None -> accu | Some y -> y :: accu)
@@ -524,8 +515,10 @@ let patch_output output_file =
 (* Extract the set of external symbols required by an object. *)
 (* If the object requires "__imp_X", and "X" is available in one of the objects/libraries
    (but not "__imp_X" itself), then we consider that "X" is required.
-   Indeed, we will create "__imp_X" (with a redirection to "X"). *)
-let needed defined unalias obj =
+   Indeed, we will create "__imp_X" (with a redirection to "X").
+   Collect such cases in "imported".
+*)
+let needed imported defined unalias obj =
   let rec normalize name =
     try
       let r = unalias name in
@@ -534,7 +527,9 @@ let needed defined unalias obj =
   in
   let normalize_imp name =
     match check_prefix "__imp_" name with
-    | Some s when not (StrSet.mem name defined) && StrSet.mem s defined -> s
+    | Some s when not (StrSet.mem name defined) ->
+        imported := StrSet.add s !imported;
+        if StrSet.mem s defined then s else name
     | _ -> name
   in
   List.fold_left
@@ -691,13 +686,13 @@ let build_dll link_exe output_file files exts extra_args =
   let imported = ref StrSet.empty in
 
   let imports obj =
-    let n = needed defined unalias obj in
+    let n = needed imported defined unalias obj in
     imported_from_implib := StrSet.union !imported_from_implib (StrSet.inter n from_imports);
     let undefs = StrSet.diff n defined in
     StrSet.filter
       (fun s ->
          match check_prefix "__imp_" s with
-         | Some s' -> (*Printf.printf "import for %s: %s\n" obj.obj_name s; *) imported := StrSet.add s' !imported; false
+         | Some s' -> false
          | None -> s <> "environ"  (* special hack for Cygwin64 *)
       )
       undefs
@@ -749,7 +744,13 @@ let build_dll link_exe output_file files exts extra_args =
 
   let dll_exports = ref StrSet.empty in
   let rec link_obj fn obj =
-    exported := exports !exported obj;
+    List.iter
+      (fun sym ->
+         if Symbol.is_defin sym && exportable sym.sym_name
+         then exported := StrSet.add sym.sym_name !exported
+      )
+      obj.symbols;
+
     dll_exports := List.fold_left (fun accu x -> StrSet.add x accu)
         !dll_exports (collect_dllexports obj);
     StrSet.iter
@@ -765,18 +766,20 @@ let build_dll link_exe output_file files exts extra_args =
             if !explain then
               Printf.printf "%s needs %s (not found)\n%!" fn s
       )
-      (needed defined unalias obj)
+      (needed imported defined unalias obj)
+
   and link_libobj (libname,objname,obj) =
     if Hashtbl.mem libobjects (libname,objname) then ()
     else (Hashtbl.replace libobjects (libname,objname) (obj,imports obj);
-          link_obj (Printf.sprintf "%s(%s)" libname objname) obj) in
+          link_obj (Printf.sprintf "%s(%s)" libname objname) obj)
+  in
 
   let redirect = Hashtbl.create 16 in
   List.iter
-    (fun (fn,obj) ->
+    (fun (fn, obj) ->
        link_obj fn obj;
        let imps = imports obj in
-       if (StrSet.is_empty imps) then ()
+       if StrSet.is_empty imps then ()
        else Hashtbl.replace redirect fn (close_obj fn imps obj);
     ) objs;
 
@@ -810,9 +813,14 @@ let build_dll link_exe output_file files exts extra_args =
   let obj = Coff.create !machine in
 
   if not (StrSet.is_empty !imported) then begin
-    error_imports "descriptor object" !imported;
+(*
+    Printf.printf "** __imp symbols:\n";
+    StrSet.iter print_endline !imported;
+*)
+    let undef_imports = StrSet.diff !imported defined in
+    error_imports "descriptor object" undef_imports;
     add_import_table obj (StrSet.elements !imported);
-    add_reloc "descriptor object" obj !imported;
+    add_reloc "descriptor object" obj undef_imports;
   end;
 
   add_export_table obj (if !noexport then [] else StrSet.elements !exported)
