@@ -31,6 +31,9 @@ let flexdir =
   with Not_found ->
     Filename.dirname Sys.executable_name
 
+let ext_obj () =
+  if !toolchain = `MSVC || !toolchain = `MSVC64 then ".obj" else ".o"
+
 (* Temporary files *)
 
 let temps = ref []
@@ -273,7 +276,8 @@ module StrSet = Set.Make(String)
    by their name). It also lists segments that are normally write-protected
    and that must be de-protected to enable the patching process. *)
 
-let add_reloc_table x p sname =
+let add_reloc_table obj p =
+  let sname = Symbol.gen_sym () in (* symbol pointing to the reloc table *)
   let sect = Section.create ".reltbl" 0xc0300040l in
   let data = Buffer.create 1024 in
   let strings = Buffer.create 1024 in
@@ -319,7 +323,7 @@ let add_reloc_table x p sname =
       int_to_buf data kind;
 
       (* name *)
-      let name = drop_underscore x rel.symbol.sym_name in
+      let name = drop_underscore obj rel.symbol.sym_name in
       let pos =
         try Hashtbl.find str_pos name
         with Not_found ->
@@ -360,7 +364,7 @@ let add_reloc_table x p sname =
     if (sec.sec_opts &&& 0x80000000l = 0l) && !min <= !max then
       nonwr := (!min,!max,Lazy.force sym) :: !nonwr
   in
-  List.iter section x.sections;
+  List.iter section obj.sections;
   int_to_buf data 0;
   strsym.value <- Int32.of_int (Buffer.length data);
   Buffer.add_buffer data strings;
@@ -377,12 +381,12 @@ let add_reloc_table x p sname =
   int_to_buf data 0;
   int_to_buf data 0;
   sect.data <- `String (Buffer.contents data);
-  x.sections <- sect :: x.sections;
-  x.symbols <-
+  obj.sections <- sect :: obj.sections;
+  obj.symbols <-
     (Symbol.export sname sect 0l) ::
-    strsym :: nonwrsym :: List.filter (fun x -> not (p x)) x.symbols
-    @ !syms
-
+    strsym :: nonwrsym :: List.filter (fun x -> not (p x)) obj.symbols
+    @ !syms;
+  sname
 
 (* Create a table for import symbols __imp_XXX *)
 
@@ -472,9 +476,6 @@ let exports accu obj =
        else accu)
     accu obj.symbols
 
-let needed f accu obj =
-  let l = List.filter Symbol.is_extern obj.symbols in
-  List.fold_left (fun accu sym -> StrSet.add (f sym.sym_name) accu) accu l
 
 let collect f l =
   List.fold_left
@@ -520,6 +521,30 @@ let patch_output output_file =
   | None -> ()
 
 
+(* Extract the set of external symbols required by an object. *)
+(* If the object requires "__imp_X", and "X" is available in one of the objects/libraries
+   (but not "__imp_X" itself), then we consider that "X" is required.
+   Indeed, we will create "__imp_X" (with a redirection to "X"). *)
+let needed defined unalias obj =
+  let rec normalize name =
+    try
+      let r = unalias name in
+      if r <> name then normalize r else r
+    with Not_found -> name
+  in
+  let normalize_imp name =
+    match check_prefix "__imp_" name with
+    | Some s when not (StrSet.mem name defined) && StrSet.mem s defined -> s
+    | _ -> name
+  in
+  List.fold_left
+    (fun accu sym ->
+       if Symbol.is_extern sym then StrSet.add (normalize_imp (normalize sym.sym_name)) accu
+       else accu
+    )
+    StrSet.empty
+    obj.symbols
+
 let build_dll link_exe output_file files exts extra_args =
   let main_pgm = link_exe <> `DLL in
 
@@ -544,64 +569,56 @@ let build_dll link_exe output_file files exts extra_args =
 
   List.iter (fun (fn,_) -> Hashtbl.add loaded_filenames fn ()) files;
 
-  let objs =
-    collect (function (f, `Obj x) -> Some (f,x) | _ -> None) files in
-  let libs =
-    collect (function (f, `Lib (x,_)) -> Some (f,x) | _ -> None) files in
-
-  let from_imports = ref StrSet.empty in (* symbols from import libraries *)
-
-  let aliases = Hashtbl.create 16 in
-  let rec normalize name =
-    try
-      let r = Hashtbl.find aliases name in
-      if r <> name then normalize r else r
-    with Not_found -> name
-  in
+  let objs = collect (function (f, `Obj x) -> Some (f,x) | _ -> None) files in
+  let libs = collect (function (f, `Lib (x,_)) -> Some (f,x) | _ -> None) files in
 
   (* Collect all the available symbols, including those defined
      in default libraries *)
-  let defined =
+  let defined, from_imports, unalias =
+    let aliases = Hashtbl.create 16 in
     let defined = ref StrSet.empty in
-    (* all symbols defined in one of the linked objects or libraries,
-       including import symbols *)
+    let from_imports = ref StrSet.empty in (* symbols from import libraries *)
     let add_def s = defined := StrSet.add s !defined in
 
     let collected = Hashtbl.create 8 in
     let rec collect_defined_obj obj =
+      (* see comments on Cygwin64 COMDATA sections.  Here we give a
+         unique name to the internal symbol.  We use ?? to ensure the
+         symbol is not exported in flexdll export table (see
+         exportable function) *)
       List.iter
         (fun sym ->
-           (* see comments on Cygwin64 COMDATA sections.  Here we give a unique name to the internal symbol.
-              We use ?? to ensure the symbol is not exported in flexdll export table (see exportable function) *)
            if has_prefix ".refptr." sym.sym_name then
              sym.sym_name <- Printf.sprintf "??flexrefptr%i" (Oo.id (object end))
         )
         obj.symbols;
 
-      List.iter (fun (x,y) ->
-          if !verbose >= 2 then
-            Printf.printf "alias %s -> %s\n"
-              x y;
-          Hashtbl.add aliases x y) (Coff.aliases obj);
-      let dirs = Coff.directives obj in
-      let all_args c =
-        List.map snd (
-          List.find_all (fun (cmd,args) -> String.uppercase cmd = c)
-            dirs)
-      in
-      let deflibs = if !builtin_linker || not !use_default_libs then [] else List.flatten (all_args "DEFAULTLIB") in
-      List.iter (fun fn ->
-          if !custom_crt && is_crt_lib fn then ()
-          else
-            let fn = find_file fn in
-            if not (Hashtbl.mem loaded_filenames fn)
-            then (Hashtbl.add loaded_filenames fn (); collect_file fn))
-        deflibs;
+      (* Collect aliases *)
       List.iter
-        (fun sym ->
-           if Symbol.is_defin sym
-           then add_def sym.sym_name
+        (fun (x, y) ->
+           if !verbose >= 2 then Printf.printf "alias %s -> %s\n" x y;
+           Hashtbl.add aliases x y
         )
+        (Coff.aliases obj);
+
+
+      (* Iterates through DEFAULTLIB directives *)
+      let register_deflib fn =
+        if not (is_crt_lib fn) then
+          let fn = find_file fn in
+          if not (Hashtbl.mem loaded_filenames fn)
+          then (Hashtbl.add loaded_filenames fn (); collect_file fn)
+      in
+      if not !builtin_linker && !use_default_libs && not !custom_crt then
+        List.iter
+          (fun (cmd, args) ->
+             if String.uppercase cmd = "DEFAULTLIB" then List.iter register_deflib args
+          )
+          (Coff.directives obj);
+
+      (* Collect defined symbols *)
+      List.iter
+        (fun sym -> if Symbol.is_defin sym then add_def sym.sym_name)
         obj.symbols
 
     and collect_file fn =
@@ -629,9 +646,9 @@ let build_dll link_exe output_file files exts extra_args =
       (fun (fn,x) ->
          Hashtbl.replace collected (String.lowercase fn) ();
          collect_defined fn x
-      ) files;
-    if !use_default_libs then
-      List.iter (fun fn -> collect_file (find_file fn)) !default_libs;
+      )
+      files;
+    if !use_default_libs then List.iter (fun fn -> collect_file (find_file fn)) !default_libs;
     List.iter (fun fn -> collect_file (find_file fn)) exts;
 
     if main_pgm then add_def (usym "static_symtable")
@@ -640,49 +657,49 @@ let build_dll link_exe output_file files exts extra_args =
     if !machine = `x64 then add_def "__ImageBase"
     else add_def "___ImageBase";
 
-    !defined
+    !defined, !from_imports, (Hashtbl.find aliases)
   in
 
   (* Determine which objects from the given libraries should be linked
      in. First step: find the mapping (symbol -> object) for these
      objects. *)
-  let defined_in = Hashtbl.create 16 in
-  let def_in_obj fn (objname,obj) = List.iter
-      (fun sym ->
-        if Symbol.is_defin sym
-        then begin
-          if !explain then
-            Printf.printf "Symbol %s found in %s(%s)\n%!" sym.sym_name fn
-              objname;
-          Hashtbl.replace defined_in sym.sym_name (fn,objname,obj);
-        end
-      ) obj.symbols in
-  List.iter
-    (fun (fn,objs) ->
-      if !explain then
-        Printf.printf "Scanning lib %s\n%!" fn;
-      List.iter (def_in_obj fn) objs)
-    libs;
+  let defined_in =
+    let defined_in = Hashtbl.create 16 in
+    let def_in_obj fn (objname, obj) =
+      List.iter
+        (fun sym ->
+           if Symbol.is_defin sym
+           then begin
+             if !explain then
+               Printf.printf "Symbol %s found in %s(%s)\n%!" sym.sym_name fn
+                 objname;
+             Hashtbl.replace defined_in sym.sym_name (fn, objname, obj);
+           end
+        )
+        obj.symbols
+    in
+    List.iter
+      (fun (fn,objs) ->
+         if !explain then Printf.printf "Scanning lib %s\n%!" fn;
+         List.iter (def_in_obj fn) objs
+      )
+      libs;
+    Hashtbl.find defined_in
+  in
 
   let imported_from_implib = ref StrSet.empty in
   let imported = ref StrSet.empty in
-  let normalize name =
-    let name = normalize name in
-    match check_prefix "__imp_" name with
-    | Some s when !exe_mode <> `DLL && not (StrSet.mem name defined) && StrSet.mem s defined -> s
-            (* The builtin DLL linker doesn't create __imp_X symbols automatically. *)
-    | _ -> name
-  in
-  let needed obj = needed normalize StrSet.empty obj in
+
   let imports obj =
-    let n = needed obj in
-    imported_from_implib := StrSet.union !imported_from_implib
-        (StrSet.inter n !from_imports);
+    let n = needed defined unalias obj in
+    imported_from_implib := StrSet.union !imported_from_implib (StrSet.inter n from_imports);
     let undefs = StrSet.diff n defined in
     StrSet.filter
-      (fun s -> match check_prefix "__imp_" s with
-      | Some s' -> (*Printf.printf "import for %s: %s\n" obj.obj_name s; *) imported := StrSet.add s' !imported; false
-      | None -> s <> "environ"  (* special hack for Cygwin64 *) )
+      (fun s ->
+         match check_prefix "__imp_" s with
+         | Some s' -> (*Printf.printf "import for %s: %s\n" obj.obj_name s; *) imported := StrSet.add s' !imported; false
+         | None -> s <> "environ"  (* special hack for Cygwin64 *)
+      )
       undefs
   in
 
@@ -694,26 +711,10 @@ let build_dll link_exe output_file files exts extra_args =
 
   List.iter (fun s -> exported := StrSet.add (usym s) !exported) !defexports;
 
-  (* re-export symbols imported from implibs *)
-  (* disabled: symbols may be undefined in the DLL! that would
-     raise an error at startup *)
-(*
-  List.iter
-    (function
-       | (_,`Lib (_,l)) ->
-           exported := List.fold_left
-             (fun accu (s,_) ->
-                if exportable s then StrSet.add s accu
-                else accu
-             ) !exported l
-       | _ -> ()) files;
-*)
-
   let record_obj name obj =
     if !builtin_linker then ""
     else begin
-      let fn = temp_file "dyndll"
-        (if !toolchain = `MSVC || !toolchain = `MSVC64 then ".obj" else ".o") in
+      let fn = temp_file "dyndll" (ext_obj ()) in
       let oc = open_out_bin fn in
       Coff.put oc obj;
       close_out oc;
@@ -726,9 +727,9 @@ let build_dll link_exe output_file files exts extra_args =
       Printf.printf "** Imported symbols for %s:\n" name;
       StrSet.iter print_endline imps
     );
-    let reloctbl = Symbol.gen_sym () in
-    reloctbls := reloctbl :: !reloctbls;
-    add_reloc_table obj (fun s -> StrSet.mem s.sym_name imps) reloctbl in
+    let sym = add_reloc_table obj (fun s -> StrSet.mem s.sym_name imps) in
+    reloctbls := sym :: !reloctbls
+  in
 
   let errors = ref false in
   let error_imports name imps =
@@ -743,7 +744,8 @@ let build_dll link_exe output_file files exts extra_args =
   let close_obj name imps obj =
     error_imports name imps;
     add_reloc name obj imps;
-    record_obj name obj in
+    record_obj name obj
+  in
 
   let dll_exports = ref StrSet.empty in
   let rec link_obj fn obj =
@@ -755,7 +757,7 @@ let build_dll link_exe output_file files exts extra_args =
         if StrSet.mem s !exported then ()
         else
           try
-            let (libname, objname, _) as o = Hashtbl.find defined_in s in
+            let (libname, objname, _) as o = defined_in s in
             if !explain then
               Printf.printf "%s -> %s(%s) because of %s\n%!" fn libname objname s;
             link_libobj o
@@ -763,7 +765,7 @@ let build_dll link_exe output_file files exts extra_args =
             if !explain then
               Printf.printf "%s needs %s (not found)\n%!" fn s
       )
-      (needed obj)
+      (needed defined unalias obj)
   and link_libobj (libname,objname,obj) =
     if Hashtbl.mem libobjects (libname,objname) then ()
     else (Hashtbl.replace libobjects (libname,objname) (obj,imports obj);
@@ -1097,8 +1099,7 @@ let setup_toolchain () =
 
 let compile_if_needed file =
   if Filename.check_suffix file ".c" then begin
-    let tmp_obj = temp_file "dyndll"
-      (if !toolchain = `MSVC || !toolchain = `MSVC64 then ".obj" else ".o") in
+    let tmp_obj = temp_file "dyndll" (ext_obj ()) in
     let cmd = match !toolchain with
       | `MSVC | `MSVC64 ->
           Printf.sprintf
