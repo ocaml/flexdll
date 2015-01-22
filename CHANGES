@@ -1,5 +1,4 @@
 Version 0.34
-- React on __flimp_X symbols instead of ___imp_X to avoid clashes
 - New option -norelrelocs to check that no relative flexdll relocations are created (this ensures that the generated DLLs can be loaded at any address),
 - New option -base to specify the image base address (msvc64 only).
 - Always generate a table for used __flimp_XXX symbols (even when X is defined in the generated image).
