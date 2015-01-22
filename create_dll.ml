@@ -1,3 +1,11 @@
+(************************************************************************)
+(*   FlexDLL                                                            *)
+(*   Alain Frisch                                                       *)
+(*                                                                      *)
+(*   Copyright 2007 Institut National de Recherche en Informatique et   *)
+(*   en Automatique.                                                    *)
+(************************************************************************)
+
 (* Create a DLL from a set of "closed" COFF files (no imported symbol). *)
 
 open Coff
