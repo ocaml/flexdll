@@ -388,7 +388,7 @@ let add_reloc_table obj obj_name p =
     @ !syms;
   sname
 
-(* Create a table for import symbols __imp_XXX *)
+(* Create a table for import symbols __flimp_XXX *)
 
 let add_import_table obj imports =
   let ptr_size = match !machine with `x86 -> 4 | `x64 -> 8 in
@@ -400,7 +400,7 @@ let add_import_table obj imports =
     (fun s ->
        let sym = Symbol.extern s in
        obj.symbols <-
-         sym :: Symbol.export ("__imp_" ^ s) sect (Int32.of_int !i) ::
+         sym :: Symbol.export ("__flimp_" ^ s) sect (Int32.of_int !i) ::
          obj.symbols;
        Reloc.abs !machine sect (Int32.of_int !i) sym;
        i := !i + ptr_size
@@ -513,9 +513,9 @@ let patch_output output_file =
 
 
 (* Extract the set of external symbols required by an object. *)
-(* If the object requires "__imp_X", and "X" is available in one of the objects/libraries
-   (but not "__imp_X" itself), then we consider that "X" is required.
-   Indeed, we will create "__imp_X" (with a redirection to "X").
+(* If the object requires "__flimp_X", and "X" is available in one of the objects/libraries
+   (but not "__flimp_X" itself), then we consider that "X" is required.
+   Indeed, we will create "__flimp_X" (with a redirection to "X").
    Collect such cases in "imported".
 *)
 let needed imported defined unalias obj =
@@ -526,7 +526,7 @@ let needed imported defined unalias obj =
     with Not_found -> name
   in
   let normalize_imp name =
-    match check_prefix "__imp_" name with
+    match check_prefix "__flimp_" name with
     | Some s when not (StrSet.mem name defined) ->
         imported := StrSet.add s !imported;
         if StrSet.mem s defined then s else name
@@ -633,7 +633,7 @@ let build_dll link_exe output_file files exts extra_args =
                  Printf.printf "lib %s import symbol %s\n%!" fn s;
                from_imports := StrSet.add s !from_imports;
                add_def s;
-               add_def ("__imp_" ^ s)
+               add_def ("__flimp_" ^ s)
             )
             imports
     in
@@ -691,7 +691,7 @@ let build_dll link_exe output_file files exts extra_args =
     let undefs = StrSet.diff n defined in
     StrSet.filter
       (fun s ->
-         match check_prefix "__imp_" s with
+         match check_prefix "__flimp_" s with
          | Some s' -> false
          | None -> s <> "environ"  (* special hack for Cygwin64 *)
       )
@@ -814,7 +814,7 @@ let build_dll link_exe output_file files exts extra_args =
 
   if not (StrSet.is_empty !imported) then begin
 (*
-    Printf.printf "** __imp symbols:\n";
+    Printf.printf "** __flimp symbols:\n";
     StrSet.iter print_endline !imported;
 *)
     add_import_table obj (StrSet.elements !imported);
