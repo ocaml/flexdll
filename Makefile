@@ -84,7 +84,7 @@ version.res: version.rc
 	rc version.rc
 
 version_res.o: version.rc
-	windres version.rc version_res.o
+	$(TOOLPREF)windres version.rc version_res.o
 
 flexdll_msvc.obj: flexdll.h flexdll.c
 	$(MSVC_PREFIX) $(MSVCC) /DMSVC -c /Fo"flexdll_msvc.obj" flexdll.c
