@@ -707,7 +707,8 @@ module Coff = struct
 	    | { storage = 3; stype = 0; auxn = auxn } when auxn > 0 ->
 		(* section def *)
 		let num = int16 s.auxs 12 in
-		if num > 0 then
+                let sel = int8 s.auxs 14 in
+		if sel = 5 && num > 0 then
 		  (try s.extra_info <- `Section sections.(num - 1)
 		   with Invalid_argument _ ->
 		     Printf.eprintf "** section %i / %i (%s)\n" num
