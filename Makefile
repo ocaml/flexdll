@@ -76,8 +76,14 @@ OCAMLOPT = ocamlopt
 
 ifeq ($(TOOLCHAIN), msvc)
 RES=version.res
+ifeq ($(ARCH), i386)
+RES_PREFIX=$(MSVC_PREFIX)
+else
+RES_PREFIX=$(MSVC64_PREFIX)
+endif
 else
 RES=version_res.o
+RES_PREFIX=
 endif
 
 ifeq ($(NATDYNLINK), false)
@@ -103,10 +109,10 @@ OBJS = version.ml coff.ml cmdline.ml create_dll.ml reloc.ml
 flexlink.exe: $(OBJS) $(RES)
 	@echo Building flexlink.exe with TOOLCHAIN=$(TOOLCHAIN)
 	rm -f flexlink.exe
-	$(OCAMLOPT) -g -w -105 -o flexlink.exe $(LINKFLAGS) $(OBJS)
+	$(RES_PREFIX) $(OCAMLOPT) -g -w -105 -o flexlink.exe $(LINKFLAGS) $(OBJS)
 
 version.res: version.rc
-	rc version.rc
+	$(RES_PREFIX) rc version.rc
 
 version_res.o: version.rc
 	$(TOOLPREF)windres version.rc version_res.o
