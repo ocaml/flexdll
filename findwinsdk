@@ -1,0 +1,37 @@
+#!/bin/bash
+
+SDK=
+SDK_INC=
+SDK_LIB=
+
+SDK_ROOT=$(reg query "HKLM\SOFTWARE\Microsoft\Microsoft SDKs\Windows" /v CurrentInstallFolder 2>/dev/null | fgrep REG_SZ | sed -e "s/.*REG_SZ *//" | cygpath -f - -md)
+
+if [ "$SDK_ROOT" != "" ] ; then
+  SETENV=$(cygpath $SDK_ROOT)/Bin
+  
+  if [ -e "$SETENV" ] ; then
+    num=0
+    while IFS= read -r line; do
+      case $num in
+        0)
+          SDK=${line%% };;
+        1)
+          SDK_LIB=${line%% };;
+        2)
+          SDK_INC=${line%% };;
+      esac
+      ((num++))
+    done < <(PROCESSOR_ARCHITEW6432=$1 PROCESSOR_ARCHITECTURE=$1 INCLUDE= LIB= PATH="$SETENV:$PATH" C:/Windows/system32/cmd.exe /v:on /c 'SetEnv.cmd /release && echo XMARKER && echo !PATH! && echo !LIB! && echo !INCLUDE!' 2>/dev/null | fgrep "XMARKER" -A 3 | tail -3)
+
+    SDK=$(cygpath "$SDK" -p)
+    SDK=${SDK%:$PATH}
+
+    SDK_LIB=${SDK_LIB%%;}
+    SDK_INC=${SDK_INC%%;}
+
+  fi
+fi
+
+echo SDK$2:="$SDK"
+echo SDK$2_INC:="$SDK_INC"
+echo SDK$2_LIB:="$SDK_LIB"

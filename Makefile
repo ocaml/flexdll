@@ -27,9 +27,20 @@ CHAINS = mingw mingw64 cygwin cygwin64 msvc msvc64
 
 # Compilers
 
-# This Makefile assumes the 32-bit version of VS 2008 or Win7 SDK is in the path.
+# Attempt to locate the Windows SDK
 
-MSVCC_ROOT = $(shell which cl.exe | cygpath -f - -ad | xargs -d \\n dirname | cygpath -f - -m)
+ifeq ($(findstring clean,$(MAKECMDGOALS)),)
+include Makefile.winsdk
+endif
+
+Makefile.winsdk: findwinsdk
+	./findwinsdk x86 > $@
+	./findwinsdk x64 64 >> $@
+
+ifeq ($(SDK),)
+# Otherwise, assume the 32-bit version of VS 2008 or Win7 SDK is in the path.
+
+MSVCC_ROOT := $(shell which cl.exe 2>/dev/null | cygpath -f - -ad | xargs -d \\n dirname 2>/dev/null | cygpath -f - -m)
 MSVC_LIB1 = $(shell dirname $(MSVCC_ROOT))
 MSVC_LIB2 = $(shell which ResGen.exe | cygpath -f - -ad | xargs -d \\n dirname | xargs -d \\n dirname | cygpath -f - -m)
 MSVC_LIB = $(MSVC_LIB1)/Lib;$(MSVC_LIB2)/Lib
@@ -39,12 +50,26 @@ MSVC_PREFIX=LIB="$(MSVC_LIB)" INCLUDE="$(MSVC_INCLUDE)"
 MSVC64_LIB = $(MSVC_LIB1)/Lib/amd64;$(MSVC_LIB2)/Lib/x64
 MSVC64_PREFIX=LIB="$(MSVC64_LIB)" INCLUDE="$(MSVC_INCLUDE)" 
 
-show_root:
-	@echo "$(MSVCC_ROOT)"
-	@echo "$(MSVC_LIB)"
-
 MSVCC = $(MSVCC_ROOT)/cl.exe /nologo /MD -D_CRT_SECURE_NO_DEPRECATE /GS-
 MSVCC64 = $(MSVCC_ROOT)/amd64/cl.exe /nologo /MD -D_CRT_SECURE_NO_DEPRECATE /GS-
+else
+MSVCC_ROOT:=
+MSVC_PREFIX=PATH="$(SDK):$(PATH)" LIB="$(SDK_LIB);$(LIB)" INCLUDE="$(SDK_INC);$(INCLUDE)" 
+MSVC64_PREFIX=PATH="$(SDK64):$(PATH)" LIB="$(SDK64_LIB);$(LIB)" INCLUDE="$(SDK64_INC);$(INCLUDE)" 
+
+MSVCC = cl.exe /nologo /MD -D_CRT_SECURE_NO_DEPRECATE /GS-
+MSVCC64 = cl.exe /nologo /MD -D_CRT_SECURE_NO_DEPRECATE /GS-
+endif
+
+show_root:
+ifeq ($(MSVCC_ROOT),)
+	@echo "$(SDK)"
+	@echo "$(SDK_LIB)"
+else
+	@echo "$(MSVCC_ROOT)"
+	@echo "$(MSVC_LIB)"
+endif
+
 OCAMLOPT = ocamlopt
 #OCAMLOPT = FLEXLINKFLAGS=-real-manifest ocamlopt
 #LINKFLAGS = unix.cmxa
@@ -146,6 +171,9 @@ demo_mingw64: flexlink.exe flexdll_mingw64.o flexdll_initer_mingw64.o
 
 demo_msvc64:  flexlink.exe flexdll_msvc64.obj flexdll_initer_msvc64.obj
 	(cd test && $(MSVC64_PREFIX) $(MAKE) clean demo CHAIN=msvc64 CC="$(MSVCC64)" O=obj)
+
+distclean: clean
+	rm -f Makefile.winsdk
 
 clean:
 	rm -f *.obj *.o *.lib *.a *.exe *.cmx *.dll *.exp *.cmi *~ version.res version.ml
