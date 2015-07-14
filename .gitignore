@@ -1,0 +1,11 @@
+*.swp
+*.obj
+*.o
+*.cmx
+*.cmi
+*.dll
+flexlink.exe
+test/dump.exe
+version.res
+version.ml
+Makefile.winsdk
