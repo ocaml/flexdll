@@ -148,7 +148,7 @@ demo_msvc64:  flexlink.exe flexdll_msvc64.obj flexdll_initer_msvc64.obj
 	(cd test && $(MSVC64_PREFIX) $(MAKE) clean demo CHAIN=msvc64 CC="$(MSVCC64)" O=obj)
 
 clean:
-	rm -f *.obj *.o *.lib *.a *.exe *.cmx *.dll *.exp *.cmi *~
+	rm -f *.obj *.o *.lib *.a *.exe *.cmx *.dll *.exp *.cmi *~ version.res version.ml
 	cd test && $(MAKE) clean
 
 
