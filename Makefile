@@ -34,8 +34,8 @@ include Makefile.winsdk
 endif
 
 Makefile.winsdk: findwinsdk
-	./findwinsdk x86 > $@
-	./findwinsdk x64 64 >> $@
+	bash ./findwinsdk x86 > $@
+	bash ./findwinsdk x64 64 >> $@
 
 ifeq ($(SDK),)
 # Otherwise, assume the 32-bit version of VS 2008 or Win7 SDK is in the path.
