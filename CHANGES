@@ -1,3 +1,7 @@
+Next version
+- Fixes for clang (patch by Roven Gabriel)
+- Improve autodetection of WinSDK paths (patch by David Allsop)
+
 Version 0.34
 - New option -norelrelocs to check that no relative flexdll relocations are created (this ensures that the generated DLLs can be loaded at any address),
 - New option -base to specify the image base address (msvc64 only).
