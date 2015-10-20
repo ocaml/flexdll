@@ -27,48 +27,28 @@ CHAINS = mingw mingw64 cygwin cygwin64 msvc msvc64
 
 # Compilers
 
-# Attempt to locate the Windows SDK
+# Attempt to locate the Visual Studio/Windows SDK
 
-ifeq ($(findstring clean,$(MAKECMDGOALS)),)
-include Makefile.winsdk
-endif
+VSCONTOOLS = $(lastword $(foreach ver,8 9 10 11 12 13 14 15 16 17 18 19 20,\
+	$(if $(VS$(ver)0COMNTOOLS), VS$(ver)0COMNTOOLS)))
 
-Makefile.winsdk: findwinsdk
-	bash ./findwinsdk x86 > $@
-	bash ./findwinsdk x64 64 >> $@
+VS_HELPER = vs.bat
+$(VS_HELPER):
+	@echo @call \"%$(VSCONTOOLS)%..\\..\\VC\\vcvarsall.bat\" %1 > $@
+	@echo shift >> $@
+	@echo set cmd=%1 %2 %3 %4 %5 %6 %7 %8 %9 >> $@
+	@for i in {1..9}; do echo shift >> $@; done 
+	@echo set cmd=%cmd% %1 %2 %3 %4 %5 %6 %7 %8 %9 >> $@
+	@echo %cmd% >> $@
 
-ifeq ($(SDK),)
-# Otherwise, assume the 32-bit version of VS 2008 or Win7 SDK is in the path.
+MSVC_PREFIX=./vs.bat x86
+MSVC64_PREFIX=./vs.bat x86_amd64
+MSVCC=cl.exe /nologo /MD -D_CRT_SECURE_NO_DEPRECATE /GS-
+MSVCC64=cl.exe /nologo /MD -D_CRT_SECURE_NO_DEPRECATE /GS-
 
-MSVCC_ROOT := $(shell which cl.exe 2>/dev/null | cygpath -f - -ad | xargs -d \\n dirname 2>/dev/null | cygpath -f - -m)
-MSVC_LIB1 = $(shell dirname $(MSVCC_ROOT))
-MSVC_LIB2 = $(shell which ResGen.exe | cygpath -f - -ad | xargs -d \\n dirname | xargs -d \\n dirname | cygpath -f - -m)
-MSVC_LIB = $(MSVC_LIB1)/Lib;$(MSVC_LIB2)/Lib
-MSVC_INCLUDE = $(MSVC_LIB1)/Include;$(MSVC_LIB2)/Include
-MSVC_PREFIX=LIB="$(MSVC_LIB)" INCLUDE="$(MSVC_INCLUDE)" 
-
-MSVC64_LIB = $(MSVC_LIB1)/Lib/amd64;$(MSVC_LIB2)/Lib/x64
-MSVC64_PREFIX=LIB="$(MSVC64_LIB)" INCLUDE="$(MSVC_INCLUDE)" 
-
-MSVCC = $(MSVCC_ROOT)/cl.exe /nologo /MD -D_CRT_SECURE_NO_DEPRECATE /GS-
-MSVCC64 = $(MSVCC_ROOT)/amd64/cl.exe /nologo /MD -D_CRT_SECURE_NO_DEPRECATE /GS-
-else
-MSVCC_ROOT:=
-MSVC_PREFIX=PATH="$(SDK):$(PATH)" LIB="$(SDK_LIB);$(LIB)" INCLUDE="$(SDK_INC);$(INCLUDE)" 
-MSVC64_PREFIX=PATH="$(SDK64):$(PATH)" LIB="$(SDK64_LIB);$(LIB)" INCLUDE="$(SDK64_INC);$(INCLUDE)" 
-
-MSVCC = cl.exe /nologo /MD -D_CRT_SECURE_NO_DEPRECATE /GS-
-MSVCC64 = cl.exe /nologo /MD -D_CRT_SECURE_NO_DEPRECATE /GS-
-endif
-
-show_root:
-ifeq ($(MSVCC_ROOT),)
-	@echo "$(SDK)"
-	@echo "$(SDK_LIB)"
-else
-	@echo "$(MSVCC_ROOT)"
-	@echo "$(MSVC_LIB)"
-endif
+check_vs: $(VS_HELPER)
+	@$(MSVC_PREFIX) cl -? > _output ; rm _output
+	@$(MSVC64_PREFIX) cl -? > _output ; rm _output
 
 OCAMLOPT = ocamlopt
 #OCAMLOPT = FLEXLINKFLAGS=-real-manifest ocamlopt
@@ -76,14 +56,16 @@ OCAMLOPT = ocamlopt
 
 ifeq ($(TOOLCHAIN), msvc)
 RES=version.res
-ifeq ($(ARCH), i386)
-RES_PREFIX=$(MSVC_PREFIX)
-else
+ifeq ($(ARCH), amd64)
 RES_PREFIX=$(MSVC64_PREFIX)
+else
+RES_PREFIX=$(MSVC_PREFIX)
 endif
+RES_HELPER=$(VS_HELPER)
 else
 RES=version_res.o
 RES_PREFIX=
+RES_HELPER=
 endif
 
 ifeq ($(NATDYNLINK), false)
@@ -106,21 +88,21 @@ build_mingw64: flexdll_mingw64.o flexdll_initer_mingw64.o
 
 OBJS = version.ml coff.ml cmdline.ml create_dll.ml reloc.ml
 
-flexlink.exe: $(OBJS) $(RES)
+flexlink.exe: $(OBJS) $(RES) $(RES_HELPER)
 	@echo Building flexlink.exe with TOOLCHAIN=$(TOOLCHAIN)
 	rm -f flexlink.exe
 	$(RES_PREFIX) $(OCAMLOPT) -g -w -105 -o flexlink.exe $(LINKFLAGS) $(OBJS)
 
-version.res: version.rc
+version.res: version.rc $(RES_HELPER)
 	$(RES_PREFIX) rc version.rc
 
 version_res.o: version.rc
 	$(TOOLPREF)windres version.rc version_res.o
 
-flexdll_msvc.obj: flexdll.h flexdll.c
+flexdll_msvc.obj: flexdll.h flexdll.c $(VS_HELPER)
 	$(MSVC_PREFIX) $(MSVCC) /DMSVC -c /Fo"flexdll_msvc.obj" flexdll.c
 
-flexdll_msvc64.obj: flexdll.h flexdll.c
+flexdll_msvc64.obj: flexdll.h flexdll.c $(VS_HELPER)
 	$(MSVC64_PREFIX) $(MSVCC64) /DMSVC  -c /Fo"flexdll_msvc64.obj" flexdll.c
 
 flexdll_cygwin.o: flexdll.h flexdll.c
@@ -138,10 +120,10 @@ flexdll_gnat.o: flexdll.h flexdll.c
 flexdll_mingw64.o: flexdll.h flexdll.c
 	$(MIN64CC) -c -DMINGW -o flexdll_mingw64.o flexdll.c
 
-flexdll_initer_msvc.obj: flexdll_initer.c
+flexdll_initer_msvc.obj: flexdll_initer.c $(VS_HELPER)
 	$(MSVC_PREFIX) $(MSVCC) -c /Fo"flexdll_initer_msvc.obj" flexdll_initer.c
 
-flexdll_initer_msvc64.obj: flexdll_initer.c
+flexdll_initer_msvc64.obj: flexdll_initer.c $(VS_HELPER)
 	$(MSVC64_PREFIX) $(MSVCC64) -c /Fo"flexdll_initer_msvc64.obj" flexdll_initer.c
 
 flexdll_initer_cygwin.o: flexdll_initer.c
@@ -179,7 +161,7 @@ demo_msvc64:  flexlink.exe flexdll_msvc64.obj flexdll_initer_msvc64.obj
 	(cd test && $(MSVC64_PREFIX) $(MAKE) clean demo CHAIN=msvc64 CC="$(MSVCC64)" O=obj)
 
 distclean: clean
-	rm -f Makefile.winsdk
+	rm -f $(VS_HELPER)
 
 clean:
 	rm -f *.obj *.o *.lib *.a *.exe *.cmx *.dll *.exp *.cmi *~ version.res version.ml

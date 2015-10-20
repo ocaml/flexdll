@@ -165,17 +165,13 @@ static void cannot_resolve_msg(char *name) {
 
 static void relocate(resolver f, void *data, reloctbl *tbl) {
   reloc_entry *ptr;
-  nonwr *wr;
   INT_PTR s;
-  /*
   DWORD old;
+  /*
   MEMORY_BASIC_INFORMATION info;
   */
 
   if (!tbl) return;
-
-  for (wr = tbl->nonwr; wr->last != 0; wr++)
-    allow_write(wr->first,wr->last + sizeof(UINT_PTR),PAGE_EXECUTE_WRITECOPY,&wr->old);
 
   for (ptr = tbl->entries; ptr->kind; ptr++) {
     if (ptr->kind & RELOC_DONE) continue;
@@ -197,6 +193,7 @@ static void relocate(resolver f, void *data, reloctbl *tbl) {
       cannot_resolve_msg(ptr->name);
       return;
     }
+    allow_write((char*)ptr->addr,(char*)(ptr->addr + 1),PAGE_READWRITE,&old);
     switch (ptr->kind & 0xff) {
     case RELOC_ABS:
       *(ptr->addr) += s;
@@ -242,9 +239,11 @@ static void relocate(resolver f, void *data, reloctbl *tbl) {
       *((UINT32*) ptr->addr) = s;
       break;
     default:
+      allow_write((char*)ptr->addr,(char*)(ptr->addr + 1),old,&old);
       fprintf(stderr, "flexdll: unknown relocation kind");
       exit(2);
     }
+    allow_write((char*)ptr->addr,(char*)(ptr->addr + 1),old,&old);
     ptr->kind |= RELOC_DONE;
 
     /*
@@ -253,10 +252,6 @@ static void relocate(resolver f, void *data, reloctbl *tbl) {
     printf("p = %p, base = %p, allocBase = %p, allocProtect = %x, state = %x, protect = %x, type = %x\n",  ptr->addr, info.BaseAddress, info.AllocationBase, info.AllocationProtect, info.State, info.Protect, info.Type);
     */
   }
-
-  /* Restore permissions. Should do it also in case of failure... */
-  for (wr = tbl->nonwr; wr->last != 0; wr++)
-    allow_write(wr->first,wr->last + 4,wr->old,&wr->old);
 }
 
 static void relocate_master(resolver f, void *data, reloctbl **ptr) {
