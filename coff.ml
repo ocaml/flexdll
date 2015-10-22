@@ -162,6 +162,7 @@ and section = {
 }
 
 type coff = {
+  bigobj: bool;
   obj_name: string;
   machine: int;
   date: int32;
@@ -170,6 +171,8 @@ type coff = {
   opts: int;
 }
 
+let header_bigobj_classid =
+  "\xC7\xA1\xBA\xD1\xEE\xBA\xA9\x4B\xAF\x20\xFA\xF6\x6A\xA4\xDC\xB8"
 
 (* Misc *)
 
@@ -327,19 +330,24 @@ module Symbol = struct
         section = `Num 0; storage = 2 }
 
 
-  let get strtbl ic pos =
-    let buf = read ic pos 18 in
-    let auxn = int8 buf 17 in
+  let get bigobj strtbl ic pos =
+    let size, sec_get, stype_ofs, storage_ofs, auxn_ofs =
+      if bigobj then
+        (20, int32_, 16, 18, 19)
+      else
+        (18, int16, 14, 16, 17) in
+    let buf = read ic pos size in
+    let auxn = int8 buf auxn_ofs in
     { sym_pos = (-1);
       sym_name =
         (if int32_ buf 0 <> 0 then strz buf 0 ~max:8 '\000'
          else strtbl (int32_ buf 4));
       value = int32 buf 8;
-      section = `Num (int16 buf 12);
-      stype = int16 buf 14;
-      storage = int8 buf 16;
+      section = `Num (sec_get buf 12);
+      stype = int16 buf stype_ofs;
+      storage = int8 buf storage_ofs;
       auxn = auxn;
-      auxs = read ic (pos + 18) (18 * auxn);
+      auxs = read ic (pos + size) (size * auxn);
       extra_info = `None;
     }
 
@@ -397,7 +405,12 @@ module Symbol = struct
             "value=0x%08lx, sect=%s, storage=%s, aux=%S\n"
             s.value sect storage (Bytes.to_string s.auxs)
 
-  let put strtbl oc s =
+  let put bigobj strtbl oc s =
+    let sec_get, sec_put, type_ofs =
+      if bigobj then
+        (int32_, (fun oc i -> emit_int32 oc (Int32.of_int i)), 16)
+      else
+        (int16, emit_int16, 14) in
     if String.length s.sym_name <= 8
     then (output_string oc s.sym_name;
           emit_zero oc (8 - String.length s.sym_name))
@@ -409,7 +422,7 @@ module Symbol = struct
           failwith (Printf.sprintf
                       "Cannot emit section for symbol %s" s.sym_name)
       | `Section sec -> sec.sec_pos in
-    emit_int16 oc sec;
+    sec_put oc sec;
     emit_int16 oc s.stype;
     emit_int8 oc s.storage;
     emit_int8 oc s.auxn;
@@ -421,8 +434,8 @@ module Symbol = struct
       | { storage = 3; extra_info = `Section s' } when int8 s.auxs 14 = 5 (* IMAGE_COMDAT_SELECT_ASSOCIATIVE *) ->
           (* section def *)
           output_bytes oc (Bytes.sub s.auxs 0 12);
-          emit_int16 oc s'.sec_pos;
-          output_bytes oc (Bytes.sub s.auxs 14 (Bytes.length s.auxs - 14))
+          sec_put oc s'.sec_pos;
+          output_bytes oc (Bytes.sub s.auxs type_ofs (Bytes.length s.auxs - type_ofs))
       | { storage = 3; extra_info = `Section s' } ->
           (* section def *)
           Printf.eprintf "!!! section symbol not supported (symbol: %s -> section:%s)\n%!" s.sym_name s'.sec_name;
@@ -434,7 +447,7 @@ module Symbol = struct
           Printf.eprintf "sel = %i\n" (int8 s.auxs 14);
           assert false
       | _ ->
-          if s.storage = 105 then assert (int16 s.auxs 12 = 0);
+          if s.storage = 105 then assert (sec_get s.auxs 12 = 0);
           output_bytes oc s.auxs
 end
 
@@ -617,7 +630,8 @@ module Coff = struct
       | `x64 -> 0x8664
       | `x86 -> 0x14c
     in
-    { obj_name = "generated";
+    { bigobj = false;
+      obj_name = "generated";
       machine = machine; date = 0x4603de0el;
       sections = []; symbols = []; opts = 0 }
 
@@ -670,15 +684,21 @@ module Coff = struct
     with Not_found -> []
 
   let get ic ofs base name =
-    let buf = read ic ofs 20 in
-    let opthdr = int16 buf 16 in
+    let buf = read ic ofs 4 in
+    let bigobj = int32_ buf 0 = -65536 in
 
-    let symtable = base + int32_ buf 8 in
-    let symcount = int32_ buf 12 in
+    let hdrsize = if bigobj then 56 else 20 in
+    let buf = read ic ofs hdrsize in
+    let opthdr = if bigobj then 0 else int16 buf 16 in
+    let symtable_ofs = if bigobj then 48 else 8 in
+
+    let symtable = base + int32_ buf symtable_ofs in
+    let symcount = int32_ buf (symtable_ofs + 4) in
+    let symsize = if bigobj then 20 else 18 in
 
     (* the string table *)
     let strtbl =
-      let pos = symtable + 18 * symcount in
+      let pos = symtable + symsize * symcount in
       if pos = 0 then fun _ -> assert false
       else
         let len = int32_ (read ic pos 4) 0 in
@@ -692,7 +712,7 @@ module Coff = struct
       let tbl = Array.make symcount None in
       let rec fill accu i =
         if i = symcount then List.rev accu
-        else let s = Symbol.get strtbl ic (symtable + 18 * i) in
+        else let s = Symbol.get bigobj strtbl ic (symtable + symsize * i) in
         (try tbl.(i) <- Some s
          with Invalid_argument _ -> assert false);
         fill (s :: accu) (i + 1 + s.auxn) in
@@ -700,9 +720,14 @@ module Coff = struct
     in
 
     (* the sections *)
-    let sectable = ofs + 20 + opthdr in
+    let sectable = ofs + hdrsize + opthdr in
+    let seccount =
+        if bigobj then
+          int32_ buf 44
+        else
+          int16 buf 2 in
     let sections =
-      Array.init (int16 buf 2)
+      Array.init seccount
         (fun i -> Section.get base strtbl symtbl ic (sectable + 40 * i))
     in
 
@@ -746,12 +771,13 @@ module Coff = struct
             | _ -> ()))
       symbols;
 
-    { obj_name = name;
-      machine = int16 buf 0;
+    { bigobj = bigobj;
+      obj_name = name;
+      machine = int16 buf (if bigobj then 6 else 0);
       sections = Array.to_list sections;
-      date = int32 buf 4;
+      date = int32 buf (if bigobj then 8 else 4);
       symbols = symbols;
-      opts = int16 buf 18;
+      opts = int16 buf (if bigobj then 32 else 18);
     }
 
   let aliases x =
@@ -776,8 +802,6 @@ module Coff = struct
     ()
 
   let put oc x =
-    emit_int16 oc x.machine;
-
     let () =
       let no = ref 0 in
       List.iter
@@ -785,8 +809,24 @@ module Coff = struct
         x.sections
     in
 
-    emit_int16 oc (List.length x.sections);
-    emit_int32 oc x.date;
+    if x.bigobj then begin
+      emit_int16 oc 0; (* Sig1 *)
+      emit_int16 oc 0xffff; (* Sig2 *)
+      emit_int16 oc 2; (* Version *)
+      emit_int16 oc x.machine;
+      emit_int32 oc x.date;
+      output_string oc header_bigobj_classid;
+      emit_int32 oc 0l;
+      emit_int32 oc (Int32.of_int x.opts);
+      emit_int32 oc 0l;
+      emit_int32 oc 0l;
+      emit_int32 oc (Int32.of_int (List.length x.sections));
+    end
+    else begin
+      emit_int16 oc x.machine;
+      emit_int16 oc (List.length x.sections);
+      emit_int32 oc x.date;
+    end;
 
     let strbuf = Buffer.create 1024 in
     let strtbl s =
@@ -798,7 +838,7 @@ module Coff = struct
 
     let patch_sym =
       delayed_ptr oc
-        (fun () -> List.iter (Symbol.put strtbl oc) x.symbols)
+        (fun () -> List.iter (Symbol.put x.bigobj strtbl oc) x.symbols)
     in
     let nbsym =
       let no = ref 0 in
@@ -811,9 +851,12 @@ module Coff = struct
         x.symbols;
       !no
     in
+
     emit_int32 oc (Int32.of_int nbsym);
-    emit_int16 oc 0;
-    emit_int16 oc x.opts;
+    if not x.bigobj then begin
+      emit_int16 oc 0;
+      emit_int16 oc x.opts;
+    end;
 
     let sects =
       List.map (Section.put strtbl oc) x.sections in
@@ -859,7 +902,7 @@ module Lib = struct
     let obj size name =
 (*      Printf.printf "-> %s (size %i)\n" name size;  *)
       let pos = pos_in ic in
-      if size > 18 && read_str ic pos 4 = "\000\000\255\255"
+      if size > 18 && read_str ic pos 6 = "\000\000\255\255\000\000"
       then imports := Import.read ic pos size :: !imports
       else objects := (name,
                        Coff.get ic pos pos
