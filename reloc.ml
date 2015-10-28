@@ -698,12 +698,12 @@ let build_dll link_exe output_file files exts extra_args =
 
       (* Iterates through DEFAULTLIB directives *)
       let register_deflib fn =
-        if not (is_crt_lib fn) then
+        if not !custom_crt || not (is_crt_lib fn) then
           let fn = find_file fn in
           if not (Hashtbl.mem loaded_filenames fn)
           then (Hashtbl.add loaded_filenames fn (); collect_file fn)
       in
-      if not !builtin_linker && !use_default_libs && not !custom_crt then
+      if not !builtin_linker && !use_default_libs then
         List.iter
           (fun (cmd, args) ->
              if String.uppercase_ascii cmd = "DEFAULTLIB" then List.iter register_deflib args
