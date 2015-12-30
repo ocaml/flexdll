@@ -356,22 +356,23 @@ void *flexdll_dlopen(const char *file, int mode) {
   error = 0;
   if (!file) return &main_unit;
 
-#ifdef MSVC
-  sprintf(flexdll_relocate_env,"%p",&flexdll_relocate);
-  _putenv_s("FLEXDLL_RELOCATE", flexdll_relocate_env);
-#endif
 #ifdef CYGWIN
   sprintf(flexdll_relocate_env,"%p",&flexdll_relocate);
   setenv("FLEXDLL_RELOCATE", flexdll_relocate_env, 1);
-#endif
-#ifdef MINGW
+#else
+#if __STDC_SECURE_LIB__ >= 200411L
+  sprintf(flexdll_relocate_env,"%p",&flexdll_relocate);
+  _putenv_s("FLEXDLL_RELOCATE", flexdll_relocate_env);
+#else
   {
+    char* s;
     sprintf(flexdll_relocate_env,"FLEXDLL_RELOCATE=%p",&flexdll_relocate);
-    char* s = malloc(strlen(flexdll_relocate_env) + 1);
+    s = malloc(strlen(flexdll_relocate_env) + 1);
     strcpy(s, flexdll_relocate_env);
     putenv(s);
   }
-#endif
+#endif /* __STDC_SECURE_LIB__ >= 200411L*/
+#endif /* CYGWIN */
 
   handle = ll_dlopen(file, exec);
   if (!handle) { if (!error) error = 1; return NULL; }
