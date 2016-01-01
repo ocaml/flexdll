@@ -2,6 +2,7 @@
 *.obj
 *.o
 *.cmx
+*.cmo
 *.cmi
 *.dll
 flexlink.exe

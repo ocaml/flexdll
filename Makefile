@@ -193,7 +193,7 @@ distclean: clean
 	rm -f Makefile.winsdk
 
 clean:
-	rm -f *.obj *.o *.lib *.a *.exe *.cmx *.dll *.exp *.cmi *~ version.res version.ml
+	rm -f *.obj *.o *.lib *.a *.exe *.cmx *.dll *.exp *.cmi *.cmo *~ version.res version.ml
 	cd test && $(MAKE) clean
 
 
