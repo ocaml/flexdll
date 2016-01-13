@@ -6,6 +6,7 @@
 *.cmi
 *.dll
 flexlink.exe
+flexlink.opt
 test/dump.exe
 version.res
 version.ml
