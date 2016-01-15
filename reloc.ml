@@ -1158,7 +1158,13 @@ let dump fn =
 
 let all_files () =
   let files = List.rev (List.map compile_if_needed !files) in
-  let f = Filename.concat flexdir in
+  let f obj =
+    let fn = Filename.concat flexdir obj in
+    (* Allow the obj files to be stored in a different location *)
+    if file_exists fn <> None then
+      fn
+    else
+      obj in
   let tc = match !toolchain with
   | `MSVC -> "msvc.obj"
   | `MSVC64 -> "msvc64.obj"

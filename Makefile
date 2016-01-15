@@ -37,6 +37,16 @@ Makefile.winsdk: findwinsdk
 	bash ./findwinsdk x86 > $@
 	bash ./findwinsdk x64 64 >> $@
 
+MSVC_DETECT=1
+MSVC_FLAGS=/nologo /MD -D_CRT_SECURE_NO_DEPRECATE /GS-
+
+ifeq ($(MSVC_DETECT),0)
+# Assume that the environment is correctly set for a single Microsoft C Compiler; don't attempt to guess anything
+MSVC_PREFIX=
+MSVC64_PREFIX=
+MSVCC=cl.exe $(MSVC_FLAGS)
+MSVCC64=cl.exe $(MSVC_FLAGS)
+else
 ifeq ($(SDK),)
 # Otherwise, assume the 32-bit version of VS 2008 or Win7 SDK is in the path.
 
@@ -50,15 +60,16 @@ MSVC_PREFIX=LIB="$(MSVC_LIB)" INCLUDE="$(MSVC_INCLUDE)"
 MSVC64_LIB = $(MSVC_LIB1)/Lib/amd64;$(MSVC_LIB2)/Lib/x64
 MSVC64_PREFIX=LIB="$(MSVC64_LIB)" INCLUDE="$(MSVC_INCLUDE)" 
 
-MSVCC = $(MSVCC_ROOT)/cl.exe /nologo /MD -D_CRT_SECURE_NO_DEPRECATE /GS-
-MSVCC64 = $(MSVCC_ROOT)/amd64/cl.exe /nologo /MD -D_CRT_SECURE_NO_DEPRECATE /GS-
+MSVCC = $(MSVCC_ROOT)/cl.exe $(MSVC_FLAGS)
+MSVCC64 = $(MSVCC_ROOT)/amd64/cl.exe $(MSVC_FLAGS)
 else
 MSVCC_ROOT:=
 MSVC_PREFIX=PATH="$(SDK):$(PATH)" LIB="$(SDK_LIB);$(LIB)" INCLUDE="$(SDK_INC);$(INCLUDE)" 
 MSVC64_PREFIX=PATH="$(SDK64):$(PATH)" LIB="$(SDK64_LIB);$(LIB)" INCLUDE="$(SDK64_INC);$(INCLUDE)" 
 
-MSVCC = cl.exe /nologo /MD -D_CRT_SECURE_NO_DEPRECATE /GS-
-MSVCC64 = cl.exe /nologo /MD -D_CRT_SECURE_NO_DEPRECATE /GS-
+MSVCC = cl.exe $(MSVC_FLAGS)
+MSVCC64 = cl.exe $(MSVC_FLAGS)
+endif
 endif
 
 show_root:
@@ -182,7 +193,7 @@ distclean: clean
 	rm -f Makefile.winsdk
 
 clean:
-	rm -f *.obj *.o *.lib *.a *.exe *.cmx *.dll *.exp *.cmi *~ version.res version.ml
+	rm -f *.obj *.o *.lib *.a *.exe *.opt *.cmx *.dll *.exp *.cmi *.cmo *~ version.res version.ml
 	cd test && $(MAKE) clean
 
 

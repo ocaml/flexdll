@@ -1,6 +1,8 @@
 Next version
 - Fixes for clang (patch by Roven Gabriel)
-- Improve autodetection of WinSDK paths (patch by David Allsop)
+- Improve autodetection of WinSDK paths (patch by David Allsopp)
+- Add MSVC_DETECT Makefile variable which overrides all C Compiler detection logic when 0.
+- Add checkenv script which determines if the environment is sound specifying MSVC_DETECT=0
 
 Version 0.34
 - New option -norelrelocs to check that no relative flexdll relocations are created (this ensures that the generated DLLs can be loaded at any address),

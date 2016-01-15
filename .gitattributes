@@ -1,3 +1,4 @@
 * text=auto
 
 findwinsdk text eol=lf
+checkenv text eol=lf
