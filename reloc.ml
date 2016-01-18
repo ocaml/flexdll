@@ -1111,7 +1111,7 @@ let display_msvc_output file name =
   let c = open_in file in
   try
     let first = input_line c in
-    if first <> name then
+    if first <> (Filename.basename name) then
       print_string first;
     while true do
       print_string (input_line c)
@@ -1122,7 +1122,7 @@ let display_msvc_output file name =
 let compile_if_needed file =
   if Filename.check_suffix file ".c" then begin
     let tmp_obj = temp_file "dyndll" (ext_obj ()) in
-    let (pipe, file) =
+    let (pipe, stdout) =
       if (!toolchain = `MSVC || !toolchain = `MSVC64) && !verbose < 2 && not !dry_mode then
         try
           let (t, c) = open_temp_file "msvc" "stdout" in
@@ -1156,12 +1156,10 @@ let compile_if_needed file =
       | `LIGHTLD ->
           failwith "Compilation of C code is not supported for this toolchain"
     in
-    if !verbose >= 1 || !dry_mode then begin
-      Printf.printf "+ %s\n%!" cmd;
-      if pipe <> "" then
-        display_msvc_output file tmp_obj
-    end;
-    if (Sys.command cmd <> 0) then failwith "Error while compiling";
+    if !verbose >= 1 || !dry_mode then Printf.printf "+ %s\n%!" cmd;
+    let exit = if !dry_mode then 0 else Sys.command cmd in
+    if pipe <> "" then display_msvc_output stdout file;
+    if exit <> 0 then failwith "Error while compiling";
     tmp_obj
   end else
     file
