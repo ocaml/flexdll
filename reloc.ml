@@ -1107,16 +1107,39 @@ let setup_toolchain () =
   | `LIGHTLD ->
       search_path := !dirs
 
+let display_msvc_output file name =
+  let c = open_in file in
+  try
+    let first = input_line c in
+    if first <> name then
+      print_string first;
+    while true do
+      print_string (input_line c)
+    done
+  with _ ->
+    close_in c
+
 let compile_if_needed file =
   if Filename.check_suffix file ".c" then begin
     let tmp_obj = temp_file "dyndll" (ext_obj ()) in
+    let (pipe, file) =
+      if (!toolchain = `MSVC || !toolchain = `MSVC64) && !verbose < 2 && not !dry_mode then
+        try
+          let (t, c) = open_temp_file "msvc" "stdout" in
+          close_out c;
+          (Printf.sprintf " > %s" (Filename.quote t), t)
+        with _ ->
+          ("", "")
+      else
+        ("", "") in
     let cmd = match !toolchain with
       | `MSVC | `MSVC64 ->
           Printf.sprintf
-            "cl /c /MD /nologo /Fo%s %s %s"
+            "cl /c /MD /nologo /Fo%s %s %s%s"
             (Filename.quote tmp_obj)
             (mk_dirs_opt "/I")
             file
+            pipe
       | `CYGWIN | `CYGWIN64 ->
           Printf.sprintf
             "gcc -c -o %s %s %s"
@@ -1133,7 +1156,11 @@ let compile_if_needed file =
       | `LIGHTLD ->
           failwith "Compilation of C code is not supported for this toolchain"
     in
-    if !verbose >= 1 || !dry_mode then Printf.printf "+ %s\n%!" cmd;
+    if !verbose >= 1 || !dry_mode then begin
+      Printf.printf "+ %s\n%!" cmd;
+      if pipe <> "" then
+        display_msvc_output file tmp_obj
+    end;
     if (Sys.command cmd <> 0) then failwith "Error while compiling";
     tmp_obj
   end else
