@@ -52,9 +52,10 @@ let sect_data s =
         )
 
 let split_relocs page_size relocs =
-  let relocs = List.sort (fun (i, _) (j, _) -> compare i j) relocs in
+  let relocs = Array.of_list relocs in
+  Array.sort (fun (i, _) (j, _) -> compare i j) relocs;
   let blocks = ref [] and current_block = ref (ref []) and current_base = ref (-1l) in
-  List.iter
+  Array.iter
     (fun (rva, k) ->
       let base = Int32.mul (Int32.div rva page_size) page_size in
       let ofs = Int32.to_int (Int32.sub rva base) in

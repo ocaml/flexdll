@@ -3,6 +3,7 @@ Next version
 - Improve autodetection of WinSDK paths (patch by David Allsopp)
 - Add MSVC_DETECT Makefile variable which overrides all C Compiler detection logic when 0.
 - Add checkenv script which determines if the environment is sound specifying MSVC_DETECT=0
+- Improve performance of -builtin
 
 Version 0.34
 - New option -norelrelocs to check that no relative flexdll relocations are created (this ensures that the generated DLLs can be loaded at any address),
@@ -100,7 +101,7 @@ Version 0.14, released on 2008-28-01
 - support for a built-in linker
 
 Version 0.13, released on 2008-11-20
-- another technique to work around the lack of response file for gcc: 
+- another technique to work around the lack of response file for gcc:
   put the command line in an external bash script and apply bash to it
   (relies on the fact that Cygwin programs can call Cygwin programs
   with long command lines); this idea is from Xavier Leroy
@@ -149,7 +150,7 @@ Version 0.6, released on 2008-02-11
 
 Version 0.5, released on 2008-01-11
  - new -default-manifest option (always on, currently)
- - use a temp file name for getting the output of commands (allow 
+ - use a temp file name for getting the output of commands (allow
    several instances of flexlink to run in parallel)
 
 Version 0.4, released on 2008-01-02
@@ -163,8 +164,8 @@ Version 0.3, released on 2007-11-20
  - New -link option
 
 Version 0.2, released on 2007-11-06
- - New -maindll option (to build a DLL that contains the "main program" 
-   from FlexDLL's point of view) 
+ - New -maindll option (to build a DLL that contains the "main program"
+   from FlexDLL's point of view)
  - Can now explicitly enable/disable the use of cygpath (on by default
    only for Cygwin)
  - New -L xxx (or -Lxxx) option
