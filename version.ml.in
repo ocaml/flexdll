@@ -1,0 +1,3 @@
+let version = "@PACKAGE_VERSION@"
+let mingw_prefix = "@MINGW_PREFIX@"
+let mingw64_prefix = "@MINGW64_PREFIX@"

@@ -1,41 +1,14 @@
-VERSION = 0.34
-all: flexlink.exe support
-
-include $(shell cygpath -ad "$(shell ocamlopt -where)/Makefile.config")
-
-MINGW_PREFIX = i686-w64-mingw32
-MINCC = $(MINGW_PREFIX)-gcc
-
-MINGW64_PREFIX = x86_64-w64-mingw32
-MIN64CC = $(MINGW64_PREFIX)-gcc
-
-CYGWIN_PREFIX = i686-pc-cygwin
-CYGCC = $(CYGWIN_PREFIX)-gcc
-
-CYGWIN64_PREFIX = x86_64-pc-cygwin
-CYG64CC = $(CYGWIN64_PREFIX)-gcc
-
-.PHONY: version.ml
-version.ml:
-	echo "let version = \"$(VERSION)\"" > version.ml
-	echo "let mingw_prefix = \"$(MINGW_PREFIX)\"" >> version.ml
-	echo "let mingw64_prefix = \"$(MINGW64_PREFIX)\"" >> version.ml
-
-# Supported tool-chains
-
-CHAINS = mingw mingw64 cygwin cygwin64 msvc msvc64
-
-# Compilers
-
-# Attempt to locate the Windows SDK
-
 ifeq ($(findstring clean,$(MAKECMDGOALS)),)
-include Makefile.winsdk
+include Makefile.config
 endif
 
-Makefile.winsdk: findwinsdk
-	bash ./findwinsdk x86 > $@
-	bash ./findwinsdk x64 64 >> $@
+all: $(if $(filter-out no,$(HAVE_OCAMLOPT)),flexlink.exe) support
+
+ifneq ($(filter-out no,$(HAVE_OCAMLOPT)),)
+include $(shell cygpath -ad "$(shell ocamlopt -where)/Makefile.config")
+endif
+
+# Compilers
 
 MSVC_DETECT=1
 MSVC_FLAGS=/nologo /MD -D_CRT_SECURE_NO_DEPRECATE /GS-
@@ -47,38 +20,18 @@ MSVC64_PREFIX=
 MSVCC=cl.exe $(MSVC_FLAGS)
 MSVCC64=cl.exe $(MSVC_FLAGS)
 else
-ifeq ($(SDK),)
-# Otherwise, assume the 32-bit version of VS 2008 or Win7 SDK is in the path.
-
-MSVCC_ROOT := $(shell which cl.exe 2>/dev/null | cygpath -f - -ad | xargs -d \\n dirname 2>/dev/null | cygpath -f - -m)
-MSVC_LIB1 = $(shell dirname $(MSVCC_ROOT))
-MSVC_LIB2 = $(shell which ResGen.exe | cygpath -f - -ad | xargs -d \\n dirname | xargs -d \\n dirname | cygpath -f - -m)
-MSVC_LIB = $(MSVC_LIB1)/Lib;$(MSVC_LIB2)/Lib
-MSVC_INCLUDE = $(MSVC_LIB1)/Include;$(MSVC_LIB2)/Include
-MSVC_PREFIX=LIB="$(MSVC_LIB)" INCLUDE="$(MSVC_INCLUDE)" 
-
-MSVC64_LIB = $(MSVC_LIB1)/Lib/amd64;$(MSVC_LIB2)/Lib/x64
-MSVC64_PREFIX=LIB="$(MSVC64_LIB)" INCLUDE="$(MSVC_INCLUDE)" 
-
-MSVCC = $(MSVCC_ROOT)/cl.exe $(MSVC_FLAGS)
-MSVCC64 = $(MSVCC_ROOT)/amd64/cl.exe $(MSVC_FLAGS)
-else
-MSVCC_ROOT:=
-MSVC_PREFIX=PATH="$(SDK):$(PATH)" LIB="$(SDK_LIB);$(LIB)" INCLUDE="$(SDK_INC);$(INCLUDE)" 
-MSVC64_PREFIX=PATH="$(SDK64):$(PATH)" LIB="$(SDK64_LIB);$(LIB)" INCLUDE="$(SDK64_INC);$(INCLUDE)" 
+# Otherwise, use configured values
+MSVC_PREFIX=PATH="$(MSVS_PATH)$(PATH)" LIB="$(MSVS_LIB);$(LIB)" INCLUDE="$(MSVS_INC);$(INCLUDE)"
+MSVC64_PREFIX=PATH="$(MSVS64_PATH)$(PATH)" LIB="$(MSVS64_LIB);$(LIB)" INCLUDE="$(MSVS64_INC);$(INCLUDE)"
 
 MSVCC = cl.exe $(MSVC_FLAGS)
 MSVCC64 = cl.exe $(MSVC_FLAGS)
 endif
-endif
 
+ifeq ($(MSVS_DETECT),1)
 show_root:
-ifeq ($(MSVCC_ROOT),)
-	@echo "$(SDK)"
-	@echo "$(SDK_LIB)"
-else
-	@echo "$(MSVCC_ROOT)"
-	@echo "$(MSVC_LIB)"
+	@echo "$(MSVS_PATH)"
+	@echo "$(MSVS_LIB)"
 endif
 
 OCAMLOPT = ocamlopt
@@ -190,10 +143,11 @@ demo_msvc64:  flexlink.exe flexdll_msvc64.obj flexdll_initer_msvc64.obj
 	(cd test && $(MSVC64_PREFIX) $(MAKE) clean demo CHAIN=msvc64 CC="$(MSVCC64)" O=obj)
 
 distclean: clean
-	rm -f Makefile.winsdk
+	rm -f Makefile.config config.log config.status version.ml
+	rm -rf autom4te.cache
 
 clean:
-	rm -f *.obj *.o *.lib *.a *.exe *.opt *.cmx *.dll *.exp *.cmi *.cmo *~ version.res version.ml
+	rm -f *.obj *.o *.lib *.a *.exe *.opt *.cmx *.dll *.exp *.cmi *.cmo *~ version.res
 	cd test && $(MAKE) clean
 
 
@@ -203,8 +157,6 @@ COMMON_FILES = LICENSE README.md CHANGES flexdll.h flexdll.c flexdll_initer.c de
 URL = frisch@frisch.fr:www/flexdll/
 
 # Source packages
-
-PACKAGE = flexdll-$(VERSION).tar.gz
 
 package_src:
 	rm -Rf flexdll-$(VERSION)
@@ -266,3 +218,9 @@ upload_installer:
 
 upload_all:
 	$(MAKE) upload_src upload_bin installer upload_installer
+
+Makefile.config: Makefile.config.in configure
+	./configure
+
+configure: configure.ac
+	autoconf

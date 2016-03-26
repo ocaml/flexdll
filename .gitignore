@@ -10,4 +10,7 @@ flexlink.opt
 test/dump.exe
 version.res
 version.ml
-Makefile.winsdk
+Makefile.config
+autom4te.cache
+config.log
+config.status
