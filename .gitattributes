@@ -1,4 +1,6 @@
 * text=auto
 
-findwinsdk text eol=lf
+msvs-detect text eol=lf
 checkenv text eol=lf
+configure text eol=lf
+configure.ac text eol=lf
