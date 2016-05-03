@@ -1097,8 +1097,8 @@ let remove_duplicate_paths paths =
 
 let setup_toolchain () =
   let mingw_libs pre =
-    gcc := pre ^ "-gcc";
-    objdump := pre ^ "-objdump";
+    gcc := pre ^ "gcc";
+    objdump := pre ^ "objdump";
     let rec get_lib_search_dirs input =
       match input with
       | entry :: input ->

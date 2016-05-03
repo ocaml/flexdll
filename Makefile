@@ -3,17 +3,17 @@ all: flexlink.exe support
 
 include $(shell cygpath -ad "$(shell ocamlopt -where)/Makefile.config")
 
-MINGW_PREFIX = i686-w64-mingw32
-MINCC = $(MINGW_PREFIX)-gcc
+MINGW_PREFIX = i686-w64-mingw32-
+MINCC = $(MINGW_PREFIX)gcc
 
-MINGW64_PREFIX = x86_64-w64-mingw32
-MIN64CC = $(MINGW64_PREFIX)-gcc
+MINGW64_PREFIX = x86_64-w64-mingw32-
+MIN64CC = $(MINGW64_PREFIX)gcc
 
-CYGWIN_PREFIX = i686-pc-cygwin
-CYGCC = $(CYGWIN_PREFIX)-gcc
+CYGWIN_PREFIX = i686-pc-cygwin-
+CYGCC = $(CYGWIN_PREFIX)gcc
 
-CYGWIN64_PREFIX = x86_64-pc-cygwin
-CYG64CC = $(CYGWIN64_PREFIX)-gcc
+CYGWIN64_PREFIX = x86_64-pc-cygwin-
+CYG64CC = $(CYGWIN64_PREFIX)gcc
 
 .PHONY: version.ml
 version.ml:
