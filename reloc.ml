@@ -85,7 +85,9 @@ let get_output ?(use_bash = false) ?(accept_error=false) cmd =
       r
 
 let get_output1 ?use_bash cmd =
-  List.hd (get_output ?use_bash cmd)
+  match get_output ?use_bash cmd with
+  | output::_ -> output
+  | [] -> raise (Failure ("command " ^ cmd ^ " did not return any output"))
 
 
 (* Preparing command line *)
