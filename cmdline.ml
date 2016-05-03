@@ -252,6 +252,26 @@ let parse_cmdline () =
           with Not_found ->
             x :: tr rest
         end
+    | s::rest when String.length s  > 1 && s.[0] = '@' ->
+        let ic = open_in (String.sub s 1 (String.length s - 1)) in
+        let opts = ref [] in
+        begin
+          try
+            while true do
+              let fn = input_line ic in
+              if fn <> "" then
+                (* todo: better unquoting *)
+                let fn =
+                  if fn.[0] = '\"' && fn.[String.length fn - 1] = '\"'
+                  then String.sub fn 1 (String.length fn - 2)
+                  else fn
+                in
+                opts := fn :: !opts
+            done
+          with End_of_file -> ()
+        end;
+        close_in ic;
+        tr (List.rev_append !opts rest)
     | x :: rest -> x :: tr rest
     | [] -> []
   in
@@ -262,25 +282,6 @@ let parse_cmdline () =
   in
 
   let add_file s =
-    if s.[0] = '@' then
-      let ic = open_in (String.sub s 1 (String.length s - 1)) in
-      begin
-        try
-          while true do
-            let fn = input_line ic in
-            if fn <> "" then
-              (* todo: better unquoting *)
-              let fn =
-                if fn.[0] = '\"' && fn.[String.length fn - 1] = '\"'
-                then String.sub fn 1 (String.length fn - 2)
-                else fn
-              in
-              files := fn :: !files
-          done
-        with End_of_file -> ()
-      end;
-      close_in ic
-    else
        files := s :: !files
   in
   Arg.parse_argv (Array.of_list args) (Arg.align specs)
