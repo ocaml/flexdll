@@ -199,6 +199,9 @@ let specs = [
   "-link", Arg.String (fun s -> extra_args := s :: !extra_args),
   "<option> Next argument is passed verbatim to the linker";
 
+  "-g", Arg.Unit (fun () -> ()),
+  " (ignored)";
+
   "-D", Arg.String (fun _ -> ()),
   "<symbol> (Ignored)";
 
