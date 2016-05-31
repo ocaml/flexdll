@@ -1,4 +1,4 @@
-VERSION = 0.34
+VERSION = 0.35
 all: flexlink.exe support
 
 include $(shell cygpath -ad "$(shell ocamlopt -where)/Makefile.config")
@@ -55,17 +55,17 @@ MSVC_LIB1 = $(shell dirname $(MSVCC_ROOT))
 MSVC_LIB2 = $(shell which ResGen.exe | cygpath -f - -ad | xargs -d \\n dirname | xargs -d \\n dirname | cygpath -f - -m)
 MSVC_LIB = $(MSVC_LIB1)/Lib;$(MSVC_LIB2)/Lib
 MSVC_INCLUDE = $(MSVC_LIB1)/Include;$(MSVC_LIB2)/Include
-MSVC_PREFIX=LIB="$(MSVC_LIB)" INCLUDE="$(MSVC_INCLUDE)" 
+MSVC_PREFIX=LIB="$(MSVC_LIB)" INCLUDE="$(MSVC_INCLUDE)"
 
 MSVC64_LIB = $(MSVC_LIB1)/Lib/amd64;$(MSVC_LIB2)/Lib/x64
-MSVC64_PREFIX=LIB="$(MSVC64_LIB)" INCLUDE="$(MSVC_INCLUDE)" 
+MSVC64_PREFIX=LIB="$(MSVC64_LIB)" INCLUDE="$(MSVC_INCLUDE)"
 
 MSVCC = $(MSVCC_ROOT)/cl.exe $(MSVC_FLAGS)
 MSVCC64 = $(MSVCC_ROOT)/amd64/cl.exe $(MSVC_FLAGS)
 else
 MSVCC_ROOT:=
-MSVC_PREFIX=PATH="$(SDK):$(PATH)" LIB="$(SDK_LIB);$(LIB)" INCLUDE="$(SDK_INC);$(INCLUDE)" 
-MSVC64_PREFIX=PATH="$(SDK64):$(PATH)" LIB="$(SDK64_LIB);$(LIB)" INCLUDE="$(SDK64_INC);$(INCLUDE)" 
+MSVC_PREFIX=PATH="$(SDK):$(PATH)" LIB="$(SDK_LIB);$(LIB)" INCLUDE="$(SDK_INC);$(INCLUDE)"
+MSVC64_PREFIX=PATH="$(SDK64):$(PATH)" LIB="$(SDK64_LIB);$(LIB)" INCLUDE="$(SDK64_INC);$(INCLUDE)"
 
 MSVCC = cl.exe $(MSVC_FLAGS)
 MSVCC64 = cl.exe $(MSVC_FLAGS)
@@ -81,7 +81,10 @@ else
 	@echo "$(MSVC_LIB)"
 endif
 
-OCAMLOPT = ocamlopt
+OCAMLOPT = ocamlopt -g
+
+#OCAMLOPT += -strict-sequence -strict-formats -safe-string -w +A-9
+
 #OCAMLOPT = FLEXLINKFLAGS=-real-manifest ocamlopt
 #LINKFLAGS = unix.cmxa
 
@@ -105,14 +108,14 @@ LINKFLAGS = -cclib "-link $(RES)"
 endif
 
 support:
-	for i in $(CHAINS); do $(MAKE) build_$$i; done 
+	for i in $(CHAINS); do $(MAKE) build_$$i; done
 
 build_gnat: flexdll_gnat.o flexdll_initer_gnat.o
 build_msvc: flexdll_msvc.obj flexdll_initer_msvc.obj
 build_msvc64: flexdll_msvc64.obj flexdll_initer_msvc64.obj
-build_cygwin: flexdll_cygwin.o flexdll_initer_cygwin.o 
-build_cygwin64: flexdll_cygwin64.o flexdll_initer_cygwin64.o 
-build_mingw: flexdll_mingw.o flexdll_initer_mingw.o 
+build_cygwin: flexdll_cygwin.o flexdll_initer_cygwin.o
+build_cygwin64: flexdll_cygwin64.o flexdll_initer_cygwin64.o
+build_mingw: flexdll_mingw.o flexdll_initer_mingw.o
 build_mingw64: flexdll_mingw64.o flexdll_initer_mingw64.o
 
 OBJS = version.ml coff.ml cmdline.ml create_dll.ml reloc.ml
@@ -120,7 +123,7 @@ OBJS = version.ml coff.ml cmdline.ml create_dll.ml reloc.ml
 flexlink.exe: $(OBJS) $(RES)
 	@echo Building flexlink.exe with TOOLCHAIN=$(TOOLCHAIN)
 	rm -f flexlink.exe
-	$(RES_PREFIX) $(OCAMLOPT) -g -w -105 -o flexlink.exe $(LINKFLAGS) $(OBJS)
+	$(RES_PREFIX) $(OCAMLOPT) -o flexlink.exe $(LINKFLAGS) $(OBJS)
 
 version.res: version.rc
 	$(RES_PREFIX) rc version.rc
@@ -243,7 +246,7 @@ show_toolchain:
 	@echo Toolchain for the visible ocamlopt: $(TOOLCHAIN)
 
 swap:
-	NOMLFICORE=1 $(OCAMLOPT) -o flexlink-new.exe $(LINKFLAGS) $(OBJS)
+	$(OCAMLOPT) -o flexlink-new.exe $(LINKFLAGS) $(OBJS)
 	cp flexlink.exe flexlink.exe.bak
 	cp flexlink-new.exe flexlink.exe
 

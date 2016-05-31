@@ -8,6 +8,7 @@
 
 (* Create a DLL from a set of "closed" COFF files (no imported symbol). *)
 
+include (struct
 open Coff
 
 let (&&&) = Int32.logand
@@ -15,15 +16,10 @@ let (|||) = Int32.logor
 let (<<<) = Int32.shift_left
 
 let read_int32 s i =
-  Int32.of_int (Char.code s.[i]) |||
-  (Int32.of_int (Char.code s.[i+1]) <<< 8) |||
-  (Int32.of_int (Char.code s.[i+2]) <<< 16) |||
-  (Int32.of_int (Char.code s.[i+3]) <<< 24)
-
-let int32_to_buf b i =
-  for k = 0 to 3 do
-    Buffer.add_char b (Char.chr (Int32.to_int (Int32.shift_right i (k * 8)) land 0xff))
-  done
+  Int32.of_int (Char.code (Bytes.get s i)) |||
+  (Int32.of_int (Char.code (Bytes.get s (i+1))) <<< 8) |||
+  (Int32.of_int (Char.code (Bytes.get s (i+2))) <<< 16) |||
+  (Int32.of_int (Char.code (Bytes.get s (i+3))) <<< 24)
 
 let align x n =
   let k = Int32.rem x n in
@@ -43,7 +39,7 @@ let sect_data s =
   | `Buf _ -> assert false
   | `Lazy _ -> assert false
   | `Sxdata _ -> assert false
-  | `Uninit 0 -> ""
+  | `Uninit 0 -> Bytes.of_string ""
   | `Uninit size ->
       failwith
         (Printf.sprintf
@@ -84,9 +80,9 @@ let create_dll oc objs =
 
   (* msdos stub *)
   output_string oc "MZ";
-  for i = 3 to 0x3c do output_byte oc 0 done;
+  for _i = 3 to 0x3c do output_byte oc 0 done;
   emit_int32 oc 0xe8l; (* file offset of COFF file header, just here *)
-  for i = 0x40 to 0xe7 do output_byte oc 0 done;
+  for _i = 0x40 to 0xe7 do output_byte oc 0 done;
 
   let sections = Hashtbl.create 8 in
   let sec_id = ref 0 in
@@ -200,7 +196,7 @@ let create_dll oc objs =
     if !total <> 0l then put_sect bss
   in
 
-  let treat_sect name (l, sect) =
+  let treat_sect (l, sect) =
     let sect_len = ref 0 in
     let mk_sect s =
       let buf = Buf.create () in
@@ -208,16 +204,16 @@ let create_dll oc objs =
       let sec_ofs = !sect_len in
       info.sec_info_ofs <- Int32.of_int sec_ofs;
       let sdata = sect_data s in
-      let slen = String.length sdata in
+      let slen = Bytes.length sdata in
 
       let pad =
         if slen mod 16 = 0 then 0
         else 16 - slen mod 16
       in
-      sect_len := !sect_len + String.length sdata + pad;
-      Buf.string buf sdata;
+      sect_len := !sect_len + Bytes.length sdata + pad;
+      Buf.bytes buf sdata;
       if pad > 0 then
-        Buf.string buf (String.make pad '\000');
+        Buf.bytes buf (Bytes.make pad '\000');
 
       let mk_reloc r =
         (* rva of the target symbol *)
@@ -265,7 +261,7 @@ let create_dll oc objs =
   in
 
   Hashtbl.iter
-    (fun name x -> treat_sect name x)
+    (fun _name x -> treat_sect x)
     sections;
 
   (* create the export table *)
@@ -412,8 +408,12 @@ let create_dll oc objs =
   in
   let align_file () =
     let i = pos_out oc mod 0x200 in
-    if i <> 0 then for k = i + 1 to 0x200 do output_char oc '\000' done;
+    if i <> 0 then for _k = i + 1 to 0x200 do output_char oc '\000' done;
   in
   align_file ();
   patch_int32 oc size_of_headers (Int32.of_int (pos_out oc));
   List.iter (fun (data,_) -> align_file (); data ()) sects
+
+end : sig
+           val create_dll: out_channel -> Coff.coff list -> unit
+end)

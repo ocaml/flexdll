@@ -22,7 +22,7 @@ let objdump = ref "objdump"
 let is_crt_lib = function
   | "LIBCMT"
   | "MSVCRT" -> true
-  | fn -> false
+  | _ -> false
 
 let flexdir =
   try
@@ -102,11 +102,11 @@ let build_diversion lst =
   List.iter
     (fun f ->
       if f <> "" then begin
-        let s = Filename.quote f in
-        for i = 0 to String.length s - 1 do
-          if s.[i] = '\\' then s.[i] <- '/'
+        let s = Bytes.of_string (Filename.quote f) in
+        for i = 0 to Bytes.length s - 1 do
+          if Bytes.get s i = '\\' then Bytes.set s i '/'
         done;
-        output_string oc s; output_char oc '\n'
+        output_bytes oc s; output_char oc '\n'
       end)
     lst;
   close_out oc;
@@ -195,7 +195,7 @@ let find_file fn =
 let find_file =
   let memo = Hashtbl.create 16 in
   fun fn ->
-    let k = String.lowercase fn in
+    let k = String.lowercase_ascii fn in
     try Hashtbl.find memo k
     with Not_found ->
       try Hashtbl.find memo (k ^ ".lib")
@@ -293,7 +293,7 @@ let add_reloc_table obj obj_name p =
 
   (* TODO: use a single symbol per section *)
   let syms = ref [] in
-  let reloc sec secsym min max rel =
+  let reloc secsym min max rel =
     if p rel.symbol then (
       (* kind *)
       let kind = match !machine, rel.rtype with
@@ -362,7 +362,7 @@ let add_reloc_table obj obj_name p =
                     syms := s :: !syms;
                     s) in
 
-    sec.relocs <- filter (reloc sec sym min max) sec.relocs;
+    sec.relocs <- filter (reloc sym min max) sec.relocs;
     if (sec.sec_opts &&& 0x80000000l = 0l) && !min <= !max then
       nonwr := (!min,!max,Lazy.force sym) :: !nonwr
   in
@@ -382,7 +382,7 @@ let add_reloc_table obj obj_name p =
     !nonwr;
   int_to_buf data 0;
   int_to_buf data 0;
-  sect.data <- `String (Buffer.contents data);
+  sect.data <- `String (Buffer.to_bytes data);
   obj.sections <- sect :: obj.sections;
   obj.symbols <-
     (Symbol.export sname sect 0l) ::
@@ -396,7 +396,7 @@ let add_import_table obj imports =
   let ptr_size = match !machine with `x86 -> 4 | `x64 -> 8 in
   let sect = Section.create ".imptbl" 0xc0300040l in
   obj.sections <- sect :: obj.sections;
-  sect.data <- `String (String.make (ptr_size * List.length imports) '\000');
+  sect.data <- `String (Bytes.make (ptr_size * List.length imports) '\000');
   let i = ref 0 in
   List.iter
     (fun s ->
@@ -435,7 +435,7 @@ let add_export_table obj exports symname =
     )
     exports;
   strsym.value <- Int32.of_int (Buffer.length data);
-  let s = Buffer.contents data ^ Buffer.contents strings in
+  let s = Bytes.cat (Buffer.to_bytes data) (Buffer.to_bytes strings) in
   sect.data <- `String s;
   obj.sections <- sect :: obj.sections
 
@@ -455,16 +455,20 @@ let add_master_reloc_table obj names symname =
     )
     names;
   int_to_buf data 0;
-  sect.data <- `String (Buffer.contents data);
+  sect.data <- `String (Buffer.to_bytes data);
   obj.sections <- sect :: obj.sections
 
 
 
 let collect_dllexports obj =
   let dirs = Coff.directives obj in
-  let l = List.map (function  (_,x::_) -> x
-    | _ -> assert false)
-    (List.find_all (fun (cmd,args) -> String.uppercase cmd = "EXPORT") dirs)
+  let l =
+    List.map
+      (function
+        | (_,x::_) -> x
+        | _ -> assert false
+      )
+      (List.find_all (fun (cmd,_args) -> String.uppercase_ascii cmd = "EXPORT") dirs)
   in
   match !toolchain with
   | `MSVC | `MSVC64 -> List.map (drop_underscore obj) l
@@ -550,7 +554,7 @@ let build_dll link_exe output_file files exts extra_args =
     List.fold_left
       (fun (seen, accu) fn ->
          let fn = find_file fn in
-         let k = String.lowercase fn in
+         let k = String.lowercase_ascii fn in
          if StrSet.mem k seen then (seen, accu)
          else (StrSet.add k seen, fn :: accu)
       ) (StrSet.empty, []) files in
@@ -609,7 +613,7 @@ let build_dll link_exe output_file files exts extra_args =
       if not !builtin_linker && !use_default_libs && not !custom_crt then
         List.iter
           (fun (cmd, args) ->
-             if String.uppercase cmd = "DEFAULTLIB" then List.iter register_deflib args
+             if String.uppercase_ascii cmd = "DEFAULTLIB" then List.iter register_deflib args
           )
           (Coff.directives obj);
 
@@ -619,8 +623,8 @@ let build_dll link_exe output_file files exts extra_args =
         obj.symbols
 
     and collect_file fn =
-      if not (Hashtbl.mem collected (String.lowercase fn)) then begin
-        Hashtbl.replace collected (String.lowercase fn) ();
+      if not (Hashtbl.mem collected (String.lowercase_ascii fn)) then begin
+        Hashtbl.replace collected (String.lowercase_ascii fn) ();
         if !verbose >= 2 then Printf.printf "** open: %s\n" fn;
         collect_defined fn (Lib.read fn)
       end
@@ -641,7 +645,7 @@ let build_dll link_exe output_file files exts extra_args =
     in
     List.iter
       (fun (fn,x) ->
-         Hashtbl.replace collected (String.lowercase fn) ();
+         Hashtbl.replace collected (String.lowercase_ascii fn) ();
          collect_defined fn x
       )
       files;
@@ -694,7 +698,7 @@ let build_dll link_exe output_file files exts extra_args =
     StrSet.filter
       (fun s ->
          match check_prefix "__imp_" s with
-         | Some s' -> false
+         | Some _ -> false
          | None -> s <> "environ"  (* special hack for Cygwin64 *)
       )
       undefs
@@ -708,7 +712,7 @@ let build_dll link_exe output_file files exts extra_args =
 
   List.iter (fun s -> exported := StrSet.add (usym s) !exported) !defexports;
 
-  let record_obj name obj =
+  let record_obj obj =
     if !builtin_linker then ""
     else begin
       let fn = temp_file "dyndll" (ext_obj ()) in
@@ -741,7 +745,7 @@ let build_dll link_exe output_file files exts extra_args =
   let close_obj name imps obj =
     error_imports name imps;
     add_reloc name obj imps;
-    record_obj name obj
+    record_obj obj
   in
 
   let dll_exports = ref StrSet.empty in
@@ -846,7 +850,7 @@ let build_dll link_exe output_file files exts extra_args =
     close_out oc
   end else
 
-  let descr = record_obj "descriptor" obj in
+  let descr = record_obj obj in
   let files =
     List.flatten
       (List.map

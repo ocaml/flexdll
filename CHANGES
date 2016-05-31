@@ -9,6 +9,7 @@ Next version
 - Ignore "-g" (passed by OCaml when building ocamlrund) (patch by whitequark)
 - Uses gcc -print-search-dirs instead of gcc -print-sysroot when figuring out the default
   library search paths (patch by whitequark)
+- Modernize code for OCaml 4.03
 
 Version 0.34
 - New option -norelrelocs to check that no relative flexdll relocations are created (this ensures that the generated DLLs can be loaded at any address),
