@@ -1072,7 +1072,7 @@ let nsplit str sep =
     loop [] 0
 
 let normalize_path path =
-  let path = nsplit path Filename.dir_sep.[0] in
+  let path = nsplit path '/' in
   let rec loop acc path =
     match path with
     | "."  :: path -> loop acc path
@@ -1081,7 +1081,7 @@ let normalize_path path =
     | [] -> List.rev acc
   in
   let path = loop [] path in
-  String.concat Filename.dir_sep path
+  String.concat "/" path
 
 let remove_duplicate_paths paths =
   let set = Hashtbl.create 16 in
@@ -1116,12 +1116,16 @@ let setup_toolchain () =
       | [] -> []
     in
     let lib_search_dirs =
-      get_lib_search_dirs (get_output (!gcc ^ " -print-search-dirs"))
+      get_output (!gcc ^ " -print-search-dirs")
+      |> get_lib_search_dirs
       |> List.map normalize_path
       |> remove_duplicate_paths
-      |> List.filter (fun path -> Sys.file_exists path && Sys.is_directory path)
     in
     search_path := !dirs @ lib_search_dirs;
+    if !verbose >= 1  then begin
+      print_endline "lib search dirs:";
+      List.iter (Printf.printf "  %s\n%!") lib_search_dirs;
+    end;
     default_libs :=
       ["-lmingw32"; "-lgcc"; "-lmoldname"; "-lmingwex"; "-lmsvcrt";
        "-luser32"; "-lkernel32"; "-ladvapi32"; "-lshell32" ];
