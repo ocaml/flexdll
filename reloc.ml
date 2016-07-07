@@ -114,7 +114,6 @@ let build_diversion lst =
 
 type cmdline = {
     may_use_response_file: bool;
-    mutable too_long: bool;
   }
 
 let new_cmdline () =
@@ -124,8 +123,7 @@ let new_cmdline () =
   in
   {
    may_use_response_file = rf;
-   too_long = false;
- }
+  }
 
 let run_command cmdline cmd =
   let cmd_quiet =
@@ -135,7 +133,9 @@ let run_command cmdline cmd =
   in
   (* note: for Cygwin, using bash allow to follow symlinks to find
      gcc... *)
-  if cmdline.too_long || !toolchain = `CYGWIN || !toolchain = `CYGWIN64 then begin
+  if !toolchain = `CYGWIN || !toolchain = `CYGWIN64 ||
+     String.length cmd_quiet >= 8192
+  then begin
     (* Dump the command in a text file and apply bash to it. *)
     let (fn, oc) = open_temp_file "longcmd" "" in
     output_string oc cmd;
@@ -154,11 +154,8 @@ let quote_files cmdline lst =
   let s =
     String.concat " "
       (List.map (fun f -> if f = "" then f else Filename.quote f) lst) in
-  if String.length s >= 1024 then
-    if cmdline.may_use_response_file then Filename.quote (build_diversion lst)
-    else (cmdline.too_long <- true; s)
-  else
-    s
+  if String.length s >= 1024 && cmdline.may_use_response_file then Filename.quote (build_diversion lst)
+  else s
 
 
 (* Looking for files *)
