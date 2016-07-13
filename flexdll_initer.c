@@ -2,7 +2,7 @@
    FlexDLL
    Alain Frisch
 
-   Copyright 2007 Institut National de Recherche en Informatique et 
+   Copyright 2007 Institut National de Recherche en Informatique et
    en Automatique.
 
 ******************************************************************/
@@ -27,7 +27,8 @@ static int flexdll_init() {
   char *s = getenv("FLEXDLL_RELOCATE");
   if (!s) { fprintf(stderr, "Cannot find FLEXDLL_RELOCATE\n"); return FALSE; }
   sscanf(s,"%p",&sym);
-  if (sym && sym(&reloctbl)) return TRUE;
+  /* sym = 0 means "loaded not for execution" */
+  if (!sym || sym(&reloctbl)) return TRUE;
   return FALSE;
 }
 

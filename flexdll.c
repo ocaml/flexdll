@@ -75,6 +75,9 @@ static void *ll_dlopen(const char *libname, int for_execution) {
   HMODULE m;
   m = LoadLibraryEx(libname, NULL,
 		    for_execution ? 0 : DONT_RESOLVE_DLL_REFERENCES);
+  /* See https://blogs.msdn.microsoft.com/oldnewthing/20050214-00/?p=36463
+     Should use LOAD_LIBRARY_AS_DATAFILE instead of DONT_RESOLVE_DLL_REFERENCES? */
+
   /* Under Win 95/98/ME, LoadLibraryEx can fail in cases where LoadLibrary
      would succeed.  Just try again with LoadLibrary for good measure. */
   if (m == NULL) m = LoadLibrary(libname);
@@ -350,23 +353,23 @@ void *flexdll_dlopen(const char *file, int mode) {
   void *handle;
   dlunit *unit;
   char flexdll_relocate_env[256];
-
   int exec = (mode & FLEXDLL_RTLD_NOEXEC ? 0 : 1);
+  void* relocate = (exec ? &flexdll_relocate : 0);
 
   error = 0;
   if (!file) return &main_unit;
 
 #ifdef CYGWIN
-  sprintf(flexdll_relocate_env,"%p",&flexdll_relocate);
+  sprintf(flexdll_relocate_env,"%p",relocate);
   setenv("FLEXDLL_RELOCATE", flexdll_relocate_env, 1);
 #else
 #if __STDC_SECURE_LIB__ >= 200411L
-  sprintf(flexdll_relocate_env,"%p",&flexdll_relocate);
+  sprintf(flexdll_relocate_env,"%p",relocate);
   _putenv_s("FLEXDLL_RELOCATE", flexdll_relocate_env);
 #else
   {
     char* s;
-    sprintf(flexdll_relocate_env,"FLEXDLL_RELOCATE=%p",&flexdll_relocate);
+    sprintf(flexdll_relocate_env,"FLEXDLL_RELOCATE=%p",relocate);
     s = malloc(strlen(flexdll_relocate_env) + 1);
     strcpy(s, flexdll_relocate_env);
     putenv(s);

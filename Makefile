@@ -250,11 +250,11 @@ swap:
 	cp flexlink.exe flexlink.exe.bak
 	cp flexlink-new.exe flexlink.exe
 
-#PREFIX = "C:\Program Files\flexdll"
-#
-#install:
-#	mkdir -p $(PREFIX)
-#	cp $(COMMON_FILES) flexlink.exe flexdll_*.obj flexdll_*.o $(PREFIX)
+PREFIX = "C:\Program Files (x86)\flexdll"
+
+install:
+	mkdir -p $(PREFIX)
+	cp $(COMMON_FILES) flexlink.exe flexdll_*.obj flexdll_*.o $(PREFIX)
 
 installer:
 	rm -rf flexdll_install_files
