@@ -43,7 +43,7 @@ About
 -----
 
 FlexDLL is distributed under the terms of a zlib/libpng open source
-[license](flexdll/LICENSE). The copyright holder is the Institut
+[license](LICENSE). The copyright holder is the Institut
 National de Recherche en Informatique et en Automatique (INRIA). The
 project was started when I (= Alain Frisch) was working at INRIA. I'm
 now working for [LexiFi](http://www.lexifi.com), which is kind enough to
@@ -51,7 +51,7 @@ let me continue my work on FlexDLL. My office mate at INRIA,
 Jean-Baptiste Tristan, coined the name FlexDLL.
 
 The runtime support library is written in C. The **`flexlink`** wrapper
-is implemented in the wonderful [Objective Caml](http://caml.inria.fr)
+is implemented in the wonderful [OCaml](http://ocaml.org)
 language.
 
 Supported toolchains
@@ -85,7 +85,7 @@ Download
 -   [Binary release 0.34 (.zip
     file)](http://alain.frisch.fr/flexdll/flexdll-bin-0.34.zip).
 
--   [Changelog](http://alain.frisch.fr/flexdll/CHANGES).
+-   [Changelog](CHANGES).
 
 -   [Development version on
     github](https://github.com/alainfrisch/flexdll).
@@ -96,7 +96,7 @@ resulting directory (e.g. `C:\Program Files\flexdll` or
 directory by hand and unzip the .zip file in it.
 
 **Compiling from sources:** To compile the code from sources, you'll
-need a working installation of Objective Caml, GNU Make, and a C
+need a working installation of OCaml, GNU Make, and a C
 toolchain (compiler + linker) either the one from Microsoft (any version
 of Visual Studio should work), Cygwin, or Mingw. It is probably a good
 idea to use a native version of ocamlopt (not the Cygwin port) to
@@ -119,7 +119,6 @@ Let's see a simple example of a plugin. Here is the code for the main
 program (file **`dump.c`**):
 
 ````
-
     #include <stdlib.h>
     #include "flexdll.h"
 
@@ -144,7 +143,6 @@ program (file **`dump.c`**):
       }
       exit(0);
     }
-
 ````
 
 This application opens in turn all the DLLs given on its command line,
@@ -433,7 +431,7 @@ initialization for the C runtime library, invoke the code that has to be
 run automatically at load time (e.g for C++: constructors of static
 objects, or right-hand sides of non-constant initializers for global
 variables), and then call the function
-[`DllMain`](%20http://msdn2.microsoft.com/en-us/library/ms682583.aspx),
+[`DllMain`](http://msdn2.microsoft.com/en-us/library/ms682583.aspx),
 which by default does nothing but can be overidden by the program to
 perform custom initialization of the DLL.
 
@@ -661,7 +659,7 @@ Real-world examples
 
 Please let me know if you use FlexDLL!
 
-### Dynamic loading for Objective Caml
+### Dynamic loading for OCaml
 
 The initial motivation for FlexDLL was to add dynamic linking of native
 code to Windows ports of [OCaml](http://caml.inria.fr) (Cygwin, MinGW,
