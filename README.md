@@ -9,7 +9,7 @@ generally used to improve code modularity and sharing. A DLL can be
 loaded automatically when the program is loaded (if it requires the
 DLL). The program can also explicitly request Windows to load a DLL at
 any moment during runtime, using the
-[`LoadLibrary`](http://msdn.microsoft.com/library/default.asp?url=/library/en-us/dllproc/base/loadlibrary.asp)
+[`LoadLibrary`](https://msdn.microsoft.com/en-us/library/windows/desktop/ms684175(v=vs.85).aspx)
 function from the Win32 API.
 
 This naturally suggests to use DLLs as a plugin mechanism. For instance,
@@ -157,7 +157,6 @@ This main program can be compiled and linked like the commands below
 (the **`[...]`** refers to the directory where FlexDLL is installed).
 
 ````
-
     # MSVC
     cl /nologo /MD -I[...] -c dump.c
     flexlink -chain msvc -exe -o dump.exe dump.obj
@@ -169,7 +168,6 @@ This main program can be compiled and linked like the commands below
     # CYGWIN
     gcc -I[...] -c dump.c
     flexlink -chain cygwin -exe -o dump.exe dump.o
-
 ````
 
 The compilation step is completely standard, but in order to link the
@@ -181,11 +179,9 @@ must produce a stand-alone application (not a DLL).
 Now we can provide a first plugin (file **`plug1.c`**):
 
 ````
-
     int x = 3;
     void dump_x() { printf("x=%i\n", x); }
     void torun() { api("plug1.torun();"); }
-
 ````
 
 Note that the plugin uses the **`api`** symbol from the main application
@@ -194,7 +190,6 @@ You can compile and link this plugin (into a DLL) with the followind
 commands:
 
 ````
-
     # MSVC
     cl /nologo /MD -c plug1.c
     flexlink -chain msvc -o plug1.dll plug1.obj
@@ -206,23 +201,19 @@ commands:
     # CYGWIN
     gcc -D_CYGWIN_  -c plug1.c
     flexlink -chain cygwin -o plug1.dll plug1.o
-
 ````
 
 And now you can ask the main program to load the plugin:
 
 ````
-
     $ ./dump plug1.dll
     API: plug1.torun();
-
 ````
 
 Here is the code for a second plugin (file **`plug2.c`**) that refers to
 symbols (a function and a global variable) defined in the first plugin:
 
 ````
-
     extern int x;
 
     void torun() {
@@ -232,13 +223,11 @@ symbols (a function and a global variable) defined in the first plugin:
       x = 100;
       dump_x();
     }
-
 ````
 
 Since the second plugin depends on the first one, you need to load both:
 
 ````
-
     $ ./dump plug2.dll
     error: Cannot resolve dump_x
     $ ./dump plug1.dll plug2.dll;
@@ -246,7 +235,6 @@ Since the second plugin depends on the first one, you need to load both:
     API: plug2.torun();
     x=3
     x=100
-
 ````
 
 Simple, isn't it? No **`declspec`** declaration, no import library to
@@ -277,11 +265,9 @@ such imported symbols by adding the **`-show-imports`** option to the
 **`flexlink`** command line:
 
 ````
-
     $ ../flexlink -chain msvc -o plug1.dll plug1.obj -show-imports
     ** Imported symbols for plug1.obj:
     _api
-
 ````
 
 When the **`flexdll_dlopen`** function opens this DLL, it will look for
@@ -294,7 +280,6 @@ defined in the main program. Indeed, when you link the main program with
 contains a symbol table, mapping symbol names to their addresses.
 
 ````
-
     $ ../flexlink -chain msvc -exe -o dump.exe dump.obj -show-exports
     ** Exported symbols:
     _api
@@ -305,7 +290,6 @@ contains a symbol table, mapping symbol names to their addresses.
     _flexdll_dump_exports
     _flexdll_dump_relocations
     _main
-
 ````
 
 As you can see, all the global symbols (including those that comes from
@@ -318,7 +302,6 @@ mentions symbols defined in previously loaded DLLs (for which the
 produce an import table for DLLs, but also an export table:
 
 ````
-
     $ ../flexlink -chain msvc -o plug1.dll plug1.obj -show-imports -show-exports
     ** Imported symbols for plug1.obj:
     _api
@@ -334,7 +317,6 @@ produce an import table for DLLs, but also an export table:
     _x
     ** Exported symbols:
     _torun
-
 ````
 
 How does FlexDLL determine which symbols as imported or exported? It
@@ -370,17 +352,13 @@ C compilers under Windows support a special declaration of external
 symbols. You can write:
 
 ````
-
     __declspec(dllimport) extern int mysymbol;
-
 ````
 
 Internally, this declaration has the same effect as declaring:
 
 ````
-
     extern int *_imp__mysymbol;
-
 ````
 
 and using **`&x`** instead of **`x`** everywhere in the current unit. In
@@ -394,9 +372,7 @@ entry for **`_imp__XXX`** in the import table. Instead, it adds the
 equivalent of the following declaration:
 
 ````
-
     void *_imp__XXX = &XXX;
-
 ````
 
 If the symbol **`XXX`** itself is not available, this will in turn
@@ -456,7 +432,6 @@ The API
 Here is the content of the **`flexdll.h`** file:
 
 ````
-
     #define FLEXDLL_RTLD_GLOBAL 0x0001
     #define FLEXDLL_RTLD_LOCAL  0x0000
     #define FLEXDLL_RTLD_NOEXEC 0x0002
@@ -468,7 +443,6 @@ Here is the content of the **`flexdll.h`** file:
 
     void flexdll_dump_exports(void *);
     void flexdll_dump_relocations(void *);
-
 ````
 
 The **`flexdll_dl*`** functions are mostly compatible with their POSIX
@@ -530,8 +504,6 @@ Command line for the flexlink wrapper
 -------------------------------------
 
 ````
-
-
     Usage:
       flexlink -o <result.dll> file1.obj file2.obj ... -- <extra linker arguments>
 
@@ -576,7 +548,6 @@ Command line for the flexlink wrapper
       --                  Following arguments are passed verbatim to the linker
       -help               Display this list of options
       --help              Display this list of options
-
 ````
 
 The files given on the command line can be object files (.obj/.o),
@@ -662,7 +633,7 @@ Please let me know if you use FlexDLL!
 ### Dynamic loading for OCaml
 
 The initial motivation for FlexDLL was to add dynamic linking of native
-code to Windows ports of [OCaml](http://caml.inria.fr) (Cygwin, MinGW,
+code to Windows ports of [OCaml](http://ocaml.org) (Cygwin, MinGW,
 MSVC). A side-effect was to simplify the dynamic loading of C libraries
 (e.g. for the toplevel) and to make it work under the Cygwin port, to
 simplify Makefiles of libraries (now shared between Unix and Windows
@@ -672,15 +643,10 @@ ports), and to create a native toplevel.
 Links
 -----
 
--   [Microsoft Portable Executable and Common Object File Format
-    Specification](http://www.microsoft.com/whdc/system/platform/firmware/PECOFF.mspx).
+- [Microsoft Portable Executable and Common Object File Format Specification](http://www.microsoft.com/whdc/system/platform/firmware/PECOFF.mspx).
 
+- [Enhanced Dynamic Linking Library for MinGW under MS-Windows (edll)](http://edll.sourceforge.net/).
 
--   [Enhanced Dynamic Linking Library for MinGW under MS-Windows
-    (edll)](http://edll.sourceforge.net/).
-
-
--   [dlopen
-    (POSIX)](http://www.opengroup.org/onlinepubs/009695399/functions/dlopen.html).
+- [dlopen (POSIX)](http://www.opengroup.org/onlinepubs/009695399/functions/dlopen.html).
 
 - [DllMain](http://msdn2.microsoft.com/en-us/library/ms682583.aspx).
