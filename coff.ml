@@ -336,7 +336,7 @@ module Symbol = struct
       section = `Num (int16 buf 12);
       stype = int16 buf 14;
       storage = int8 buf 16;
-      auxn;
+      auxn = auxn;
       auxs = read ic (pos + 18) (18 * auxn);
       extra_info = `None;
     }
@@ -380,7 +380,7 @@ module Symbol = struct
           Printf.printf "extern\n"
       | { storage = 2; section = `Num 0; value = n } ->
           Printf.printf "common symbol, size %ld\n" n
-      | { storage = 3; value = 0l; auxn } when auxn > 0 ->
+      | { storage = 3; value = 0l; auxn = auxn } when auxn > 0 ->
           Printf.printf "section %s, num %i, select %i\n" sect
             (int16 s.auxs 12)
             (int8 s.auxs 14)
@@ -443,7 +443,7 @@ module Reloc = struct
       | `x86 -> 0x06
       | `x64 -> 0x01
     in
-    sec.relocs <- { addr; symbol = sym; rtype } :: sec.relocs
+    sec.relocs <- { addr = addr; symbol = sym; rtype = rtype } :: sec.relocs
 
   let rel32 machine sec addr sym =
     let rtype =
@@ -451,7 +451,7 @@ module Reloc = struct
       | `x86 -> 0x14
       | `x64 -> 0x04
     in
-    sec.relocs <- { addr; symbol = sym; rtype } :: sec.relocs
+    sec.relocs <- { addr = addr; symbol = sym; rtype = rtype } :: sec.relocs
 
   let get symtbl va ic base =
     let buf = read ic base 10 in
@@ -527,8 +527,8 @@ module Section = struct
       sec_name = name;
       vsize = int32 buf 8;
       vaddress = 0l;
-      data;
-      relocs;
+      data = data;
+      relocs = relocs;
       sec_opts = int32 buf 36
     }
 
@@ -614,7 +614,7 @@ module Coff = struct
       | `x86 -> 0x14c
     in
     { obj_name = "generated";
-      machine; date = 0x4603de0el;
+      machine = machine; date = 0x4603de0el;
       sections = []; symbols = []; opts = 0 }
 
   let parse_directives s =
@@ -715,7 +715,7 @@ module Coff = struct
                    | Some s' -> s.extra_info <- `Alias s'
                    | None -> assert false
                  with Invalid_argument _ -> assert false);
-            | { storage = 3; stype = 0; auxn } when auxn > 0 ->
+            | { storage = 3; stype = 0; auxn = auxn } when auxn > 0 ->
                 (* section def *)
                 let num = int16 s.auxs 12 in
                 let sel = int8 s.auxs 14 in
@@ -727,7 +727,7 @@ module Coff = struct
                      assert false);
             | { storage = 103 }
             | { auxn = 0 } -> ()
-            | { storage = (2|3); stype = 0x20; auxn = 1; auxs } ->
+            | { storage = (2|3); stype = 0x20; auxn = 1; auxs = auxs } ->
                 (* Remove extra information for function symbols *)
                 s.auxs <- Bytes.make (Bytes.length auxs) '\000'
             | _ ->
@@ -746,7 +746,7 @@ module Coff = struct
       machine = int16 buf 0;
       sections = Array.to_list sections;
       date = int32 buf 4;
-      symbols;
+      symbols = symbols;
       opts = int16 buf 18;
     }
 

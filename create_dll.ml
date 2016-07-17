@@ -134,7 +134,7 @@ let create_dll oc objs =
 
       List.iter
         (function
-          | {sym_name=name; value=ofs; storage; section = `Section s} as sym when s.sec_pos >= 0 ->
+          | {sym_name=name; value=ofs; storage=storage; section = `Section s} as sym when s.sec_pos >= 0 ->
               let info = Hashtbl.find sec_info s.sec_pos in
               let rva = lazy (Int32.add ofs (Lazy.force info.sec_info_vaddress)) in
               if storage = 2
