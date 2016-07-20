@@ -511,7 +511,12 @@ let dll_exports fn = match !toolchain with
 
 let patch_output output_file =
   match !stack_reserve with
-  | Some x -> Stacksize.set_stack_reserve output_file x
+  | Some x ->
+      begin try Stacksize.set_stack_reserve output_file x
+      with exn ->
+        Printf.eprintf "Cannot set stack reserve: %s"
+          (Printexc.to_string exn)
+      end
   | None -> ()
 
 
@@ -1023,9 +1028,8 @@ let build_dll link_exe output_file files exts extra_args =
         failwith "Error while merging the manifest";
       safe_remove manifest_file;
     end;
-
     patch_output output_file
-  end
+ end
 
 let ends_with s suf =
   let rec aux s suf suflen offset i =

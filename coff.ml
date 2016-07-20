@@ -934,6 +934,10 @@ end
 
 module Stacksize = struct
   let set_stack_reserve filename reserve =
+    let filename =
+      if not (Sys.file_exists filename) && (Sys.file_exists (filename ^ ".exe")) then filename ^ ".exe"
+      else filename
+    in
     let ic = open_in_bin filename in
     let hdr_offset = int16 (read ic 0x3c 2) 0 in
     let pe_signature = read_str ic hdr_offset 4 in
