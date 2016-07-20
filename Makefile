@@ -2,6 +2,7 @@ VERSION = 0.35
 all: flexlink.exe support
 
 include $(shell cygpath -ad "$(shell ocamlopt -where)/Makefile.config")
+OCAML_VERSION:=$(shell ocamlopt -version|sed -e "s/+.*//" -e "s/\.//g")
 
 MINGW_PREFIX = i686-w64-mingw32-
 MINCC = $(MINGW_PREFIX)gcc
@@ -15,8 +16,7 @@ CYGCC = $(CYGWIN_PREFIX)gcc
 CYGWIN64_PREFIX = x86_64-pc-cygwin-
 CYG64CC = $(CYGWIN64_PREFIX)gcc
 
-.PHONY: version.ml
-version.ml:
+version.ml: Makefile
 	echo "let version = \"$(VERSION)\"" > version.ml
 	echo "let mingw_prefix = \"$(MINGW_PREFIX)\"" >> version.ml
 	echo "let mingw64_prefix = \"$(MINGW64_PREFIX)\"" >> version.ml
@@ -118,10 +118,19 @@ build_cygwin64: flexdll_cygwin64.o flexdll_initer_cygwin64.o
 build_mingw: flexdll_mingw.o flexdll_initer_mingw.o
 build_mingw64: flexdll_mingw64.o flexdll_initer_mingw64.o
 
-OBJS = version.ml coff.ml cmdline.ml create_dll.ml reloc.ml
+OBJS = version.ml Compat.ml coff.ml cmdline.ml create_dll.ml reloc.ml
+
+COMPILER-$(OCAML_VERSION):
+	rm -f COMPILER-*
+	touch COMPILER-$(OCAML_VERSION)
+
+test_ver = $(shell if [ $(OCAML_VERSION) -lt $(1) ] ; then echo lt ; fi)
+
+Compat.ml: COMPILER-$(OCAML_VERSION) $(if $(call test_ver,4030),Compat403.ml) $(if $(call test_ver,4020),Compat402.ml)
+	cat $^ > $@
 
 flexlink.exe: $(OBJS) $(RES)
-	@echo Building flexlink.exe with TOOLCHAIN=$(TOOLCHAIN)
+	@echo Building flexlink.exe with TOOLCHAIN=$(TOOLCHAIN) for OCaml $(OCAML_VERSION)
 	rm -f flexlink.exe
 	$(RES_PREFIX) $(OCAMLOPT) -o flexlink.exe $(LINKFLAGS) $(OBJS)
 
@@ -196,7 +205,7 @@ distclean: clean
 	rm -f Makefile.winsdk
 
 clean:
-	rm -f *.obj *.o *.lib *.a *.exe *.opt *.cmx *.dll *.exp *.cmi *.cmo *~ version.res version.ml
+	rm -f *.obj *.o *.lib *.a *.exe *.opt *.cmx *.dll *.exp *.cmi *.cmo *~ version.res version.ml COMPILER-* Compat.ml
 	cd test && $(MAKE) clean
 
 
@@ -213,7 +222,7 @@ package_src:
 	rm -Rf flexdll-$(VERSION)
 	mkdir flexdll-$(VERSION)
 	mkdir flexdll-$(VERSION)/test
-	cp -a *.ml Makefile $(COMMON_FILES) version.rc flexdll-$(VERSION)/
+	cp -a $(filter-out Compat.ml,$(wildcard *.ml)) Makefile $(COMMON_FILES) version.rc flexdll-$(VERSION)/
 	cp -aR test/Makefile test/*.c flexdll-$(VERSION)/test/
 	tar czf $(PACKAGE) flexdll-$(VERSION)
 	rm -Rf flexdll-$(VERSION)
