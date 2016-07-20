@@ -9,7 +9,7 @@ Next version
 - Ignore "-g" (passed by OCaml when building ocamlrund) (patch by whitequark)
 - Uses gcc -print-search-dirs instead of gcc -print-sysroot when figuring out the default
   library search paths (patch by whitequark)
-- Modernize code for OCaml 4.03
+- Modernize code for OCaml 4.03 (patch for compatibility layers for earlier versions by David Allsopp)
 - Better support for long command line when calling the toolchain linker
 - Do not perform relocation from the DLL entry point when the DLL is loaded in "not for
   execution mode" (http://caml.inria.fr/mantis/view.php?id=7268)

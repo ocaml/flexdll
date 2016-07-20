@@ -51,7 +51,7 @@ let usage_msg =
     Version.version
 
 let footer =
-{|Notes:
+"Notes:
 * The -I, -l and -L options do not need to be separated from their argument.
 * An option like /linkXXX is an abbrevation for '-link XXX'.
 * FlexDLL's object files are searched by default in the same directory as
@@ -59,7 +59,7 @@ let footer =
   if it is defined.
 * Extra argument can be passed in the environment variable FLEXLINKFLAGS.
 
-Homepage: http://alain.frisch.fr/flexdll.html|}
+Homepage: http://alain.frisch.fr/flexdll.html"
 
 let specs = [
   "-o", Arg.Set_string output_file,
