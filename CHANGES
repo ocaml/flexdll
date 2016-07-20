@@ -13,6 +13,7 @@ Next version
 - Better support for long command line when calling the toolchain linker
 - Do not perform relocation from the DLL entry point when the DLL is loaded in "not for
   execution mode" (http://caml.inria.fr/mantis/view.php?id=7268)
+- Fix -stack for Cygwin (when the resulting executable is called XXX.exe, not XXX)
 
 Version 0.34
 - New option -norelrelocs to check that no relative flexdll relocations are created (this ensures that the generated DLLs can be loaded at any address),
