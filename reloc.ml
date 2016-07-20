@@ -163,10 +163,13 @@ let quote_files cmdline lst =
 let cygpath l =
   get_output (Printf.sprintf "cygpath -m %s" (String.concat " " (List.map Filename.quote l)))
 
+let cygpath1 fn =
+  get_output1 (Printf.sprintf "cygpath -m %s" fn)
+
 let file_exists fn =
   if Sys.file_exists fn && not (Sys.is_directory fn) then Some fn
   else if !use_cygpath && Sys.file_exists (fn ^ ".lnk") then
-    Some (get_output1 (Printf.sprintf "cygpath -m %s" fn))
+    Some (cygpath1 fn)
   else None
 
 let rec find_file_in = function
@@ -509,10 +512,18 @@ let dll_exports fn = match !toolchain with
       parse_dll_exports dmp
 
 
-let patch_output output_file =
+let patch_output filename =
   match !stack_reserve with
   | Some x ->
-      begin try Stacksize.set_stack_reserve output_file x
+      let filename =
+        if not (Sys.file_exists filename) && (Sys.file_exists (filename ^ ".exe")) then filename ^ ".exe"
+        else filename
+      in
+      let filename =
+        if !use_cygpath then cygpath1 filename
+        else filename
+      in
+      begin try Stacksize.set_stack_reserve filename x
       with exn ->
         Printf.eprintf "Cannot set stack reserve: %s"
           (Printexc.to_string exn)
