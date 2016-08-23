@@ -1,4 +1,4 @@
-Next version
+Version 0.35
 - Fixes for clang (patch by Roven Gabriel)
 - Improve autodetection of WinSDK paths (patch by David Allsopp)
 - Add MSVC_DETECT Makefile variable which overrides all C Compiler detection logic when 0.

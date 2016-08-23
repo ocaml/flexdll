@@ -74,21 +74,17 @@ LD: an internal linker to produce .dll (only).
 Download
 --------
 
--   [Binary release 0.34 (self-extracting
-    installer)](http://alain.frisch.fr/flexdll/flexdll-0.34-setup.exe).
+-   [Source releases](https://github.com/alainfrisch/flexdll/releases).
 
+-   [Binary release 0.35 (self-extracting
+    installer)](http://alain.frisch.fr/flexdll/flexdll-0.35-setup.exe).
 
--   [Source release 0.34 (.tar.gz
-    file)](http://alain.frisch.fr/flexdll/flexdll-0.34.tar.gz).
+-   [Binary release 0.35 (.zip
+    file)](http://alain.frisch.fr/flexdll/flexdll-bin-0.35.zip).
 
-
--   [Binary release 0.34 (.zip
-    file)](http://alain.frisch.fr/flexdll/flexdll-bin-0.34.zip).
+-   [Development version](https://github.com/alainfrisch/flexdll).
 
 -   [Changelog](CHANGES).
-
--   [Development version on
-    github](https://github.com/alainfrisch/flexdll).
 
 **Installation instructions:** Simply run the installer and add the
 resulting directory (e.g. `C:\Program Files\flexdll` or
