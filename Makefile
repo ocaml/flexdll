@@ -2,7 +2,11 @@ VERSION = 0.35
 all: flexlink.exe support
 
 include $(shell cygpath -ad "$(shell ocamlopt -where)/Makefile.config")
+OCAMLOPT=ocamlopt
 OCAML_VERSION:=$(shell $(OCAMLOPT) -version|sed -e "s/+.*//" -e "s/\.//g")
+ifeq ($(OCAML_VERSION),)
+OCAML_VERSION:=0
+endif
 
 MINGW_PREFIX = i686-w64-mingw32-
 MINCC = $(MINGW_PREFIX)gcc
