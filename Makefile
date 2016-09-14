@@ -222,7 +222,7 @@ package_src:
 	rm -Rf flexdll-$(VERSION)
 	mkdir flexdll-$(VERSION)
 	mkdir flexdll-$(VERSION)/test
-	cp -a $(filter-out Compat.ml version.ml,$(OBJS) $(shell git ls-files Compat*.ml)) Makefile $(COMMON_FILES) version.rc flexdll-$(VERSION)/
+	cp -a $(filter-out Compat.ml version.ml,$(OBJS) $(shell git ls-files Compat*.ml)) Makefile findwinsdk $(COMMON_FILES) version.rc flexdll-$(VERSION)/
 	cp -aR test/Makefile test/*.c flexdll-$(VERSION)/test/
 	tar czf $(PACKAGE) flexdll-$(VERSION)
 	rm -Rf flexdll-$(VERSION)
