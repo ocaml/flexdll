@@ -1,0 +1,17 @@
+lib: ["flexdll.h"]
+share: [
+  "cmdline.ml"
+  "coff.ml"
+  "create_dll.ml"
+  "reloc.ml"
+  "Compat402.ml"
+  "Compat403.ml"
+  "version.rc"
+  "Makefile"
+  "findwinsdk"
+  "flexdll.h"
+  "flexdll.c"
+  "flexdll_initer.c"
+  "default.manifest"
+  "default_amd64.manifest"
+]

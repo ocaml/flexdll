@@ -2,3 +2,4 @@
 
 findwinsdk text eol=lf
 checkenv text eol=lf
+assemble.sh text eol=lf

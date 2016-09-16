@@ -1,4 +1,4 @@
-VERSION = 0.35
+VERSION = 0.36
 all: flexlink.exe support
 
 include $(shell cygpath -ad "$(shell ocamlopt -where)/Makefile.config")
@@ -210,7 +210,7 @@ demo_msvc64:  flexlink.exe flexdll_msvc64.obj flexdll_initer_msvc64.obj
 	(cd test && $(MSVC64_PREFIX) $(MAKE) clean demo CHAIN=msvc64 CC="$(MSVCC64)" O=obj)
 
 distclean: clean
-	rm -f Makefile.winsdk
+	rm -rf Makefile.winsdk opam
 
 clean:
 	rm -f *.obj *.o *.lib *.a *.exe *.opt *.cmx *.dll *.exp *.cmi *.cmo *~ version.res version.ml version.rc COMPILER-* Compat.ml
@@ -286,3 +286,40 @@ upload_installer:
 
 upload_all:
 	$(MAKE) upload_src upload_bin installer upload_installer
+
+tag_release:
+	git tag -a $(VERSION) -m "Version $(VERSION)"
+
+# OPAM Targets
+# On master, at any given point, VERSION in Makefile should be the version in development
+# Release procedure:
+#   make tag_release
+#   make upload_bin upload_src
+#   make opam_release
+#   make OPAMREPO=/path/to/opam-repository/clone opam
+#   make bump_version
+#   Review and commit changes to version numbers
+
+# Override this on the command line when maintaining on Unix
+UNIX2DOS=| sed -e "s/$$/\\r/"
+
+# Update flexdll.opam with the most current binary release zip
+opam_release:
+	@sed -i -e 's/-bin-.*/-bin-$(VERSION).zip" "$(shell wget -qO - http://alain.frisch.fr/flexdll/flexdll-bin-$(VERSION).zip | md5sum | sed -e "s/ .*//")"/' $(UNIX2DOS) flexdll.opam
+
+# Create the flexdll and flexlink packages for $(VERSION)
+OPAMREPO=./opam
+.PHONY: opam
+opam:
+	@mkdir -p $(OPAMREPO)/packages/flexdll/flexdll.$(VERSION)/files $(OPAMREPO)/packages/flexlink/flexlink.$(VERSION)/files
+	@cp assemble.sh flexdll.install $(OPAMREPO)/packages/flexdll/flexdll.$(VERSION)/files
+	@grep -q -- "-bin-$(subst .,\.,$(VERSION))\\.zip.*$(shell wget -qO - http://alain.frisch.fr/flexdll/flexdll-bin-$(VERSION).zip | md5sum | sed -e 's/ .*//')" flexdll.opam || echo "Warning: flexdll.opam has the wrong binary file/checksum"
+	@grep -v "^\(name\|version\): " flexdll.opam $(UNIX2DOS) > $(OPAMREPO)/packages/flexdll/flexdll.$(VERSION)/opam
+	@sed -e "s/%MD5%/$(shell wget -qO - http://alain.frisch.fr/flexdll/flexdll-$(VERSION).tar.gz | md5sum | sed -e 's/ .*//')/" -e "s/%VERSION%/$(VERSION)/" opam-url $(UNIX2DOS) >> $(OPAMREPO)/packages/flexdll/flexdll.$(VERSION)/opam
+	@cp flexlink.install.in $(OPAMREPO)/packages/flexlink/flexlink.$(VERSION)/files
+	@grep -v "^\(name\|version\): " flexlink.opam $(UNIX2DOS) > $(OPAMREPO)/packages/flexlink/flexlink.$(VERSION)/opam
+	@sed -e "s/%MD5%/$(shell wget -qO - http://alain.frisch.fr/flexdll/flexdll-$(VERSION).tar.gz | md5sum | sed -e 's/ .*//')/" -e "s/%VERSION%/$(VERSION)/" opam-url $(UNIX2DOS) >> $(OPAMREPO)/packages/flexlink/flexlink.$(VERSION)/opam
+
+# Increment VERSION in Makefile and the two OPAM pins
+bump_version:
+	@sed -i -e "s/$(subst .,\.,$(VERSION))\([^.]\|$$\)/$(shell echo $(VERSION)| awk '{print $$1 + 0.01}')\1/" $(subst | sed,,$(UNIX2DOS)) Makefile flexdll.opam flexlink.opam

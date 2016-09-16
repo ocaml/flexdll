@@ -1,0 +1,16 @@
+opam-version: "2.0"
+name: "flexlink"
+version: "0.36"
+descr: """
+FlexDLL Linker
+"""
+authors: "Alain Frisch"
+maintainer: "Alain Frisch <alain.frisch@lexifi.com>"
+bug-reports: "https://github.com/alainfrisch/flexdll/issues"
+dev-repo: "git+https://github.com/alainfrisch/flexdll.git"
+homepage: "https://github.com/alainfrisch/flexdll#readme"
+depends: ["ocaml" "flexdll" {<= version}]
+build: [
+  [make "MSVC_DETECT=0" "TOOLPREF=%{compiler:target-arch}%-w64-mingw32-" {ocaml:version < "4.00.0" & compiler:cc = "cc"} "flexlink.exe"] {flexdll:version != version | ocaml:version < "4.03.0"}
+  ["mv" "flexlink.install.in" "flexlink.install"] {flexdll:version != version | ocaml:version < "4.03.0"}
+]

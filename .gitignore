@@ -13,3 +13,4 @@ version.ml
 Makefile.winsdk
 COMPILER-*
 Compat.ml
+opam/

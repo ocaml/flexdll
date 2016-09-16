@@ -1,0 +1,4 @@
+url {
+  src: "http://alain.frisch.fr/flexdll/flexdll-%VERSION%.tar.gz"
+  checksum: "%MD5%"
+}
