@@ -138,6 +138,10 @@ flexlink.exe: $(OBJS) $(RES)
 	rm -f flexlink.exe
 	$(RES_PREFIX) $(OCAMLOPT) -o flexlink.exe $(LINKFLAGS) $(OBJS)
 
+# This changes when 1.0 is released!
+version.rc: version.rc.in Makefile
+	sed -e "s/%VERSION%/$(subst 0.,,$(VERSION))/" version.rc.in > $@
+
 version.res: version.rc
 	$(RES_PREFIX) rc version.rc
 
@@ -209,7 +213,7 @@ distclean: clean
 	rm -f Makefile.winsdk
 
 clean:
-	rm -f *.obj *.o *.lib *.a *.exe *.opt *.cmx *.dll *.exp *.cmi *.cmo *~ version.res version.ml COMPILER-* Compat.ml
+	rm -f *.obj *.o *.lib *.a *.exe *.opt *.cmx *.dll *.exp *.cmi *.cmo *~ version.res version.ml version.rc COMPILER-* Compat.ml
 	cd test && $(MAKE) clean
 
 
@@ -226,7 +230,7 @@ package_src:
 	rm -Rf flexdll-$(VERSION)
 	mkdir flexdll-$(VERSION)
 	mkdir flexdll-$(VERSION)/test
-	cp -a $(filter-out Compat.ml version.ml,$(OBJS) $(shell git ls-files Compat*.ml)) Makefile findwinsdk $(COMMON_FILES) version.rc flexdll-$(VERSION)/
+	cp -a $(filter-out Compat.ml version.ml,$(OBJS) $(shell git ls-files Compat*.ml)) Makefile findwinsdk $(COMMON_FILES) version.rc.in flexdll-$(VERSION)/
 	cp -aR test/Makefile test/*.c flexdll-$(VERSION)/test/
 	tar czf $(PACKAGE) flexdll-$(VERSION)
 	rm -Rf flexdll-$(VERSION)
