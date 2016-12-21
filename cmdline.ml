@@ -6,6 +6,8 @@
 (*   en Automatique.                                                    *)
 (************************************************************************)
 
+include Compat
+
 let underscore = ref true
     (* Are "normal" symbols prefixed with an underscore? *)
 
@@ -62,6 +64,7 @@ let footer =
 Homepage: http://alain.frisch.fr/flexdll.html"
 
 let specs = [
+
   "-o", Arg.Set_string output_file,
   " Choose the name of the output file";
 
@@ -245,6 +248,10 @@ let parse_cmdline () =
         String.sub s 0 2 :: String.sub s 2 (String.length s - 2) :: tr rest
     | s :: rest when String.length s >= 5 && String.sub s 0 5 = "/link" ->
         "-link" :: String.sub s 5 (String.length s - 5) :: tr rest
+    | "-arg" :: x :: rest ->
+        tr (Array.to_list (read_arg x)) @ rest
+    | "-arg0" :: x :: rest ->
+        tr (Array.to_list (read_arg0 x)) @ rest
     | x :: rest when x <> "" && x.[0] = '-' ->
         begin
           try
