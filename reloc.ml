@@ -260,6 +260,15 @@ let find_file fn =
     | Some x -> Some x
     | None -> if !use_cygpath then find_file_in (cygpath l) else None
 
+let rec map_until_found f = function
+  | [] ->
+      None
+  | x::xs ->
+      match f x with
+      | None ->
+          map_until_found f xs
+      | r ->
+          r
 
 let find_file =
   let memo = Hashtbl.create 16 in
@@ -269,12 +278,16 @@ let find_file =
     with Not_found ->
       try Hashtbl.find memo (k ^ ".lib")
       with Not_found ->
-        let fn =
+        let fns =
           if String.length fn > 2 && String.sub fn 0 2 = "-l" then
-            "lib" ^ (String.sub fn 2 (String.length fn - 2))
-          else fn in
+            let base = String.sub fn 2 (String.length fn - 2) in
+            if !toolchain = `MSVC || !toolchain = `MSVC64 then
+              ["lib" ^ base; base]
+            else
+              ["lib" ^ base]
+          else [fn] in
         let r =
-          match find_file fn with
+          match map_until_found find_file fns with
           | Some fn -> fn
           | None ->
               failwith (Printf.sprintf "Cannot find file %S" fn)
