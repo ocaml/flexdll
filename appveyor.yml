@@ -1,0 +1,45 @@
+platform:
+  - x64
+
+image: Visual Studio 2015
+
+environment:
+  global:
+    CYG_ROOT: C:/cygwin
+    CYG_MIRROR: http://mirrors.kernel.org/sourceware/cygwin/
+    CYG_CACHE: C:/cygwin/var/cache/setup
+    FLEXDLL_DIR: C:/flexdll
+  matrix:
+#    - OCAMLBRANCH: 4.02
+    - OCAMLBRANCH: 4.03
+    - OCAMLBRANCH: 4.04
+    - OCAMLBRANCH: 4.05
+    - OCAMLBRANCH: trunk
+  OCAMLROOT: C:/OCaml
+
+cache:
+  - C:/OCaml
+
+install:
+  - mkdir "%FLEXDLL_DIR%"
+  - appveyor DownloadFile "http://alain.frisch.fr/flexdll/flexdll-bin-0.35.zip" -FileName "flexdll.zip"
+  - appveyor DownloadFile "http://alain.frisch.fr/flexdll/flexdll-0.35.tar.gz" -FileName "flexdll.tar.gz"
+  - cinst 7zip.commandline
+  - mkdir flexdll-tmp
+  - cd flexdll-tmp
+  - 7za x -y ..\flexdll.zip
+  - for %%F in (flexdll.h flexlink.exe default_amd64.manifest) do copy %%F "%FLEXDLL_DIR%"
+  - cd ..
+  # Make sure the Cygwin path comes before the Git one (otherwise
+  # cygpath behaves crazily), but after the MSVC one.
+  - set Path=C:\cygwin\bin;%OCAMLROOT%\bin;C:\flexdll;%Path%
+  - '%CYG_ROOT%\bin\bash -lc "cygcheck -dc cygwin"'
+  - '"%CYG_ROOT%\setup-x86.exe" -qgnNdO -R "%CYG_ROOT%" -s "%CYG_MIRROR%" -l "%CYG_CACHE%" -P diffutils -P gcc-core -P cygwin64-gcc-core -P mingw64-i686-gcc-core -P mingw64-x86_64-gcc-core -P make >NUL'
+  - call "C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\bin\amd64\vcvars64.bat"
+  - appveyor DownloadFile "https://raw.githubusercontent.com/ocaml/ocaml/trunk/tools/msvs-promote-path" -FileName "msvs-promote-path"
+
+build_script:
+  - "%CYG_ROOT%/bin/bash -lc \"echo 'eval $($APPVEYOR_BUILD_FOLDER/msvs-promote-path)' >> ~/.bash_profile\""
+  - '%CYG_ROOT%/bin/bash -lc "$APPVEYOR_BUILD_FOLDER/appveyor_build.sh"'
+
+test: off
