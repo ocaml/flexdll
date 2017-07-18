@@ -1,5 +1,7 @@
 FlexDLL: an implementation of a dlopen-like API for Windows
 
+[![Build status](https://ci.appveyor.com/api/projects/status/5plx0da26cv03lgd?svg=true)](https://ci.appveyor.com/project/alainfrisch/flexdll)
+
 Introduction
 ------------
 
