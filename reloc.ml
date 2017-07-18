@@ -94,6 +94,28 @@ let get_output1 ?use_bash cmd =
 
 let mk_dirs_opt pr = String.concat " " (List.map (fun s -> pr ^ (Filename.quote s)) !dirs)
 
+(* Ocmal reimplementation of writeargv from libiberty *)
+let gnu_quote arg =
+  let len = String.length arg in
+  let buf = Buffer.create len in
+  String.iter (fun c -> begin match c with
+      | ' ' | '\t' | '\r' | '\n' | '\\' | '\'' | '"' ->
+          Buffer.add_char buf '\\'
+      | _ -> () end;
+      Buffer.add_char buf c) arg;
+  Buffer.contents buf
+
+(* msvc compatible quoting *)
+let msvc_quote arg =
+  let s = Bytes.of_string (Filename.quote arg) in
+  for i = 0 to Bytes.length s - 1 do
+    if Bytes.get s i = '\\' then Bytes.set s i '/'
+  done;
+  Bytes.to_string s
+
+let quote = match !toolchain with
+  | `MSVC | `MSVC64 | `LIGHTLD -> msvc_quote
+  | `MINGW | `MINGW64 | `GNAT | `CYGWIN | `CYGWIN64 -> gnu_quote
 
 (* Build @responsefile to work around Windows limitations on
    command-line length *)
@@ -101,28 +123,23 @@ let build_diversion lst =
   let (responsefile, oc) = open_temp_file "camlresp" "" in
   List.iter
     (fun f ->
-      if f <> "" then begin
-        let s = Bytes.of_string (Filename.quote f) in
-        for i = 0 to Bytes.length s - 1 do
-          if Bytes.get s i = '\\' then Bytes.set s i '/'
-        done;
-        output_bytes oc s; output_char oc '\n'
-      end)
+       if f <> "" then
+         Printf.fprintf oc "%s\n" (quote f))
     lst;
   close_out oc;
   "@" ^ responsefile
 
 type cmdline = {
-    may_use_response_file: bool;
+    response_file_limit: int;
   }
 
 let new_cmdline () =
-  let rf = match !toolchain with
-  | `MSVC | `MSVC64 | `LIGHTLD -> true
-  | `MINGW | `MINGW64 | `GNAT | `CYGWIN | `CYGWIN64 -> false
+  let rf_limit = match !toolchain with
+  | `MSVC | `MSVC64 | `LIGHTLD -> 1024
+  | `MINGW | `MINGW64 | `GNAT | `CYGWIN | `CYGWIN64 -> 8192
   in
   {
-   may_use_response_file = rf;
+    response_file_limit = rf_limit;
   }
 
 let run_command cmdline cmd =
@@ -154,7 +171,7 @@ let quote_files cmdline lst =
   let s =
     String.concat " "
       (List.map (fun f -> if f = "" then f else Filename.quote f) lst) in
-  if String.length s >= 1024 && cmdline.may_use_response_file then Filename.quote (build_diversion lst)
+  if String.length s >= cmdline.response_file_limit then Filename.quote (build_diversion lst)
   else s
 
 
