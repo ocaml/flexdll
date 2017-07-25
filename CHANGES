@@ -1,3 +1,6 @@
+Next Version
+- Add Unicode support (patch by Nicolás Ojeda Bär)
+
 Version 0.35
 - Fixes for clang (patch by Roven Gabriel)
 - Improve autodetection of WinSDK paths (patch by David Allsopp)
@@ -184,3 +187,7 @@ Version 0.2, released on 2007-11-06
 
 Version 0.1, released on 2007-06-14
  - Initial release
+
+<!-- Local Variables:  -->
+<!-- coding: utf-8     -->
+<!-- End:              -->
