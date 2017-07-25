@@ -435,6 +435,9 @@ Here is the content of the **`flexdll.h`** file:
     #define FLEXDLL_RTLD_NOEXEC 0x0002
 
     void *flexdll_dlopen(const char *, int);
+#ifndef CYGWIN
+    void *flexdll_wdlopen(const wchar_t *, int);
+#endif
     void *flexdll_dlsym(void *, const char *);
     void flexdll_dlclose(void *);
     char *flexdll_dlerror(void);
@@ -471,6 +474,11 @@ because the same handle is actually returned for all the calls). If an
 error occurs during the call to **`flexdll_dlopen`**, the functions
 returns **`NULL`** and the error message can be retrieved using
 **`flexdll_dlerror`**.
+
+The function **`flexdll_wdlopen`** is a wide-character version of
+**`flexdll_dlopen`**.  The filename argument to **`flexdll_wdlopen`** is a
+wide-character string. **`flexdll_wdlopen`** and **`flexdll_dlopen`** behave
+identically otherwise.
 
 The second most important function is **`flexdll_dlsym`** which looks
 for a symbol whose name is the second argument. The first argument can

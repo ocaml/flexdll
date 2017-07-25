@@ -94,21 +94,90 @@ let get_output1 ?use_bash cmd =
 
 let mk_dirs_opt pr = String.concat " " (List.map (fun s -> pr ^ (Filename.quote s)) !dirs)
 
+exception Not_utf8
+
+let utf8_next s i =
+  let fail () = raise Not_utf8 in
+  let check i =
+    if i >= String.length s then fail ();
+    let n = Char.code s.[i] in
+    if n lsr 6 <> 0b10 then fail () else n
+  in
+  if !i >= String.length s then fail ();
+  match s.[!i] with
+  | '\000'..'\127' as c ->
+      let n = Char.code c in
+      i := !i + 1;
+      n
+  | '\192'..'\223' as c ->
+      let n1 = Char.code c in
+      let n2 = check (!i+1) in
+      let n =
+        ((n1 land 0b11111) lsl 6) lor
+        ((n2 land 0b111111))
+      in
+      i := !i + 2;
+      n
+  | '\224'..'\239' as c ->
+      let n1 = Char.code c in
+      let n2 = check (!i+1) in
+      let n3 = check (!i+2) in
+      let n =
+        ((n1 land 0b1111) lsl 12) lor
+        ((n2 land 0b111111) lsl 6) lor
+        ((n3 land 0b111111))
+      in
+      i := !i + 3;
+      n
+  | '\240'..'\247' as c ->
+      let n1 = Char.code c in
+      let n2 = check (!i+1) in
+      let n3 = check (!i+2) in
+      let n4 = check (!i+3) in
+      let n =
+        ((n1 land 0b111) lsl 18) lor
+        ((n2 land 0b111111) lsl 12) lor
+        ((n3 land 0b111111) lsl 6) lor
+        ((n4 land 0b111111))
+      in
+      i := !i + 4;
+      n
+  | _ ->
+      fail ()
+
+let toutf16 s =
+  let i = ref 0 in
+  let b = Buffer.create (String.length s) in
+  let cp n = Buffer.add_char b (Char.chr (n land 0xFF)); Buffer.add_char b (Char.chr ((n lsr 8) land 0xFF)) in
+  while !i < String.length s do
+    let n = utf8_next s i in
+    if n <= 0xFFFF then cp n else (cp (0xD7C0 + (n lsl 10)); cp (0xDC00 + (n land 0x3FF)))
+  done;
+  Buffer.contents b
 
 (* Build @responsefile to work around Windows limitations on
    command-line length *)
 let build_diversion lst =
-  let (responsefile, oc) = open_temp_file "camlresp" "" in
-  List.iter
-    (fun f ->
-      if f <> "" then begin
+  let responsefile = temp_file "camlresp" "" in
+  let oc = open_out_bin responsefile in
+  let lst =
+    List.map (fun f ->
         let s = Bytes.of_string (Filename.quote f) in
         for i = 0 to Bytes.length s - 1 do
           if Bytes.get s i = '\\' then Bytes.set s i '/'
         done;
-        output_bytes oc s; output_char oc '\n'
-      end)
-    lst;
+        Bytes.to_string s ^ "\r\n"
+      ) (List.filter (fun f -> f <> "") lst)
+  in
+  let utf16, lst =
+    match List.map toutf16 lst with
+    | lst ->
+        true, lst
+    | exception Not_utf8 ->
+        false, lst
+  in
+  if utf16 then output_string oc "\xFF\xFE"; (* LE BOM *)
+  List.iter (fun s -> output_string oc s) lst;
   close_out oc;
   "@" ^ responsefile
 
