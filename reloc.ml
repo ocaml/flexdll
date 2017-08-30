@@ -986,6 +986,9 @@ let build_dll link_exe output_file files exts extra_args =
           else
             temp_file "dyndll_implib" ".lib"
         in
+        (* VS 2017.3 doesn't seem to be able to cope with /implib: existing but
+           being an empty file. *)
+        let c = open_out implib in output_string c "x"; close_out c;
         let _impexp = add_temp (Filename.chop_suffix implib ".lib" ^ ".exp") in
         let extra_args =
           if !custom_crt then "/nodefaultlib:LIBCMT /nodefaultlib:MSVCRT " ^ extra_args
