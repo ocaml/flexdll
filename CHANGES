@@ -1,4 +1,4 @@
-Next Version
+Version 0.36
 - Add Unicode support (patch by Nicolás Ojeda Bär)
 - Workaround apparent bug in VS 2017.3 link (patch by David Allsopp)
 - Additional heuristic for -lfoo on MSVC: try libfoo.lib but then try foo.lib (David Allsopp)

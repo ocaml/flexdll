@@ -78,11 +78,11 @@ Download
 
 -   [Source releases](https://github.com/alainfrisch/flexdll/releases).
 
--   [Binary release 0.35 (self-extracting
-    installer)](http://alain.frisch.fr/flexdll/flexdll-0.35-setup.exe).
+-   [Binary release 0.36 (self-extracting
+    installer)](http://alain.frisch.fr/flexdll/flexdll-0.36-setup.exe).
 
--   [Binary release 0.35 (.zip
-    file)](http://alain.frisch.fr/flexdll/flexdll-bin-0.35.zip).
+-   [Binary release 0.36 (.zip
+    file)](https://github.com/alainfrisch/flexdll/archive/0.36.zip)
 
 -   [Development version](https://github.com/alainfrisch/flexdll).
 
