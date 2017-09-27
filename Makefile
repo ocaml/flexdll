@@ -113,7 +113,7 @@ LINKFLAGS = -cclib "-link $(RES)"
 endif
 
 support:
-	for i in $(CHAINS); do $(MAKE) build_$$i; done
+	for i in $(CHAINS); do $(MAKE) --no-print-directory build_$$i || break ; done
 
 build_gnat: flexdll_gnat.o flexdll_initer_gnat.o
 build_msvc: flexdll_msvc.obj flexdll_initer_msvc.obj
