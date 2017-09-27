@@ -14,6 +14,15 @@
 #include <windows.h>
 #include "flexdll.h"
 
+/* Guard against compiling with the wrong cl! */
+#ifdef MSVC
+#if defined(_M_AMD64) && !defined(MSVC64)
+#error 64-bit cl selected for a 32-bit build
+#elif !defined(_M_AMD64) && defined(MSVC64)
+#error 32-bit cl selected for a 64-bit build
+#endif
+#endif /* MSVC */
+
 typedef long intnat;
 typedef unsigned long uintnat;
 

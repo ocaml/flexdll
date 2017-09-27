@@ -149,7 +149,7 @@ flexdll_msvc.obj: flexdll.h flexdll.c
 	$(MSVC_PREFIX) $(MSVCC) /DMSVC -c /Fo"flexdll_msvc.obj" flexdll.c
 
 flexdll_msvc64.obj: flexdll.h flexdll.c
-	$(MSVC64_PREFIX) $(MSVCC64) /DMSVC  -c /Fo"flexdll_msvc64.obj" flexdll.c
+	$(MSVC64_PREFIX) $(MSVCC64) /DMSVC /DMSVC64 -c /Fo"flexdll_msvc64.obj" flexdll.c
 
 flexdll_cygwin.o: flexdll.h flexdll.c
 	$(CYGCC) -c -DCYGWIN -o flexdll_cygwin.o flexdll.c
