@@ -14,6 +14,18 @@ function run {
     fi
 }
 
+function configure_ocaml {
+    cp config/m-nt.h $HEADER_DIR/m.h
+    cp config/s-nt.h $HEADER_DIR/s.h
+
+    sed -e "s|PREFIX=.*|PREFIX=$OCAMLROOT|" \
+        -e "s|OTHERLIBRARIES=.*|OTHERLIBRARIES=|" \
+        -e "s|WITH_DEBUGGER=.*|WITH_DEBUGGER=|" \
+        -e "s|WITH_OCAMLDOC=.*|WITH_OCAMLDOC=|" \
+        config/Makefile.msvc64 > $CONFIG_DIR/Makefile
+    #run "Content of config/Makefile" cat $CONFIG_DIR/Makefile
+}
+
 echo ** OCAMLROOT=$OCAMLROOT
 
 #echo "APPVEYOR_PULL_REQUEST_NUMBER = $APPVEYOR_PULL_REQUEST_NUMBER"
@@ -26,6 +38,8 @@ echo ** OCAMLROOT=$OCAMLROOT
 #echo "APPVEYOR_REPO_BRANCH = $APPVEYOR_REPO_BRANCH"
 
 cd $APPVEYOR_BUILD_FOLDER
+
+git tag merge
 
 # Do not perform end-of-line conversion
 git config --global core.autocrlf false
@@ -47,17 +61,9 @@ case $OCAMLBRANCH in
         ;;
 esac
 
+configure_ocaml
+
 if [ ! -f $OCAMLROOT/STAMP ] || [ "$(git rev-parse HEAD)" != "$(cat $OCAMLROOT/STAMP)" ]; then
-    cp config/m-nt.h $HEADER_DIR/m.h
-    cp config/s-nt.h $HEADER_DIR/s.h
-
-    sed -e "s|PREFIX=.*|PREFIX=$OCAMLROOT|" \
-        -e "s|OTHERLIBRARIES=.*|OTHERLIBRARIES=|" \
-        -e "s|WITH_DEBUGGER=.*|WITH_DEBUGGER=|" \
-        -e "s|WITH_OCAMLDOC=.*|WITH_OCAMLDOC=|" \
-        config/Makefile.msvc64 > $CONFIG_DIR/Makefile
-    #run "Content of config/Makefile" cat $CONFIG_DIR/Makefile
-
     run "make world.opt" $MAKEOCAML flexdll world.opt
     run "make install" $MAKEOCAML install
 
@@ -66,7 +72,7 @@ fi
 
 export CAML_LD_LIBRARY_PATH=$OCAMLROOT/lib/stublibs
 
-cd $APPVEYOR_BUILD_FOLDER
+pushd $APPVEYOR_BUILD_FOLDER
 
 run "make flexlink.exe" make MSVC_DETECT=0 flexlink.exe
 
@@ -79,3 +85,20 @@ done
 for CHAIN in $CHAINS; do
     run "make demo_$CHAIN" make demo_$CHAIN
 done
+
+popd
+
+if [ -f ocamlopt.opt ] ; then
+    git clean -dfx > /dev/null
+    cd flexdll
+    git clean -dfx > /dev/null
+    cd ..
+    configure_ocaml
+fi
+
+cd flexdll
+git remote add local $(echo "$APPVEYOR_BUILD_FOLDER"| cygpath -f -) -f --tags
+run "git checkout $APPVEYOR_REPO_COMMIT" git checkout merge
+cd ..
+
+run "make world" $MAKEOCAML flexdll world
