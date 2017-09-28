@@ -31,31 +31,31 @@ git clone https://github.com/ocaml/ocaml.git --branch $OCAMLBRANCH --depth 1 oca
 cd ocaml
 
 MAKEOCAML=make
-CONFIG_DIR=byterun/caml
+CONFIG_DIR=config
+HEADER_DIR=byterun/caml
 
 case $OCAMLBRANCH in
-    4.01|4.02|4.03|4.04|4.05)
+    4.01|4.02|4.03|4.04)
         MAKEOCAML="make -f Makefile.nt"
-        CONFIG_DIR=config
+        HEADER_DIR=config
+        ;;
+    4.05)
+        HEADER_DIR=config
         ;;
 esac
 
 if [ ! -f $OCAMLROOT/STAMP ] || [ "$(git rev-parse HEAD)" != "$(cat $OCAMLROOT/STAMP)" ]; then
-    cp config/m-nt.h $CONFIG_DIR/m.h
-    cp config/s-nt.h $CONFIG_DIR/s.h
-    #cp config/Makefile.msvc config/Makefile
-    cp config/Makefile.msvc64 config/Makefile
+    cp config/m-nt.h $HEADER_DIR/m.h
+    cp config/s-nt.h $HEADER_DIR/s.h
 
-    cp config/Makefile config/Makefile.bak
     sed -e "s|PREFIX=.*|PREFIX=$OCAMLROOT|" \
         -e "s|OTHERLIBRARIES=.*|OTHERLIBRARIES=|" \
         -e "s|WITH_DEBUGGER=.*|WITH_DEBUGGER=|" \
         -e "s|WITH_OCAMLDOC=.*|WITH_OCAMLDOC=|" \
-        config/Makefile.bak > config/Makefile
-    #run "Content of config/Makefile" cat config/Makefile
+        config/Makefile.msvc64 > $CONFIG_DIR/Makefile
+    #run "Content of config/Makefile" cat $CONFIG_DIR/Makefile
 
-    run "make world" $MAKEOCAML world
-    run "make opt" $MAKEOCAML opt
+    run "make world.opt" $MAKEOCAML world.opt
     run "make install" $MAKEOCAML install
 
     git rev-parse HEAD > $OCAMLROOT/STAMP
