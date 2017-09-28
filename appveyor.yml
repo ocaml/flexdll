@@ -8,9 +8,7 @@ environment:
     CYG_ROOT: C:/cygwin
     CYG_MIRROR: http://mirrors.kernel.org/sourceware/cygwin/
     CYG_CACHE: C:/cygwin/var/cache/setup
-    FLEXDLL_DIR: C:/flexdll
   matrix:
-#    - OCAMLBRANCH: 4.02
     - OCAMLBRANCH: 4.03
     - OCAMLBRANCH: 4.04
     - OCAMLBRANCH: 4.05
@@ -21,15 +19,6 @@ cache:
   - C:/OCaml
 
 install:
-  - mkdir "%FLEXDLL_DIR%"
-  - appveyor DownloadFile "http://alain.frisch.fr/flexdll/flexdll-bin-0.35.zip" -FileName "flexdll.zip"
-  - appveyor DownloadFile "http://alain.frisch.fr/flexdll/flexdll-0.35.tar.gz" -FileName "flexdll.tar.gz"
-  - cinst 7zip.commandline
-  - mkdir flexdll-tmp
-  - cd flexdll-tmp
-  - 7za x -y ..\flexdll.zip
-  - for %%F in (flexdll.h flexlink.exe default_amd64.manifest) do copy %%F "%FLEXDLL_DIR%"
-  - cd ..
   # Make sure the Cygwin path comes before the Git one (otherwise
   # cygpath behaves crazily), but after the MSVC one.
   - set Path=C:\cygwin\bin;%OCAMLROOT%\bin;C:\flexdll;%Path%

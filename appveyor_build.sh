@@ -27,15 +27,9 @@ echo ** OCAMLROOT=$OCAMLROOT
 
 cd $APPVEYOR_BUILD_FOLDER
 
-tar -xzf flexdll.tar.gz
-cd flexdll-0.35
-make MSVC_DETECT=0 CHAINS=msvc64 support
-cp flexdll*_msvc64.obj "$FLEXDLL_DIR"
-cd ..
-
 # Do not perform end-of-line conversion
 git config --global core.autocrlf false
-git clone https://github.com/ocaml/ocaml.git --branch $OCAMLBRANCH --depth 1 ocaml
+git clone https://github.com/ocaml/ocaml.git --branch $OCAMLBRANCH --depth 1 --recurse-submodules ocaml
 
 cd ocaml
 
@@ -44,7 +38,7 @@ CONFIG_DIR=config
 HEADER_DIR=byterun/caml
 
 case $OCAMLBRANCH in
-    4.01|4.02|4.03|4.04)
+    4.03|4.04)
         MAKEOCAML="make -f Makefile.nt"
         HEADER_DIR=config
         ;;
@@ -64,7 +58,7 @@ if [ ! -f $OCAMLROOT/STAMP ] || [ "$(git rev-parse HEAD)" != "$(cat $OCAMLROOT/S
         config/Makefile.msvc64 > $CONFIG_DIR/Makefile
     #run "Content of config/Makefile" cat $CONFIG_DIR/Makefile
 
-    run "make world.opt" $MAKEOCAML world.opt
+    run "make world.opt" $MAKEOCAML flexdll world.opt
     run "make install" $MAKEOCAML install
 
     git rev-parse HEAD > $OCAMLROOT/STAMP
