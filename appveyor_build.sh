@@ -88,6 +88,10 @@ done
 
 popd
 
+if [ "$SKIP_OCAML_TEST" != no ] ; then
+  exit 0
+fi
+
 if [ -f ocamlopt.opt ] ; then
     git clean -dfx > /dev/null
     cd flexdll

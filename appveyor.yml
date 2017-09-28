@@ -13,6 +13,7 @@ environment:
     - OCAMLBRANCH: 4.04
     - OCAMLBRANCH: 4.05
     - OCAMLBRANCH: trunk
+      SKIP_OCAML_TEST: no
   OCAMLROOT: C:/OCaml
 
 cache:
