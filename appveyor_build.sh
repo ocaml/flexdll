@@ -56,7 +56,7 @@ case $OCAMLBRANCH in
         MAKEOCAML="make -f Makefile.nt"
         HEADER_DIR=config
         ;;
-    4.05|4.06)
+    4.05)
         HEADER_DIR=config
         ;;
 esac
