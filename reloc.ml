@@ -1229,23 +1229,33 @@ let setup_toolchain () =
     if !exe_mode = `EXE then default_libs := "crt2.o" :: !default_libs
     else default_libs := "dllcrt2.o" :: !default_libs
   in
+  let cygwin pre =
+    gcc := pre ^ "gcc";
+    objdump := pre ^ "objdump";
+    let lib_search_dirs =
+      [
+        "/lib";
+        "/lib/w32api";
+        Filename.dirname (get_output1 ~use_bash:true (!gcc ^ " -print-libgcc-file-name"));
+      ]
+    in
+    search_path := !dirs @ lib_search_dirs;
+    if !verbose >= 1  then begin
+      print_endline "lib search dirs:";
+      List.iter (Printf.printf "  %s\n%!") lib_search_dirs;
+    end;
+    default_libs := ["-lkernel32"; "-luser32"; "-ladvapi32";
+                     "-lshell32"; "-lcygwin"; "-lgcc"]
+  in
   match !toolchain with
   | _ when !builtin_linker ->
       search_path := !dirs;
       add_flexdll_obj := false;
       noentry := true
-  | `CYGWIN | `CYGWIN64 ->
-      gcc := "gcc";
-      objdump := "objdump";
-      search_path :=
-        !dirs @
-          [
-           "/lib";
-           "/lib/w32api";
-           Filename.dirname (get_output1 ~use_bash:true "gcc -print-libgcc-file-name");
-          ];
-      default_libs := ["-lkernel32"; "-luser32"; "-ladvapi32";
-                       "-lshell32"; "-lcygwin"; "-lgcc"]
+  | `CYGWIN ->
+      cygwin Version.cygwin_prefix
+  |  `CYGWIN64 ->
+      cygwin Version.cygwin64_prefix
   | `MSVC | `MSVC64 ->
       search_path := !dirs @
         parse_libpath (try Sys.getenv "LIB" with Not_found -> "");
@@ -1305,13 +1315,7 @@ let compile_if_needed file =
             (mk_dirs_opt "/I")
             file
             pipe
-      | `CYGWIN | `CYGWIN64 ->
-          Printf.sprintf
-            "gcc -c -o %s %s %s"
-            (Filename.quote tmp_obj)
-            (mk_dirs_opt "-I")
-            file
-      | `MINGW | `MINGW64 | `GNAT ->
+      | `CYGWIN | `CYGWIN64 | `MINGW | `MINGW64 | `GNAT ->
           Printf.sprintf
             "%s -c -o %s %s %s"
             !gcc
@@ -1328,6 +1332,16 @@ let compile_if_needed file =
     tmp_obj
   end else
     file
+
+let toolchain_suffix () =
+  match !toolchain with
+  | `MSVC -> "msvc.obj"
+  | `MSVC64 -> "msvc64.obj"
+  | `CYGWIN -> "cygwin.o"
+  | `CYGWIN64 -> "cygwin64.o"
+  | `MINGW64 -> "mingw64.o"
+  | `GNAT    -> "gnat.o"
+  | `MINGW | `LIGHTLD -> "mingw.o"
 
 let dump fn =
   let fn = find_file fn in
@@ -1355,20 +1369,49 @@ let all_files () =
       fn
     else
       obj in
-  let tc = match !toolchain with
-  | `MSVC -> "msvc.obj"
-  | `MSVC64 -> "msvc64.obj"
-  | `CYGWIN -> "cygwin.o"
-  | `CYGWIN64 -> "cygwin64.o"
-  | `MINGW64 -> "mingw64.o"
-  | `GNAT    -> "gnat.o"
-  | `MINGW | `LIGHTLD -> "mingw.o" in
+  let tc = toolchain_suffix () in
   if !exe_mode <> `DLL then
     if !add_flexdll_obj then f ("flexdll_" ^ tc) :: files
     else files
   else
     if !noentry then files
     else f ("flexdll_initer_" ^ tc) :: files
+
+let install file =
+  let target = Filename.concat !output_file file ^ "_" ^ toolchain_suffix () in
+  let target = Filename.quote (if !use_cygpath then cygpath1 target else target) in
+  let src = Filename.quote (Filename.concat flexdir file ^ ".c") in
+  let call_gcc extra =
+    Printf.sprintf
+      "%s -c %s -o %s %s"
+      !gcc
+      extra
+      target
+      src
+  in
+  let cmd =
+    match !toolchain with
+    | `MSVC ->
+        Printf.sprintf
+          "cl /DMSVC /c /MD /nologo -D_CRT_SECURE_NO_DEPRECATE /GS- /Fo%s %s"
+          target
+          src
+    | `MSVC64 ->
+        Printf.sprintf
+          "cl /DMSVC /DMSVC64 /c /MD /nologo -D_CRT_SECURE_NO_DEPRECATE /GS- /Fo%s %s"
+          target
+          src
+    | `CYGWIN | `CYGWIN64 -> call_gcc "-DCYGWIN"
+    | `MINGW | `MINGW64 -> call_gcc "-DMINGW"
+    | `GNAT -> call_gcc ""
+    | `LIGHTLD ->
+        failwith "Compilation of C code is not supported for this toolchain"
+  in
+  if !verbose >= 1 || !dry_mode then Printf.printf "+ %s\n%!" cmd;
+  if not !dry_mode && Sys.command cmd <> 0
+  then
+    failwith (Printf.sprintf "Error while compiling %s.c" file)
+
 
 let main () =
   parse_cmdline ();
@@ -1408,6 +1451,9 @@ let main () =
         (String.concat " " (List.map Filename.quote (List.rev !extra_args)))
   | `PATCH ->
       patch_output !output_file
+  | `INSTALL ->
+      install "flexdll";
+      install "flexdll_initer"
 
 let () =
   try main ()

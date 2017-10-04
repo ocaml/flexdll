@@ -36,7 +36,7 @@ let exts = ref []
 let output_file = ref ""
 let exe_mode : [`DLL | `EXE | `MAINDLL] ref = ref `DLL
 let extra_args = ref []
-let mode : [`NORMAL | `DUMP | `PATCH] ref = ref `NORMAL
+let mode : [`NORMAL | `DUMP | `PATCH | `INSTALL] ref = ref `NORMAL
 let defexports = ref []
 let noentry = ref false
 let use_cygpath = ref true
@@ -209,6 +209,9 @@ let specs = [
 
   "-U", Arg.String (fun _ -> ()),
   "<symbol> (Ignored)";
+
+  "-install", Arg.Unit (fun () -> mode := `INSTALL),
+  " Compile runtime support file for the selected toolchain";
 
   "--", Arg.Rest (fun s -> extra_args := s :: !extra_args),
   " Following arguments are passed verbatim to the linker";

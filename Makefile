@@ -25,6 +25,8 @@ version.ml: Makefile
 	echo "let version = \"$(VERSION)\"" > version.ml
 	echo "let mingw_prefix = \"$(MINGW_PREFIX)\"" >> version.ml
 	echo "let mingw64_prefix = \"$(MINGW64_PREFIX)\"" >> version.ml
+	echo "let cygwin_prefix = \"$(CYGWIN_PREFIX)\"" >> version.ml
+	echo "let cygwin64_prefix = \"$(CYGWIN64_PREFIX)\"" >> version.ml
 
 # Supported tool-chains
 
