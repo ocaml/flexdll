@@ -17,7 +17,9 @@ let search_path = ref []
 let default_libs = ref []
 
 let gcc = ref "gcc"
+let cl = ref "cl"
 let objdump = ref "objdump"
+let link = ref "link"
 
 let is_crt_lib = function
   | "LIBCMT"
@@ -1018,7 +1020,8 @@ let build_dll link_exe output_file files exts extra_args =
            with the Windows 7 SDK in 64-bit mode. *)
 
         Printf.sprintf
-          "link /nologo %s%s%s%s%s /implib:%s /out:%s /subsystem:%s %s %s %s"
+          "%s /nologo %s%s%s%s%s /implib:%s /out:%s /subsystem:%s %s %s %s"
+          !link
           (if !verbose >= 2 then "/verbose " else "")
           (if link_exe = `EXE then "" else "/dll ")
           (if main_pgm then "" else "/export:symtbl /export:reloctbl ")
@@ -1198,6 +1201,7 @@ let remove_duplicate_paths paths =
 
 let setup_toolchain () =
   let mingw_libs pre =
+    let pre = if !cc_prefix = "" then pre else !cc_prefix in
     gcc := pre ^ "gcc";
     objdump := pre ^ "objdump";
     let rec get_lib_search_dirs input =
@@ -1230,6 +1234,7 @@ let setup_toolchain () =
     else default_libs := "dllcrt2.o" :: !default_libs
   in
   let cygwin pre =
+    let pre = if !cc_prefix = "" then pre else !cc_prefix in
     gcc := pre ^ "gcc";
     objdump := pre ^ "objdump";
     let lib_search_dirs =
@@ -1257,6 +1262,10 @@ let setup_toolchain () =
   |  `CYGWIN64 ->
       cygwin Version.cygwin64_prefix
   | `MSVC | `MSVC64 ->
+      if !cc_prefix <> "" then begin
+        cl := !cc_prefix ^ "cl";
+        link := !cc_prefix ^ "link";
+      end;
       search_path := !dirs @
         parse_libpath (try Sys.getenv "LIB" with Not_found -> "");
       if not !custom_crt then
@@ -1268,17 +1277,19 @@ let setup_toolchain () =
   | `GNAT ->
    (* This is a plain copy of the mingw version, but we do not change the
       prefix and use "gnatls" to compute the include dir. *)
-    search_path :=
-      !dirs @
-      [
-       Filename.dirname (get_output1 (!gcc ^ " -print-libgcc-file-name"));
-       read_gnatls ();
-      ];
-    default_libs :=
-      ["-lmingw32"; "-lgcc"; "-lmoldname"; "-lmingwex"; "-lmsvcrt";
-       "-luser32"; "-lkernel32"; "-ladvapi32"; "-lshell32" ];
-    if !exe_mode = `EXE then default_libs := "crt2.o" :: !default_libs
-    else default_libs := "dllcrt2.o" :: !default_libs
+      gcc := !cc_prefix ^ "gcc";
+      objdump := !cc_prefix ^ "objdump";
+      search_path :=
+        !dirs @
+        [
+          Filename.dirname (get_output1 (!gcc ^ " -print-libgcc-file-name"));
+          read_gnatls ();
+        ];
+      default_libs :=
+        ["-lmingw32"; "-lgcc"; "-lmoldname"; "-lmingwex"; "-lmsvcrt";
+         "-luser32"; "-lkernel32"; "-ladvapi32"; "-lshell32" ];
+      if !exe_mode = `EXE then default_libs := "crt2.o" :: !default_libs
+      else default_libs := "dllcrt2.o" :: !default_libs
   | `LIGHTLD ->
       search_path := !dirs
 
@@ -1310,7 +1321,8 @@ let compile_if_needed file =
     let cmd = match !toolchain with
       | `MSVC | `MSVC64 ->
           Printf.sprintf
-            "cl /c /MD /nologo /Fo%s %s %s%s"
+            "%s /c /MD /nologo /Fo%s %s %s%s"
+            !cl
             (Filename.quote tmp_obj)
             (mk_dirs_opt "/I")
             file
@@ -1389,23 +1401,22 @@ let install file =
       target
       src
   in
+  let call_cl extra =
+    Printf.sprintf
+      "%s /DMSVC %s /c /MD /nologo -D_CRT_SECURE_NO_DEPRECATE /GS- /Fo%s %s"
+      !cl
+      extra
+      target
+      src
+  in
   let cmd =
     match !toolchain with
-    | `MSVC ->
-        Printf.sprintf
-          "cl /DMSVC /c /MD /nologo -D_CRT_SECURE_NO_DEPRECATE /GS- /Fo%s %s"
-          target
-          src
-    | `MSVC64 ->
-        Printf.sprintf
-          "cl /DMSVC /DMSVC64 /c /MD /nologo -D_CRT_SECURE_NO_DEPRECATE /GS- /Fo%s %s"
-          target
-          src
+    | `MSVC -> call_cl ""
+    | `MSVC64 -> call_cl "/DMSVC64"
     | `CYGWIN | `CYGWIN64 -> call_gcc "-DCYGWIN"
     | `MINGW | `MINGW64 -> call_gcc "-DMINGW"
     | `GNAT -> call_gcc ""
-    | `LIGHTLD ->
-        failwith "Compilation of C code is not supported for this toolchain"
+    | `LIGHTLD -> failwith "Compilation of C code is not supported for this toolchain"
   in
   if !verbose >= 1 || !dry_mode then Printf.printf "+ %s\n%!" cmd;
   if not !dry_mode && Sys.command cmd <> 0

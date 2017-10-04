@@ -53,6 +53,8 @@ MSVC_PREFIX=
 MSVC64_PREFIX=
 MSVCC=cl.exe $(MSVC_FLAGS)
 MSVCC64=cl.exe $(MSVC_FLAGS)
+MSVC_CCPREFIX=
+MSVC64_CCPREFIX=
 else
 ifeq ($(SDK),)
 # Otherwise, assume the 32-bit version of VS 2008 or Win7 SDK is in the path.
@@ -69,6 +71,8 @@ MSVC64_PREFIX=LIB="$(MSVC64_LIB)" INCLUDE="$(MSVC_INCLUDE)"
 
 MSVCC = $(MSVCC_ROOT)/cl.exe $(MSVC_FLAGS)
 MSVCC64 = $(MSVCC_ROOT)/amd64/cl.exe $(MSVC_FLAGS)
+MSVC_CCPREFIX=-cc-prefix $(MSVCC_ROOT)/
+MSVC64_CCPREFIX=-cc-prefix $(MSVCC_ROOT)/amd64/
 else
 MSVCC_ROOT:=
 MSVC_PREFIX=PATH="$(SDK):$(PATH)" LIB="$(SDK_LIB);$(LIB)" INCLUDE="$(SDK_INC);$(INCLUDE)"
@@ -76,6 +80,8 @@ MSVC64_PREFIX=PATH="$(SDK64):$(PATH)" LIB="$(SDK64_LIB);$(LIB)" INCLUDE="$(SDK64
 
 MSVCC = cl.exe $(MSVC_FLAGS)
 MSVCC64 = cl.exe $(MSVC_FLAGS)
+MSVC_CCPREFIX=
+MSVC64_CCPREFIX=
 endif
 endif
 
@@ -147,47 +153,26 @@ version.res: version.rc
 version_res.o: version.rc
 	$(TOOLPREF)windres version.rc version_res.o
 
-flexdll_msvc.obj: flexdll.h flexdll.c
-	$(MSVC_PREFIX) $(MSVCC) /DMSVC -c /Fo"flexdll_msvc.obj" flexdll.c
+flexdll_initer_msvc.obj flexdll_msvc.obj: flexdll.h flexdll.c flexdll_initer.c flexlink.exe
+	$(MSVC_PREFIX) ./flexlink -v -install -o . -chain msvc $(MSVC_CCPREFIX)
 
-flexdll_msvc64.obj: flexdll.h flexdll.c
-	$(MSVC64_PREFIX) $(MSVCC64) /DMSVC /DMSVC64 -c /Fo"flexdll_msvc64.obj" flexdll.c
+flexdll_initer_msvc64.obj flexdll_msvc64.obj: flexdll.h flexdll.c flexdll_initer.c flexlink.exe
+	$(MSVC64_PREFIX) ./flexlink -v -install -o . -chain msvc64 $(MSVC64_CCPREFIX)
 
-flexdll_cygwin.o: flexdll.h flexdll.c
-	$(CYGCC) -c -DCYGWIN -o flexdll_cygwin.o flexdll.c
+flexdll_initer_cygwin.o flexdll_cygwin.o: flexdll.h flexdll.c flexdll_initer.c flexlink.exe
+	./flexlink -v -install -o . -chain cygwin
 
-flexdll_cygwin64.o: flexdll.h flexdll.c
-	$(CYG64CC) -c -DCYGWIN -o flexdll_cygwin64.o flexdll.c
+flexdll_initer_cygwin64.o flexdll_cygwin64.o: flexdll.h flexdll.c flexdll_initer.c flexlink.exe
+	./flexlink -v -install -o . -chain cygwin64
 
-flexdll_mingw.o: flexdll.h flexdll.c
-	$(MINCC) -c -DMINGW -o flexdll_mingw.o flexdll.c
+flexdll_initer_mingw.o flexdll_mingw.o: flexdll.h flexdll.c flexdll_initer.c flexlink.exe
+	./flexlink -v -install -o . -chain mingw
 
-flexdll_gnat.o: flexdll.h flexdll.c
-	gcc -c -o flexdll_gnat.o flexdll.c
+flexdll_initer_mingw64.o flexdll_mingw64.o: flexdll.h flexdll.c flexdll_initer.c flexlink.exe
+	./flexlink -v -install -o . -chain mingw64
 
-flexdll_mingw64.o: flexdll.h flexdll.c
-	$(MIN64CC) -c -DMINGW -o flexdll_mingw64.o flexdll.c
-
-flexdll_initer_msvc.obj: flexdll_initer.c
-	$(MSVC_PREFIX) $(MSVCC) -c /Fo"flexdll_initer_msvc.obj" flexdll_initer.c
-
-flexdll_initer_msvc64.obj: flexdll_initer.c
-	$(MSVC64_PREFIX) $(MSVCC64) -c /Fo"flexdll_initer_msvc64.obj" flexdll_initer.c
-
-flexdll_initer_cygwin.o: flexdll_initer.c
-	$(CYGCC) -c -o flexdll_initer_cygwin.o flexdll_initer.c
-
-flexdll_initer_cygwin64.o: flexdll_initer.c
-	$(CYG64CC) -c -o flexdll_initer_cygwin64.o flexdll_initer.c
-
-flexdll_initer_mingw.o: flexdll_initer.c
-	$(MINCC) -c -o flexdll_initer_mingw.o flexdll_initer.c
-
-flexdll_initer_gnat.o: flexdll_initer.c
-	gcc -c -o flexdll_initer_gnat.o flexdll_initer.c
-
-flexdll_initer_mingw64.o: flexdll_initer.c
-	$(MIN64CC) -c -o flexdll_initer_mingw64.o flexdll_initer.c
+flexdll_initer_gnat.o flexdll_gnat.o: flexdll.h flexdll.c flexdll_initer.c flexlink.exe
+	./flexlink -v -install -o . -chain gnat
 
 
 demo_msvc: flexlink.exe flexdll_msvc.obj flexdll_initer_msvc.obj
