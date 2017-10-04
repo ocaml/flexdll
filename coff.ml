@@ -484,6 +484,8 @@ module Section = struct
     vaddress = 0l; vsize = 0l;  sec_opts = flags;
   }
 
+  let nreloc_ovfl = 0x01000000l
+
   let get filebase strtbl symtbl ic base =
     let buf = read ic base 40 in
     let size = int32_ buf 16 in
@@ -495,7 +497,7 @@ module Section = struct
     let va = int32 buf 12 in
 
     let nrelocs = int16 buf 32 in
-    let more_relocs = int32 buf 36 &&& 0x01000000l <> 0l in
+    let more_relocs = int32 buf 36 &&& nreloc_ovfl <> 0l in
     let base_relocs = filebase + int32_ buf 24 in
     let base_relocs, nrelocs =
       if more_relocs then begin
@@ -597,7 +599,7 @@ module Section = struct
     if many_relocs then emit_int16 oc 0xffff
     else emit_int16 oc nrelocs;
     emit_int16 oc 0;
-    let sec_opts = if many_relocs then x.sec_opts ||| 0x01000000l else x.sec_opts in
+    let sec_opts = if many_relocs then x.sec_opts ||| nreloc_ovfl else x.sec_opts &&& Int32.lognot nreloc_ovfl in
     emit_int32 oc sec_opts;
 
     send_data, send_reloc
