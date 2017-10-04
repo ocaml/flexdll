@@ -33,6 +33,10 @@ let flexdir =
   with Not_found ->
     Filename.dirname Sys.executable_name
 
+let runtime_objects_dir =
+  if !runtime_objects_dir = "" then flexdir
+  else !runtime_objects_dir
+
 let ext_obj () =
   if !toolchain = `MSVC || !toolchain = `MSVC64 then ".obj" else ".o"
 
@@ -1375,7 +1379,7 @@ let dump fn =
 let all_files () =
   let files = List.rev (List.map compile_if_needed !files) in
   let f obj =
-    let fn = Filename.concat flexdir obj in
+    let fn = Filename.concat runtime_objects_dir obj in
     (* Allow the obj files to be stored in a different location *)
     if file_exists fn <> None then
       fn

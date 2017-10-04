@@ -13,6 +13,7 @@ let underscore = ref true
 
 let machine : [ `x86 | `x64 ] ref = ref `x86
 
+let runtime_objects_dir = ref ""
 let cc_prefix = ref ""
 let noexport = ref false
 let custom_crt = ref false
@@ -216,6 +217,9 @@ let specs = [
 
   "-cc-prefix", Arg.Set_string cc_prefix,
   "<file> Add an explicit directory or a prefix in front of the C compiler (cl / gcc) and other tools";
+
+  "-runtime-objects", Arg.Set_string runtime_objects_dir,
+  "<dir> Specify in which directory the flexdll runtime objects are found";
 
   "--", Arg.Rest (fun s -> extra_args := s :: !extra_args),
   " Following arguments are passed verbatim to the linker";
