@@ -2,6 +2,9 @@ Next version
 - Bug fix: the IMAGE_SCN_LNK_NRELOC_OVFL section flag was not propertly reset when
   the number of relocations was reduced enough to fit in the 16-bit field,
   causing https://caml.inria.fr/mantis/view.php?id=7603
+- Support for passing argument through external files (-arg/-arg0)
+  (Bernhard Schommer)
+
 
 Version 0.36
 - Add Unicode support (patch by Nicolás Ojeda Bär)
