@@ -249,7 +249,7 @@ package_bin:
 	$(MAKE) clean all
 	rm -f $(PACKAGE_BIN)
 	zip $(PACKAGE_BIN) $(COMMON_FILES) \
-	    flexlink.exe flexdll_*.obj flexdll_*.o
+	    flexlink.exe flexdll_*.obj flexdll_*.o flexdll.c flexdll_initer.c
 
 do_upload_bin:
 	rsync $(PACKAGE_BIN) $(URL)
@@ -268,7 +268,7 @@ PREFIX = "C:\Program Files (x86)\flexdll"
 
 install:
 	mkdir -p $(PREFIX)
-	cp $(COMMON_FILES) flexlink.exe flexdll_*.obj flexdll_*.o $(PREFIX)
+	cp $(COMMON_FILES) flexlink.exe flexdll_*.obj flexdll_*.o flexdll.c flexdll_initer.c $(PREFIX)
 
 installer:
 	rm -rf flexdll_install_files
