@@ -151,7 +151,13 @@ let toutf16 s =
   let cp n = Buffer.add_char b (Char.chr (n land 0xFF)); Buffer.add_char b (Char.chr ((n lsr 8) land 0xFF)) in
   while !i < String.length s do
     let n = utf8_next s i in
-    if n <= 0xFFFF then cp n else (cp (0xD7C0 + (n lsl 10)); cp (0xDC00 + (n land 0x3FF)))
+    if n <= 0xFFFF then
+      cp n
+    else
+      (* Surrogates *)
+      let n = n - 0x10000 in
+      cp (0xD800 + (n lsr 10));
+      cp (0xDC00 + (n land 0x3FF))
   done;
   Buffer.contents b
 

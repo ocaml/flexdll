@@ -4,7 +4,7 @@ Next version
   causing https://caml.inria.fr/mantis/view.php?id=7603
 - Support for passing argument through external files (-arg/-arg0)
   (Bernhard Schommer)
-
+- Fix encoding of high surrogate for U+10000-U+10FFFF in UTF-16 response files (David Allsopp)
 
 Version 0.36
 - Add Unicode support (patch by Nicolás Ojeda Bär)
