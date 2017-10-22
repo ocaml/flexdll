@@ -61,6 +61,10 @@ case $OCAMLBRANCH in
         ;;
 esac
 
+if [ $OCAMLBRANCH = "4.03" ] ; then
+  sed -i -e "s/:=.*/:=/" config/Makefile.msvc64
+fi
+
 configure_ocaml
 
 if [ ! -f $OCAMLROOT/STAMP ] || [ "$(git rev-parse HEAD)" != "$(cat $OCAMLROOT/STAMP)" ]; then
