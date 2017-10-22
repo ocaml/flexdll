@@ -38,3 +38,8 @@ module String = struct
       (map Char.lowercase_ascii, map Char.uppercase_ascii)
 end
 
+module Uchar = struct
+  let unsafe_of_int c = c
+
+  let to_int c = c
+end

@@ -131,7 +131,7 @@ COMPILER-$(OCAML_VERSION):
 
 test_ver = $(shell if [ $(OCAML_VERSION) -lt $(1) ] ; then echo lt ; fi)
 
-Compat.ml: COMPILER-$(OCAML_VERSION) $(if $(call test_ver,4060),Compat406.ml) $(if $(call test_ver,4050),Compat405.ml) $(if $(call test_ver,4030),Compat403.ml) $(if $(call test_ver,4020),Compat402.ml)
+Compat.ml: COMPILER-$(OCAML_VERSION) $(if $(call test_ver,4020),Compat402.ml) $(if $(call test_ver,4030),Compat403.ml) $(if $(call test_ver,4050),Compat405.ml) $(if $(call test_ver,4060),Compat406.ml)
 	cat $^ > $@
 
 flexlink.exe: $(OBJS) $(RES)
