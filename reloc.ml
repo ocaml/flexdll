@@ -147,11 +147,9 @@ let utf8_next s i =
 
 let toutf16 s =
   let i = ref 0 in
-  let b = Buffer.create (String.length s) in
-  let cp n = Buffer.add_char b (Char.chr (n land 0xFF)); Buffer.add_char b (Char.chr ((n lsr 8) land 0xFF)) in
+  let b = Buffer.create (String.length s * 2) in
   while !i < String.length s do
-    let n = utf8_next s i in
-    if n <= 0xFFFF then cp n else (cp (0xD7C0 + (n lsl 10)); cp (0xDC00 + (n land 0x3FF)))
+    Buffer.add_utf_16le_uchar b (Uchar.unsafe_of_int (utf8_next s i))
   done;
   Buffer.contents b
 
