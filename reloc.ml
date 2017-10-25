@@ -17,7 +17,9 @@ let search_path = ref []
 let default_libs = ref []
 
 let gcc = ref "gcc"
+let cl = ref "cl"
 let objdump = ref "objdump"
+let link = ref "link"
 
 let is_crt_lib = function
   | "LIBCMT"
@@ -30,6 +32,10 @@ let flexdir =
     if s = "" then raise Not_found else s
   with Not_found ->
     Filename.dirname Sys.executable_name
+
+let runtime_objects_dir =
+  if !runtime_objects_dir = "" then flexdir
+  else !runtime_objects_dir
 
 let ext_obj () =
   if !toolchain = `MSVC || !toolchain = `MSVC64 then ".obj" else ".o"
@@ -1016,7 +1022,8 @@ let build_dll link_exe output_file files exts extra_args =
            with the Windows 7 SDK in 64-bit mode. *)
 
         Printf.sprintf
-          "link /nologo %s%s%s%s%s /implib:%s /out:%s /subsystem:%s %s %s %s"
+          "%s /nologo %s%s%s%s%s /implib:%s /out:%s /subsystem:%s %s %s %s"
+          !link
           (if !verbose >= 2 then "/verbose " else "")
           (if link_exe = `EXE then "" else "/dll ")
           (if main_pgm then "" else "/export:symtbl /export:reloctbl ")
@@ -1196,6 +1203,7 @@ let remove_duplicate_paths paths =
 
 let setup_toolchain () =
   let mingw_libs pre =
+    let pre = if !cc_prefix = "" then pre else !cc_prefix in
     gcc := pre ^ "gcc";
     objdump := pre ^ "objdump";
     let rec get_lib_search_dirs input =
@@ -1227,24 +1235,39 @@ let setup_toolchain () =
     if !exe_mode = `EXE then default_libs := "crt2.o" :: !default_libs
     else default_libs := "dllcrt2.o" :: !default_libs
   in
+  let cygwin pre =
+    let pre = if !cc_prefix = "" then pre else !cc_prefix in
+    gcc := pre ^ "gcc";
+    objdump := pre ^ "objdump";
+    let lib_search_dirs =
+      [
+        "/lib";
+        "/lib/w32api";
+        Filename.dirname (get_output1 ~use_bash:true (!gcc ^ " -print-libgcc-file-name"));
+      ]
+    in
+    search_path := !dirs @ lib_search_dirs;
+    if !verbose >= 1  then begin
+      print_endline "lib search dirs:";
+      List.iter (Printf.printf "  %s\n%!") lib_search_dirs;
+    end;
+    default_libs := ["-lkernel32"; "-luser32"; "-ladvapi32";
+                     "-lshell32"; "-lcygwin"; "-lgcc"]
+  in
   match !toolchain with
   | _ when !builtin_linker ->
       search_path := !dirs;
       add_flexdll_obj := false;
       noentry := true
-  | `CYGWIN | `CYGWIN64 ->
-      gcc := "gcc";
-      objdump := "objdump";
-      search_path :=
-        !dirs @
-          [
-           "/lib";
-           "/lib/w32api";
-           Filename.dirname (get_output1 ~use_bash:true "gcc -print-libgcc-file-name");
-          ];
-      default_libs := ["-lkernel32"; "-luser32"; "-ladvapi32";
-                       "-lshell32"; "-lcygwin"; "-lgcc"]
+  | `CYGWIN ->
+      cygwin Version.cygwin_prefix
+  |  `CYGWIN64 ->
+      cygwin Version.cygwin64_prefix
   | `MSVC | `MSVC64 ->
+      if !cc_prefix <> "" then begin
+        cl := !cc_prefix ^ "cl";
+        link := !cc_prefix ^ "link";
+      end;
       search_path := !dirs @
         parse_libpath (try Sys.getenv "LIB" with Not_found -> "");
       if not !custom_crt then
@@ -1256,17 +1279,19 @@ let setup_toolchain () =
   | `GNAT ->
    (* This is a plain copy of the mingw version, but we do not change the
       prefix and use "gnatls" to compute the include dir. *)
-    search_path :=
-      !dirs @
-      [
-       Filename.dirname (get_output1 (!gcc ^ " -print-libgcc-file-name"));
-       read_gnatls ();
-      ];
-    default_libs :=
-      ["-lmingw32"; "-lgcc"; "-lmoldname"; "-lmingwex"; "-lmsvcrt";
-       "-luser32"; "-lkernel32"; "-ladvapi32"; "-lshell32" ];
-    if !exe_mode = `EXE then default_libs := "crt2.o" :: !default_libs
-    else default_libs := "dllcrt2.o" :: !default_libs
+      gcc := !cc_prefix ^ "gcc";
+      objdump := !cc_prefix ^ "objdump";
+      search_path :=
+        !dirs @
+        [
+          Filename.dirname (get_output1 (!gcc ^ " -print-libgcc-file-name"));
+          read_gnatls ();
+        ];
+      default_libs :=
+        ["-lmingw32"; "-lgcc"; "-lmoldname"; "-lmingwex"; "-lmsvcrt";
+         "-luser32"; "-lkernel32"; "-ladvapi32"; "-lshell32" ];
+      if !exe_mode = `EXE then default_libs := "crt2.o" :: !default_libs
+      else default_libs := "dllcrt2.o" :: !default_libs
   | `LIGHTLD ->
       search_path := !dirs
 
@@ -1298,18 +1323,13 @@ let compile_if_needed file =
     let cmd = match !toolchain with
       | `MSVC | `MSVC64 ->
           Printf.sprintf
-            "cl /c /MD /nologo /Fo%s %s %s%s"
+            "%s /c /MD /nologo /Fo%s %s %s%s"
+            !cl
             (Filename.quote tmp_obj)
             (mk_dirs_opt "/I")
             file
             pipe
-      | `CYGWIN | `CYGWIN64 ->
-          Printf.sprintf
-            "gcc -c -o %s %s %s"
-            (Filename.quote tmp_obj)
-            (mk_dirs_opt "-I")
-            file
-      | `MINGW | `MINGW64 | `GNAT ->
+      | `CYGWIN | `CYGWIN64 | `MINGW | `MINGW64 | `GNAT ->
           Printf.sprintf
             "%s -c -o %s %s %s"
             !gcc
@@ -1326,6 +1346,16 @@ let compile_if_needed file =
     tmp_obj
   end else
     file
+
+let toolchain_suffix () =
+  match !toolchain with
+  | `MSVC -> "msvc.obj"
+  | `MSVC64 -> "msvc64.obj"
+  | `CYGWIN -> "cygwin.o"
+  | `CYGWIN64 -> "cygwin64.o"
+  | `MINGW64 -> "mingw64.o"
+  | `GNAT    -> "gnat.o"
+  | `MINGW | `LIGHTLD -> "mingw.o"
 
 let dump fn =
   let fn = find_file fn in
@@ -1347,26 +1377,54 @@ let dump fn =
 let all_files () =
   let files = List.rev (List.map compile_if_needed !files) in
   let f obj =
-    let fn = Filename.concat flexdir obj in
+    let fn = Filename.concat runtime_objects_dir obj in
     (* Allow the obj files to be stored in a different location *)
     if file_exists fn <> None then
       fn
     else
       obj in
-  let tc = match !toolchain with
-  | `MSVC -> "msvc.obj"
-  | `MSVC64 -> "msvc64.obj"
-  | `CYGWIN -> "cygwin.o"
-  | `CYGWIN64 -> "cygwin64.o"
-  | `MINGW64 -> "mingw64.o"
-  | `GNAT    -> "gnat.o"
-  | `MINGW | `LIGHTLD -> "mingw.o" in
+  let tc = toolchain_suffix () in
   if !exe_mode <> `DLL then
     if !add_flexdll_obj then f ("flexdll_" ^ tc) :: files
     else files
   else
     if !noentry then files
     else f ("flexdll_initer_" ^ tc) :: files
+
+let install file =
+  let target = Filename.concat !output_file file ^ "_" ^ toolchain_suffix () in
+  let target = Filename.quote (if !use_cygpath then cygpath1 target else target) in
+  let src = Filename.quote (Filename.concat flexdir file ^ ".c") in
+  let call_gcc extra =
+    Printf.sprintf
+      "%s -c %s -o %s %s"
+      !gcc
+      extra
+      target
+      src
+  in
+  let call_cl extra =
+    Printf.sprintf
+      "%s /DMSVC %s /c /MD /nologo -D_CRT_SECURE_NO_DEPRECATE /GS- /Fo%s %s"
+      !cl
+      extra
+      target
+      src
+  in
+  let cmd =
+    match !toolchain with
+    | `MSVC -> call_cl ""
+    | `MSVC64 -> call_cl "/DMSVC64"
+    | `CYGWIN | `CYGWIN64 -> call_gcc "-DCYGWIN"
+    | `MINGW | `MINGW64 -> call_gcc "-DMINGW"
+    | `GNAT -> call_gcc ""
+    | `LIGHTLD -> failwith "Compilation of C code is not supported for this toolchain"
+  in
+  if !verbose >= 1 || !dry_mode then Printf.printf "+ %s\n%!" cmd;
+  if not !dry_mode && Sys.command cmd <> 0
+  then
+    failwith (Printf.sprintf "Error while compiling %s.c" file)
+
 
 let main () =
   parse_cmdline ();
@@ -1406,6 +1464,9 @@ let main () =
         (String.concat " " (List.map Filename.quote (List.rev !extra_args)))
   | `PATCH ->
       patch_output !output_file
+  | `INSTALL ->
+      install "flexdll";
+      install "flexdll_initer"
 
 let () =
   try main ()

@@ -13,6 +13,8 @@ let underscore = ref true
 
 let machine : [ `x86 | `x64 ] ref = ref `x86
 
+let runtime_objects_dir = ref ""
+let cc_prefix = ref ""
 let noexport = ref false
 let custom_crt = ref false
 let reexport_from_implibs = ref true
@@ -36,7 +38,7 @@ let exts = ref []
 let output_file = ref ""
 let exe_mode : [`DLL | `EXE | `MAINDLL] ref = ref `DLL
 let extra_args = ref []
-let mode : [`NORMAL | `DUMP | `PATCH] ref = ref `NORMAL
+let mode : [`NORMAL | `DUMP | `PATCH | `INSTALL] ref = ref `NORMAL
 let defexports = ref []
 let noentry = ref false
 let use_cygpath = ref true
@@ -209,6 +211,15 @@ let specs = [
 
   "-U", Arg.String (fun _ -> ()),
   "<symbol> (Ignored)";
+
+  "-install", Arg.Unit (fun () -> mode := `INSTALL),
+  " Compile runtime support file for the selected toolchain";
+
+  "-cc-prefix", Arg.Set_string cc_prefix,
+  "<file> Add an explicit directory or a prefix in front of the C compiler (cl / gcc) and other tools";
+
+  "-runtime-objects", Arg.Set_string runtime_objects_dir,
+  "<dir> Specify in which directory the flexdll runtime objects are found";
 
   "--", Arg.Rest (fun s -> extra_args := s :: !extra_args),
   " Following arguments are passed verbatim to the linker";
