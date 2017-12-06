@@ -634,6 +634,9 @@ let needed imported defined unalias obj =
     | Some s when not (StrSet.mem name defined) ->
         imported := StrSet.add s !imported;
         if StrSet.mem s defined then s else name
+    | None when not (StrSet.mem name defined) && StrSet.mem ("__imp_" ^ name) defined ->
+        imported := StrSet.add ("__imp_" ^ name) !imported;
+        "__imp_" ^ name
     | _ -> name
   in
   List.fold_left
