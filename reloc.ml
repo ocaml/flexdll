@@ -1247,7 +1247,7 @@ let setup_toolchain () =
       List.iter (Printf.printf "  %s\n%!") lib_search_dirs;
     end;
     default_libs :=
-      ["-lmingw32"; "-lgcc"; "-lmoldname"; "-lmingwex"; "-lmsvcrt";
+      ["-lmingw32"; "-lgcc"; "-lgcc_eh"; "-lmoldname"; "-lmingwex"; "-lmsvcrt";
        "-luser32"; "-lkernel32"; "-ladvapi32"; "-lshell32" ];
     if !exe_mode = `EXE then default_libs := "crt2.o" :: !default_libs
     else default_libs := "dllcrt2.o" :: !default_libs
