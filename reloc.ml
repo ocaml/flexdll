@@ -662,7 +662,10 @@ let build_dll link_exe output_file files exts extra_args =
   let loaded_filenames : (string,unit) Hashtbl.t = Hashtbl.create 16 in
   let read_file fn =
     if Lib.is_dll fn then `Lib ([], dll_exports fn)
-    else Lib.read fn
+    else begin
+      if !verbose >= 2 then Printf.printf "** open: %s\n" fn;
+      Lib.read fn
+    end
   in
   let files = List.map (fun fn -> fn, read_file fn) files in
 
