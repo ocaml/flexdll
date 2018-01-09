@@ -186,7 +186,7 @@ type cmdline = {
 let new_cmdline () =
   let rf = match !toolchain with
   | `MSVC | `MSVC64 | `LIGHTLD -> true
-  | `MINGW | `MINGW64 | `GNAT | `CYGWIN | `CYGWIN64 -> false
+  | `MINGW | `MINGW64 | `GNAT | `GNAT64 | `CYGWIN | `CYGWIN64 -> false
   in
   {
    may_use_response_file = rf;
@@ -585,7 +585,7 @@ let parse_dll_exports fn =
 let dll_exports fn = match !toolchain with
   | `MSVC | `MSVC64 | `LIGHTLD ->
       failwith "Creation of import library not supported for this toolchain"
-  | `GNAT | `CYGWIN | `CYGWIN64 | `MINGW | `MINGW64 ->
+  | `GNAT | `GNAT64 | `CYGWIN | `CYGWIN64 | `MINGW | `MINGW64 ->
       let dmp = temp_file "dyndll" ".dmp" in
       if cmd_verbose (Printf.sprintf "%s -p %s > %s" !objdump fn dmp) <> 0
       then failwith "Error while extracting exports from a DLL";
@@ -1058,7 +1058,7 @@ let build_dll link_exe output_file files exts extra_args =
           files
           def_file
           extra_args
-    | `MINGW | `MINGW64 | `GNAT ->
+    | `MINGW | `MINGW64 | `GNAT | `GNAT64 ->
         let def_file =
           if main_pgm then ""
           else
@@ -1253,7 +1253,7 @@ let setup_toolchain () =
       mingw_libs Version.mingw_prefix
   | `MINGW64 ->
       mingw_libs Version.mingw64_prefix
-  | `GNAT ->
+  | `GNAT | `GNAT64 ->
    (* This is a plain copy of the mingw version, but we do not change the
       prefix and use "gnatls" to compute the include dir. *)
     search_path :=
@@ -1309,7 +1309,7 @@ let compile_if_needed file =
             (Filename.quote tmp_obj)
             (mk_dirs_opt "-I")
             file
-      | `MINGW | `MINGW64 | `GNAT ->
+      | `MINGW | `MINGW64 | `GNAT | `GNAT64 ->
           Printf.sprintf
             "%s -c -o %s %s %s"
             !gcc
@@ -1359,7 +1359,8 @@ let all_files () =
   | `CYGWIN -> "cygwin.o"
   | `CYGWIN64 -> "cygwin64.o"
   | `MINGW64 -> "mingw64.o"
-  | `GNAT    -> "gnat.o"
+  | `GNAT     -> "gnat.o"
+  | `GNAT64     -> "gnat64.o"
   | `MINGW | `LIGHTLD -> "mingw.o" in
   if !exe_mode <> `DLL then
     if !add_flexdll_obj then f ("flexdll_" ^ tc) :: files
@@ -1377,7 +1378,7 @@ let main () =
       match !toolchain, !cygpath_arg with
       | _, `Yes -> true
       | _, `No -> false
-      | (`GNAT|`MINGW|`MINGW64|`CYGWIN|`CYGWIN64), `None ->
+      | (`GNAT|`GNAT64|`MINGW|`MINGW64|`CYGWIN|`CYGWIN64), `None ->
           begin match Sys.os_type with
           | "Unix" | "Cygwin" ->
               Sys.command "cygpath -S 2>/dev/null >/dev/null" = 0
