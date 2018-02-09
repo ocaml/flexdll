@@ -1116,7 +1116,9 @@ let build_dll link_exe output_file files exts extra_args =
         in
 
         let extra_args =
-          if !machine = `x64 then (Printf.sprintf "/base:%s " !base_addr) ^ extra_args else extra_args
+          match !machine, !base_addr with
+          | `x64, Some base_addr -> Printf.sprintf "/base:%s %s" base_addr extra_args
+          | _ -> extra_args
         in
 
         let extra_args =
@@ -1161,6 +1163,11 @@ let build_dll link_exe output_file files exts extra_args =
             close_out oc;
             Filename.quote def_file
         in
+        let extra_args =
+          match !machine, !base_addr with
+          | `x64, Some base_addr -> Printf.sprintf "-Xlinker --image-base -Xlinker %s %s" base_addr extra_args
+          | _ -> extra_args
+        in
         Printf.sprintf
           "%s %s%s -L. %s %s -o %s %s %s %s %s"
           !gcc
@@ -1181,6 +1188,11 @@ let build_dll link_exe output_file files exts extra_args =
             Printf.fprintf oc "EXPORTS\n  reloctbl\n  symtbl\n";
             close_out oc;
             Filename.quote def_file
+        in
+        let extra_args =
+          match !machine, !base_addr with
+          | `x64, Some base_addr -> Printf.sprintf "-Xlinker --image-base -Xlinker %s %s" base_addr extra_args
+          | _ -> extra_args
         in
         Printf.sprintf
           "%s -m%s %s%s -L. %s %s -o %s %s %s %s %s %s"

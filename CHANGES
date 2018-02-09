@@ -1,4 +1,7 @@
 Next version
+- GPR#52: -base option consistently applied to mingw64, cygwin64 and msvc64.
+  Default is no longer specified, making msvc64 consistent with the other two
+  ports (David Allsopp)
 - GPR#127: Recognise hyphens in option names in the COFF .drectve section. Fixes #126 (Reza Barazesh)
 - GPR#136: Fix parallel access crashes and misbehavior (David Allsopp, Jan Midtgaard, Antonin Décimo)
 - GPR#140: Fixes #29. Support relocation kind 0003 (IMAGE_REL_AMD64_ADDR32NB) and
