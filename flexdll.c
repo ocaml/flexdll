@@ -501,6 +501,28 @@ int flexdll_relocate(void *tbl) {
   return 1;
 }
 
+void set_env_ptr(char* name, void* ptr) {
+  char env[256];
+
+#if defined(CYGWIN) || __STDC_SECURE_LIB__ >= 200411L
+  sprintf(env, "%p", ptr);
+#endif
+
+#ifdef CYGWIN
+  setenv(name, env, 1);
+#elif __STDC_SECURE_LIB__ >= 200411L
+  _putenv_s(name, env);
+#else
+  {
+    char* s;
+    sprintf(env, "%s=%p", name, relocate);
+    s = malloc(strlen(env) + 1);
+    strcpy(s, env);
+    putenv(s);
+  }
+#endif
+}
+
 #ifdef CYGWIN
 void *flexdll_dlopen(const char *file, int mode) {
 #else
@@ -508,32 +530,14 @@ void *flexdll_wdlopen(const wchar_t *file, int mode) {
 #endif
   void *handle;
   dlunit *unit;
-  char flexdll_relocate_env[256];
   int exec = (mode & FLEXDLL_RTLD_NOEXEC ? 0 : 1);
-  void* relocate = (exec ? &flexdll_relocate : 0);
 
   err_t * err;
   err = get_tls_error(TLS_ERROR_RESET);
   if(err == NULL) return NULL;
   if (!file) return &main_unit;
 
-#ifdef CYGWIN
-  sprintf(flexdll_relocate_env,"%p",relocate);
-  setenv("FLEXDLL_RELOCATE", flexdll_relocate_env, 1);
-#else
-#if __STDC_SECURE_LIB__ >= 200411L
-  sprintf(flexdll_relocate_env,"%p",relocate);
-  _putenv_s("FLEXDLL_RELOCATE", flexdll_relocate_env);
-#else
-  {
-    char* s;
-    sprintf(flexdll_relocate_env,"FLEXDLL_RELOCATE=%p",relocate);
-    s = malloc(strlen(flexdll_relocate_env) + 1);
-    strcpy(s, flexdll_relocate_env);
-    putenv(s);
-  }
-#endif /* __STDC_SECURE_LIB__ >= 200411L*/
-#endif /* CYGWIN */
+  set_env_ptr("FLEXDLL_RELOCATE", (exec ? &flexdll_relocate : 0));
 
 again:
   if (units_mutex == INVALID_HANDLE_VALUE) {
