@@ -19,16 +19,27 @@
 #include <windows.h>
 
 typedef int func(void*);
+typedef int func_v2(void*,void*);
 
 extern int reloctbl;
+extern int jmptbl;
 
 static int flexdll_init() {
   func *sym = 0;
-  char *s = getenv("FLEXDLL_RELOCATE");
-  if (!s) { fprintf(stderr, "Cannot find FLEXDLL_RELOCATE\n"); return FALSE; }
-  sscanf(s,"%p",&sym);
-  /* sym = 0 means "loaded not for execution" */
-  if (!sym || sym(&reloctbl)) return TRUE;
+  func_v2 *sym_v2 = 0;
+  char *s = getenv("FLEXDLL_RELOCATE_V2");
+  /* If the supplied symbol is NULL, treat as "loaded not for execution" */
+  if (!s) {
+    s = getenv("FLEXDLL_RELOCATE");
+    if (!s) { fprintf(stderr, "Cannot find FLEXDLL_RELOCATE\n"); return FALSE; }
+    /* The executable image doesn't support the V2 interface, so RELOC_REL32
+       may fail. */
+    sscanf(s, "%p", &sym);
+    if (!sym || sym(&reloctbl)) return TRUE;
+  } else {
+    sscanf(s, "%p", &sym_v2);
+    if (!sym_v2 || sym_v2(&reloctbl, &jmptbl)) return TRUE;
+  }
   return FALSE;
 }
 

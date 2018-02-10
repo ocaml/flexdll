@@ -2,6 +2,12 @@ Next version
 - GPR#52: -base option consistently applied to mingw64, cygwin64 and msvc64.
   Default is no longer specified, making msvc64 consistent with the other two
   ports (David Allsopp)
+- GPR#52: 64-bit ports can now always process RELOC_REL32* jumps by generating
+  trampolines for cases where the relocations are more than 32GiB away. New
+  functionality passed as flexdll_relocate_v2, which allows mixing executables
+  and DLLs compiled with and without the new features. If either executable or
+  DLL lacks the flexdll_relocate_v2 support, then it falls back to the previous
+  error message if a RELOC_REL32 is more than 2GiB away. (David Allsopp)
 - GPR#127: Recognise hyphens in option names in the COFF .drectve section. Fixes #126 (Reza Barazesh)
 - GPR#136: Fix parallel access crashes and misbehavior (David Allsopp, Jan Midtgaard, Antonin Décimo)
 - GPR#140: Fixes #29. Support relocation kind 0003 (IMAGE_REL_AMD64_ADDR32NB) and
