@@ -51,7 +51,7 @@ typedef struct dlunit {
   int count;
   struct dlunit *next,*prev;
 } dlunit;
-typedef void *resolver(void*, const char*);
+typedef dynsymbol *resolver(void*, const char*);
 
 static HANDLE units_mutex = INVALID_HANDLE_VALUE;
 
@@ -267,6 +267,7 @@ static void relocate(resolver f, void *data, reloctbl *tbl, err_t *err) {
   SYSTEM_INFO si;
   char *page_start, *page_end;
   char *prev_page_start = (char*)1, *prev_page_end = (char*)1;
+  dynsymbol *sym;
 
   if (!tbl) return;
 
@@ -278,12 +279,13 @@ static void relocate(resolver f, void *data, reloctbl *tbl, err_t *err) {
   for (ptr = tbl->entries; ptr->kind; ptr++) {
     if (ptr->kind & RELOC_DONE) continue;
 
-    s = (UINT_PTR) f(data,ptr->name);
-    if (!s) {
+    sym = f(data, ptr->name);
+    if (!sym) {
       err->code = 2;
       cannot_resolve_msg(ptr->name, err);
       goto restore;
     }
+    s = (UINT_PTR)sym->addr;
 
     /* Set up page protection to allow the relocation.  We will undo
        the change on the next relocation if it falls in a different
@@ -432,7 +434,7 @@ static int compare_dynsymbol(const void *s1, const void *s2) {
   return strcmp(((dynsymbol*) s1) -> name, ((dynsymbol*) s2) -> name);
 }
 
-static void *find_symbol(symtbl *tbl, const char *name) {
+static dynsymbol *find_symbol(symtbl *tbl, const char *name) {
   static dynsymbol s;
   dynsymbol *sym;
 
@@ -442,7 +444,7 @@ static void *find_symbol(symtbl *tbl, const char *name) {
   sym =
     bsearch(&s,&tbl->entries,tbl->size, sizeof(dynsymbol),&compare_dynsymbol);
 
-  return (NULL == sym ? NULL : sym -> addr);
+  return sym;
 }
 
 
@@ -467,8 +469,8 @@ static void unlink_unit(dlunit *unit) {
   if (unit->next) unit->next->prev=unit->prev;
 }
 
-static void *find_symbol_global(void *data, const char *name) {
-  void *sym;
+static dynsymbol *find_symbol_global(void *data, const char *name) {
+  dynsymbol *sym;
   dlunit *unit;
   (void)data; /* data is unused */
 
@@ -616,7 +618,7 @@ void flexdll_dlclose(void *u) {
 
 
 void *flexdll_dlsym(void *u, const char *name) {
-  void *res;
+  dynsymbol *res;
   err_t * err;
   err = get_tls_error(TLS_ERROR_NOP);
   if (err == NULL) return NULL;
@@ -629,7 +631,7 @@ void *flexdll_dlsym(void *u, const char *name) {
   else if (NULL == u) res = find_symbol(&static_symtable,name);
   else res = find_symbol(((dlunit*)u)->symtbl,name);
   ReleaseMutex(units_mutex);
-  return res;
+  return (res ? res->addr : NULL);
 }
 
 char *flexdll_dlerror(void) {
