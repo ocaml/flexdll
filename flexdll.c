@@ -373,10 +373,10 @@ static void relocate(resolver f, void *data, reloctbl *tbl, void **jmptbl, err_t
             void* trampoline = sym->trampoline = *jmptbl;
             /* movq $(sym->addr), %rax */
             *((short*)trampoline) = 0xb848;
-            *((UINT_PTR*)(trampoline + 2)) = (UINT_PTR)sym->addr;
+            *((UINT_PTR*)((char*)trampoline + 2)) = (UINT_PTR)sym->addr;
             /* jmp %rax */
-            *((short*)(trampoline + 10)) = 0xe0ff;
-            *jmptbl += 16;
+            *((short*)((char*)trampoline + 10)) = 0xe0ff;
+            *((char*)jmptbl) += 16;
           }
           s = (UINT_PTR)(sym->trampoline);
           s -= (INT_PTR)(ptr->addr) + rel_offset;
