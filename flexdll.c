@@ -386,7 +386,7 @@ static void relocate(resolver f, void *data, reloctbl *tbl, void **jmptbl, err_t
             *((UINT_PTR*)((char*)trampoline + 7)) = (UINT_PTR)sym->addr;
             /* Pad with nop */
             *(((char*)trampoline + 15)) = 0x90;
-            *((char*)jmptbl) += 16;
+            *((UINT_PTR*)jmptbl) += 16;
           }
           s = (UINT_PTR)(sym->trampoline);
           s -= (INT_PTR)(ptr->addr) + rel_offset;
