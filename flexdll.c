@@ -380,11 +380,12 @@ static void relocate(resolver f, void *data, reloctbl *tbl, void **jmptbl, err_t
               return;
             }
             trampoline = sym->trampoline = *jmptbl;
-            /* movq $(sym->addr), %rax */
-            *((short*)trampoline) = 0xb848;
-            *((UINT_PTR*)((char*)trampoline + 2)) = (UINT_PTR)sym->addr;
-            /* jmp %rax */
-            *((short*)((char*)trampoline + 10)) = 0xe0ff;
+            /* rex.W jmpq $0x0(%rip) */
+            *((__int64*)trampoline) = 0x25ff48;
+            /* Place the actual symbol immediately after the instruction */
+            *((UINT_PTR*)((char*)trampoline + 7)) = (UINT_PTR)sym->addr;
+            /* Pad with nop */
+            *(((char*)trampoline + 15)) = 0x90;
             *((char*)jmptbl) += 16;
           }
           s = (UINT_PTR)(sym->trampoline);
