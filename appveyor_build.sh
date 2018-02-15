@@ -221,7 +221,9 @@ if [ "$SKIP_OCAML_TEST" = no ] ; then
     run "git checkout $APPVEYOR_REPO_COMMIT" git checkout merge
     cd ..
 
+    mv $OCAMLROOT $OCAMLROOT-Disabled
     run "make world" $MAKEOCAML flexdll world
+    mv $OCAMLROOT-Disabled $OCAMLROOT
 fi
 
 if [ "$ARTEFACTS" = 'yes' ] ; then
