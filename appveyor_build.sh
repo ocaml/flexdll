@@ -206,6 +206,16 @@ popd
 if [ "$SKIP_OCAML_TEST" = no ] ; then
     configure_ocaml full
 
+    if [[ -e otherlibs/win32unix/Makefile ]]; then
+      unix_dir='win32'
+    else
+      unix_dir=''
+    fi
+    # This tortures the ocamldoc compilation as it means that dllcamlstr,
+    # dllunix and ocamlrun will all be more than 2GiB apart.
+    sed -i -e "s/^LDOPTS=.*/\0 -ldopt -base -ldopt 0x210000000/" "otherlibs/${unix_dir}unix/Makefile"
+    sed -i -e "/^include \.\.\/Makefile/aLDOPTS=-ldopt -base -ldopt 0x310000000" otherlibs/str/Makefile
+
     cd flexdll
     git remote add local $(echo "$APPVEYOR_BUILD_FOLDER"| cygpath -f -) -f --tags
     run "git checkout $APPVEYOR_REPO_COMMIT" git checkout merge
