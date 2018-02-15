@@ -24,24 +24,32 @@ function configure_ocaml {
         sed -i -e 's/@iflexdir@/-I"$(ROOTDIR)\/flexdll"/' Makefile.config.in
       fi
 
+      if [ "$1" = "full" ] ; then
+        DISABLE=()
+      else
+        DISABLE=(--disable-debugger \
+                 --disable-ocamldoc \
+                 --disable-systhreads \
+                 --disable-str-lib \
+                 --disable-unix-lib \
+                 --disable-bigarray-lib \
+                 $GRAPHICS_DISABLE \
+                 $OCAMLTEST_DISABLE \
+                 --disable-debug-runtime)
+      fi
       ./configure --build=x86_64-pc-cygwin --host=$OCAML_TARGET \
-                    --prefix=$OCAMLROOT \
-                    --disable-debugger \
-                    --disable-ocamldoc \
-                    --disable-systhreads \
-                    --disable-str-lib \
-                    --disable-unix-lib \
-                    --disable-bigarray-lib \
-                    $GRAPHICS_DISABLE \
-                    $OCAMLTEST_DISABLE \
-                    --disable-debug-runtime
+                  --prefix=$OCAMLROOT "${DISABLE[@]}"
     else
       # "Classic" configuration
       cp config/m-nt.h $HEADER_DIR/m.h
       cp config/s-nt.h $HEADER_DIR/s.h
 
-      sed -e "s|PREFIX=.*|PREFIX=$OCAMLROOT|" \
-          -e 's/\(OTHERLIBRARIES\|WITH_DEBUGGER\|WITH_OCAMLDOC\|DEBUGGER\|EXTRALIBS\|WITH_OCAMLBUILD\|CAMLP4\)=.*/\1=/' \
+      if [ "$1" = "full" ] ; then
+        DISABLE=()
+      else
+        DISABLE=(-e 's/\(OTHERLIBRARIES\|WITH_OCAMLDOC\|WITH_DEBUGGER\|DEBUGGER\|EXTRALIBS\|WITH_OCAMLBUILD\|CAMLP4\)=.*/\1=/')
+      fi
+      sed -e "s|PREFIX=.*|PREFIX=$OCAMLROOT|" "${DISABLE[@]}" \
           config/Makefile.$OCAML_PORT > $CONFIG_DIR/Makefile
       #run "Content of config/Makefile" cat $CONFIG_DIR/Makefile
     fi
@@ -196,7 +204,7 @@ done
 popd
 
 if [ "$SKIP_OCAML_TEST" = no ] ; then
-    configure_ocaml
+    configure_ocaml full
 
     cd flexdll
     git remote add local $(echo "$APPVEYOR_BUILD_FOLDER"| cygpath -f -) -f --tags
