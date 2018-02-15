@@ -858,7 +858,7 @@ let build_dll link_exe output_file files exts extra_args =
     List.iter (fun fn -> collect_file (find_file fn)) exts;
 
     if main_pgm then add_def (usym "static_symtable")
-    else (add_def (usym "reloctbl"); add_def (usym "jmptbl"));
+    else (add_def (usym "reloctbl"); if !machine = `x64 then add_def (usym "jmptbl"));
 
     if !machine = `x64 then add_def "__ImageBase"
     else add_def "___ImageBase";
@@ -1045,7 +1045,8 @@ let build_dll link_exe output_file files exts extra_args =
     (usym (if main_pgm then "static_symtable" else "symtbl"));
   if not main_pgm then begin
     add_master_reloc_table obj !reloctbls (usym "reloctbl");
-    add_master_jmp_table obj !trampolines (usym "jmptbl");
+    if !machine = `x64 then
+      add_master_jmp_table obj !trampolines (usym "jmptbl");
   end;
 
   if !errors then
@@ -1147,10 +1148,11 @@ let build_dll link_exe output_file files exts extra_args =
            with the Windows 7 SDK in 64-bit mode. *)
 
         Printf.sprintf
-          "link /nologo %s%s%s%s%s /implib:%s /out:%s /subsystem:%s %s %s %s"
+          "link /nologo %s%s%s%s%s%s /implib:%s /out:%s /subsystem:%s %s %s %s"
           (if !verbose >= 2 then "/verbose " else "")
           (if link_exe = `EXE then "" else "/dll ")
-          (if main_pgm then "" else "/export:symtbl /export:reloctbl /export:jmptbl ")
+          (if main_pgm then "" else "/export:symtbl /export:reloctbl ")
+          (if main_pgm || !machine = `x86 then "" else "/export:jmptbl ")
           (if main_pgm then "" else if !noentry then "/noentry " else
           let s =
             match !machine with
@@ -1170,7 +1172,9 @@ let build_dll link_exe output_file files exts extra_args =
           if main_pgm then ""
           else
             let def_file, oc = open_temp_file "flexlink" ".def" in
-            Printf.fprintf oc "EXPORTS\n  reloctbl\n  symtbl\n  jmptbl\n";
+            Printf.fprintf oc "EXPORTS\n  reloctbl\n  symtbl\n";
+            if !machine = `x64 then
+              Printf.fprintf oc "  jmptbl\n";
             close_out oc;
             Filename.quote def_file
         in
@@ -1196,7 +1200,9 @@ let build_dll link_exe output_file files exts extra_args =
           if main_pgm then ""
           else
             let def_file, oc = open_temp_file "flexlink" ".def" in
-            Printf.fprintf oc "EXPORTS\n  reloctbl\n  symtbl\n  jmptbl\n";
+            Printf.fprintf oc "EXPORTS\n  reloctbl\n  symtbl\n";
+            if !machine = `x64 then
+              Printf.fprintf oc "  jmptbl\n";
             close_out oc;
             Filename.quote def_file
         in
