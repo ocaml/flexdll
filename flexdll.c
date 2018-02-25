@@ -371,8 +371,8 @@ static void relocate(resolver f, void *data, reloctbl *tbl, void **jmptbl, err_t
 retry:
       if (s != (INT32) s) {
         if (!jmptbl) {
-          sprintf(err->message, "flexdll error: cannot relocate RELOC_%s, target is too far: %p  %p",
-                  reloc_type, (void *)((UINT_PTR) s), (void *) ((UINT_PTR)(INT32) s));
+          sprintf(err->message, "flexdll error: cannot relocate %s RELOC_%s, target is too far: %p  %p",
+                  ptr->name, reloc_type, (void *)((UINT_PTR) s), (void *) ((UINT_PTR)(INT32) s));
           err->code = 3;
           return;
         }
@@ -380,8 +380,8 @@ retry:
           void* trampoline;
           /* trampolines cannot be created for data */
           if (VirtualQuery(sym->addr, &info, sizeof(info)) && !(info.Protect & 0xf0)) {
-            sprintf(err->message, "flexdll error: cannot relocate RELOC_%s, target is too far, and not executable: %p  %p",
-                    reloc_type, (void *)((UINT_PTR) s), (void *) ((UINT_PTR)(INT32) s));
+            sprintf(err->message, "flexdll error: cannot relocate %s RELOC_%s, target is too far, and not executable: %p  %p",
+                    ptr->name, reloc_type, (void *)((UINT_PTR) s), (void *) ((UINT_PTR)(INT32) s));
             err->code = 3;
             return;
           }
