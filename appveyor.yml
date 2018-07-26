@@ -14,6 +14,8 @@ environment:
     - OCAMLBRANCH: 4.05
     - OCAMLBRANCH: 4.06
       SKIP_OCAML_TEST: no
+    - OCAMLBRANCH: 4.07
+      SKIP_OCAML_TEST: no
     - OCAMLBRANCH: trunk
       SKIP_OCAML_TEST: no
   OCAMLROOT: C:/OCaml
