@@ -1,3 +1,10 @@
+## Tips to build flexdll:
+##
+##  To use an already configured 64-bit MSVC toolchain:
+##     make all MSVC_DETECT=0 CHAINS="mingw mingw64 cygwin cygwin64 msvc64"
+##
+
+
 VERSION = 0.37
 all: flexlink.exe support
 
