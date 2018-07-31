@@ -389,8 +389,8 @@ let add_reloc_table obj obj_name p =
         | `x64, 0x08 when not !no_rel_relocs-> 0x0003 (* rel32_4 *)
         | `x64, 0x06 when not !no_rel_relocs-> 0x0005 (* rel32_2 *)
 
-        | `x86, (0x0a (* IMAGE_REL_I386_SECTION *) |
-                 0x0b (* IMAGE_REL_I386_SECREL*) ) ->
+        | (`x86 | `x64), (0x0a (* IMAGE_REL_{I386|AMD64}_SECTION *) |
+                          0x0b (* IMAGE_REL_{I386|AMD64}_SECREL*) ) ->
             0x0100 (* debug relocs: ignore *)
 
         | _, k  ->
