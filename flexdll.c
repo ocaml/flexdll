@@ -14,6 +14,8 @@
 #include <windows.h>
 #include "flexdll.h"
 
+#define FLEXDLL_DEBUG 0
+
 /* Guard against compiling with the wrong cl! */
 #ifdef MSVC
 #if defined(_M_AMD64) && !defined(MSVC64)
@@ -146,11 +148,26 @@ static void dump_master_reloctbl(reloctbl **ptr) {
   while (*ptr) dump_reloctbl(*ptr++);
 }
 
+#if FLEXDLL_DEBUG
+static LARGE_INTEGER perf_freq;
+static double allow_write_time;
+static int allow_write_count;
+#endif
+
 static void allow_write(char *begin, char *end, DWORD new, PDWORD old) {
   static long int pagesize = 0;
   int res;
   SYSTEM_INFO si;
+#if FLEXDLL_DEBUG
+  LARGE_INTEGER perf_count;
+  double time1, time2;
 
+  if (perf_freq.QuadPart == 0) {
+    QueryPerformanceFrequency(&perf_freq);
+  }
+  QueryPerformanceCounter(&perf_count);
+  time1 = (double)perf_count.QuadPart/perf_freq.QuadPart;
+#endif
   if (0 == pagesize) {
     GetSystemInfo (&si);
     pagesize = si.dwPageSize;
@@ -163,6 +180,12 @@ static void allow_write(char *begin, char *end, DWORD new, PDWORD old) {
     exit(2);
   }
   /* printf("%p -> %p\n", *old, new); */
+#if FLEXDLL_DEBUG
+  QueryPerformanceCounter(&perf_count);
+  time2 = (double)perf_count.QuadPart/perf_freq.QuadPart;
+  allow_write_time += time2 - time1;
+  ++allow_write_count;
+#endif
 }
 
 /* Avoid the use of snprintf */
@@ -177,18 +200,18 @@ static void cannot_resolve_msg(char *name) {
 
 static void relocate(resolver f, void *data, reloctbl *tbl) {
   reloc_entry *ptr;
-  nonwr *wr;
   INT_PTR s;
-  /*
   DWORD old;
+  /*
   MEMORY_BASIC_INFORMATION info;
   */
 
   if (!tbl) return;
 
-  for (wr = tbl->nonwr; wr->last != 0; wr++)
-    allow_write(wr->first,wr->last + sizeof(UINT_PTR),PAGE_EXECUTE_WRITECOPY,&wr->old);
-
+#if FLEXDLL_DEBUG
+  allow_write_time = 0.;
+  allow_write_count = 0;
+#endif
   for (ptr = tbl->entries; ptr->kind; ptr++) {
     if (ptr->kind & RELOC_DONE) continue;
 
@@ -209,6 +232,7 @@ static void relocate(resolver f, void *data, reloctbl *tbl) {
       cannot_resolve_msg(ptr->name);
       return;
     }
+    allow_write((char*)ptr->addr,(char*)(ptr->addr + 1),PAGE_READWRITE,&old);
     switch (ptr->kind & 0xff) {
     case RELOC_ABS:
       *(ptr->addr) += s;
@@ -254,9 +278,11 @@ static void relocate(resolver f, void *data, reloctbl *tbl) {
       *((UINT32*) ptr->addr) = s;
       break;
     default:
+      allow_write((char*)ptr->addr,(char*)(ptr->addr + 1),old,&old);
       fprintf(stderr, "flexdll: unknown relocation kind");
       exit(2);
     }
+    allow_write((char*)ptr->addr,(char*)(ptr->addr + 1),old,&old);
     ptr->kind |= RELOC_DONE;
 
     /*
@@ -265,10 +291,9 @@ static void relocate(resolver f, void *data, reloctbl *tbl) {
     printf("p = %p, base = %p, allocBase = %p, allocProtect = %x, state = %x, protect = %x, type = %x\n",  ptr->addr, info.BaseAddress, info.AllocationBase, info.AllocationProtect, info.State, info.Protect, info.Type);
     */
   }
-
-  /* Restore permissions. Should do it also in case of failure... */
-  for (wr = tbl->nonwr; wr->last != 0; wr++)
-    allow_write(wr->first,wr->last + 4,wr->old,&wr->old);
+#if FLEXDLL_DEBUG
+  fprintf(stderr, "allow_write() calls: %d, total time: %f sec\n", allow_write_count, allow_write_time); fflush(stderr);
+#endif
 }
 
 static void relocate_master(resolver f, void *data, reloctbl **ptr) {
