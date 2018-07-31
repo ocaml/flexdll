@@ -49,7 +49,7 @@ cd ocaml
 
 MAKEOCAML=make
 CONFIG_DIR=config
-HEADER_DIR=byterun/caml
+HEADER_DIR=runtime/caml
 
 case $OCAMLBRANCH in
     4.03|4.04)
@@ -59,6 +59,8 @@ case $OCAMLBRANCH in
     4.05)
         HEADER_DIR=config
         ;;
+    4.06|4.07)
+        HEADER_DIR=byterun/caml
 esac
 
 if [ $OCAMLBRANCH = "4.03" ] ; then
