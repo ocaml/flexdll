@@ -146,25 +146,6 @@ static void dump_master_reloctbl(reloctbl **ptr) {
   while (*ptr) dump_reloctbl(*ptr++);
 }
 
-static void allow_write(char *begin, char *end, DWORD new, PDWORD old) {
-  static long int pagesize = 0;
-  int res;
-  SYSTEM_INFO si;
-
-  if (0 == pagesize) {
-    GetSystemInfo (&si);
-    pagesize = si.dwPageSize;
-  }
-
-  begin -= (size_t) begin % pagesize;
-  res = VirtualProtect(begin, end - begin, new, old);
-  if (0 == res) {
-    fprintf(stderr, "natdynlink: VirtualProtect failed (%s), begin = 0x%p, end = 0x%p, new = %x\n", ll_dlerror(), begin, end, new);
-    exit(2);
-  }
-  /* printf("%p -> %p\n", *old, new); */
-}
-
 /* Avoid the use of snprintf */
 static void cannot_resolve_msg(char *name) {
   static char msg[] = "Cannot resolve ";
@@ -179,36 +160,62 @@ static void relocate(resolver f, void *data, reloctbl *tbl) {
   reloc_entry *ptr;
   nonwr *wr;
   INT_PTR s;
-  /*
-  DWORD old;
-  MEMORY_BASIC_INFORMATION info;
-  */
+  DWORD prev_protect;
+  static long int page_size = 0;
+  SYSTEM_INFO si;
+  char *page_start, *page_end;
+  char *prev_page_start = (char*)1, *prev_page_end = (char*)1;
 
   if (!tbl) return;
 
-  for (wr = tbl->nonwr; wr->last != 0; wr++)
-    allow_write(wr->first,wr->last + sizeof(UINT_PTR),PAGE_EXECUTE_WRITECOPY,&wr->old);
+  if (0 == page_size) {
+    GetSystemInfo (&si);
+    page_size = si.dwPageSize;
+  }
 
   for (ptr = tbl->entries; ptr->kind; ptr++) {
     if (ptr->kind & RELOC_DONE) continue;
-
-    /*
-    assert(VirtualQuery(ptr->addr, &info, sizeof(info)) == sizeof(info));
-    printf("p = %p, base = %p, allocBase = %p, allocProtect = %x, state = %x, protect = %x, type = %x\n",  ptr->addr, info.BaseAddress, info.AllocationBase, info.AllocationProtect, info.State, info.Protect, info.Type);
-
-    allow_write(ptr->addr,ptr->addr+4,PAGE_EXECUTE_WRITECOPY,&old);
-
-    assert(VirtualQuery(ptr->addr, &info, sizeof(info)) == sizeof(info));
-    printf("p = %p, base = %p, allocBase = %p, allocProtect = %x, state = %x, protect = %x, type = %x\n",  ptr->addr, info.BaseAddress, info.AllocationBase, info.AllocationProtect, info.State, info.Protect, info.Type);
-    */
-
 
     s = (UINT_PTR) f(data,ptr->name);
     if (!s) {
       error = 2;
       cannot_resolve_msg(ptr->name);
-      return;
+      goto restore;
     }
+
+    /* Set up page protection to allow the relocation.  We will undo
+       the change on the next relocation if it falls in a different
+       page (or at the end of the process), to avoid too many calls to
+       VirtualProtect.
+
+       prev_page_start, prev_page_end, prev_protect: describe the
+       protection to be reset.
+
+       Note that a single relocation can fall between two pages.
+    */
+
+    page_start = (char*)ptr->addr;
+    page_end = page_start+((ptr->kind & 0xff) == RELOC_ABS ? sizeof(UINT_PTR) - 1 : 3);
+    page_start -= (size_t) page_start % page_size;
+    page_end -= (size_t) page_end % page_size;
+
+    if (prev_page_start != page_start || prev_page_end != page_end) {
+      if (prev_page_start != (char*)1) {
+        /* Restore */
+        if (0 == VirtualProtect(prev_page_start, prev_page_end-prev_page_start+page_size, prev_protect, &prev_protect)) {
+          fprintf(stderr, "natdynlink: VirtualProtect failed (%s), page_start = 0x%p\n", ll_dlerror(), page_start);
+          exit(2);
+        }
+      }
+
+      prev_page_start = page_start;
+      prev_page_end = page_end;
+      if (0 == VirtualProtect(page_start, page_end-page_start+page_size, PAGE_READWRITE, &prev_protect)) {
+        fprintf(stderr, "natdynlink: VirtualProtect failed (%s), page_start = 0x%p\n", ll_dlerror(), page_start);
+        exit(2);
+      }
+    }
+
     switch (ptr->kind & 0xff) {
     case RELOC_ABS:
       *(ptr->addr) += s;
@@ -219,7 +226,7 @@ static void relocate(resolver f, void *data, reloctbl *tbl) {
       if (s != (INT32) s) {
         sprintf(error_buffer, "flexdll error: cannot relocate RELOC_REL32, target is too far: %p  %p", (void *)((UINT_PTR) s), (void *) ((UINT_PTR)(INT32) s));
         error = 3;
-        return;
+        goto restore;
       }
       *((UINT32*) ptr->addr) = s;
       break;
@@ -229,7 +236,7 @@ static void relocate(resolver f, void *data, reloctbl *tbl) {
       if (s != (INT32) s) {
         sprintf(error_buffer, "flexdll error: cannot relocate RELOC_REL32_4, target is too far: %p  %p",(void *)((UINT_PTR) s), (void *) ((UINT_PTR)(INT32) s));
         error = 3;
-        return;
+        goto restore;
       }
       *((UINT32*) ptr->addr) = s;
       break;
@@ -239,7 +246,7 @@ static void relocate(resolver f, void *data, reloctbl *tbl) {
       if (s != (INT32) s) {
         sprintf(error_buffer, "flexdll error: cannot relocate RELOC_REL32_1, target is too far: %p  %p",(void *)((UINT_PTR) s), (void *) ((UINT_PTR)(INT32) s));
         error = 3;
-        return;
+        goto restore;
       }
       *((UINT32*) ptr->addr) = s;
       break;
@@ -249,7 +256,7 @@ static void relocate(resolver f, void *data, reloctbl *tbl) {
       if (s != (INT32) s) {
         sprintf(error_buffer, "flexdll error: cannot relocate RELOC_REL32_2, target is too far: %p  %p",(void *)((UINT_PTR) s), (void *) ((UINT_PTR)(INT32) s));
         error = 3;
-        return;
+        goto restore;
       }
       *((UINT32*) ptr->addr) = s;
       break;
@@ -258,17 +265,15 @@ static void relocate(resolver f, void *data, reloctbl *tbl) {
       exit(2);
     }
     ptr->kind |= RELOC_DONE;
-
-    /*
-    allow_write(ptr->addr,ptr->addr+4,old,&old);
-    assert(VirtualQuery(ptr->addr, &info, sizeof(info)) == sizeof(info));
-    printf("p = %p, base = %p, allocBase = %p, allocProtect = %x, state = %x, protect = %x, type = %x\n",  ptr->addr, info.BaseAddress, info.AllocationBase, info.AllocationProtect, info.State, info.Protect, info.Type);
-    */
   }
-
-  /* Restore permissions. Should do it also in case of failure... */
-  for (wr = tbl->nonwr; wr->last != 0; wr++)
-    allow_write(wr->first,wr->last + 4,wr->old,&wr->old);
+ restore:
+  /* Restore page permission */
+  if (prev_page_start != (char*)1) {
+    if (0 == VirtualProtect(prev_page_start, prev_page_end-prev_page_start+page_size, prev_protect, &prev_protect)) {
+      fprintf(stderr, "natdynlink: VirtualProtect failed (%s), page_start = 0x%p\n", ll_dlerror(), page_start);
+      exit(2);
+    }
+  }
 }
 
 static void relocate_master(resolver f, void *data, reloctbl **ptr) {
