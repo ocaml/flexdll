@@ -2,6 +2,8 @@ Next version
 - GPR#58: Bug fix: fix -custom-crt regression (Dmitry Bely)
 - GPR#61: Ignore x64 debug relocs (Dmitry Bely)
 - GPR#49: Adding support for 64bit GNAT compiler (Johannes Kanig)
+- GPR#64: Fix problem with setting page permission during relocation (report
+  by Dmitry Bely)
 
 Version 0.37
 - Bug fix: the IMAGE_SCN_LNK_NRELOC_OVFL section flag was not propertly reset when
