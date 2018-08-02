@@ -34,8 +34,7 @@ typedef unsigned long uintnat;
 #define RELOC_DONE      0x0100
 
 typedef struct { UINT_PTR kind; char *name; UINT_PTR *addr; } reloc_entry;
-typedef struct { char *first; char *last; DWORD old; } nonwr;
-typedef struct { nonwr *nonwr; reloc_entry entries[]; } reloctbl;
+typedef struct { UINT_PTR magic; reloc_entry entries[]; } reloctbl;
 typedef struct { void *addr; char *name; } dynsymbol;
 typedef struct { UINT_PTR size; dynsymbol entries[]; } symtbl;
 typedef struct dlunit {
@@ -122,15 +121,9 @@ static char *ll_dlerror(void)
 
 static void dump_reloctbl(reloctbl *tbl) {
   reloc_entry *ptr;
-  nonwr *wr;
 
   if (!tbl) { printf("No relocation table\n"); return; }
   printf("Dynamic relocation table found at %p\n", tbl);
-
-  for (wr = tbl->nonwr; wr->last != 0; wr++)
-    printf(" Non-writable relocation in zone %p -> %p\n",
-	   wr->first,
-	   wr->last);
 
   for (ptr = tbl->entries; ptr->kind; ptr++)
     printf(" %p (kind:%04lx) (now:%p)  %s\n",
@@ -158,7 +151,6 @@ static void cannot_resolve_msg(char *name) {
 
 static void relocate(resolver f, void *data, reloctbl *tbl) {
   reloc_entry *ptr;
-  nonwr *wr;
   INT_PTR s;
   DWORD prev_protect;
   static long int page_size = 0;
@@ -167,6 +159,10 @@ static void relocate(resolver f, void *data, reloctbl *tbl) {
   char *prev_page_start = (char*)1, *prev_page_end = (char*)1;
 
   if (!tbl) return;
+  if (tbl->magic != 42) {
+    error = 4;
+    return;
+  }
 
   if (0 == page_size) {
     GetSystemInfo (&si);
@@ -463,6 +459,7 @@ char *flexdll_dlerror() {
   case 1: error = 0; return ll_dlerror();
   case 2: error = 0; return error_buffer;
   case 3: error = 0; return error_buffer;
+  case 4: error = 0; return "Invalid flexdll magic number (flexdll version mismatch?)";
   }
   return NULL;
 }

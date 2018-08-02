@@ -363,17 +363,14 @@ let add_reloc_table obj obj_name p =
   let sect = Section.create ".reltbl" 0xc0300040l in
   let data = Buffer.create 1024 in
   let strings = Buffer.create 1024 in
-  let nonwr = ref [] in
-  let nonwrsym = Symbol.intern sect 0l in
   let strsym = Symbol.intern sect 0l in
   let str_pos = Hashtbl.create 16 in
 
-  Reloc.abs !machine sect 0l nonwrsym;
-  int_to_buf data 0;
+  int_to_buf data 42;
 
   (* TODO: use a single symbol per section *)
   let syms = ref [] in
-  let reloc secsym min max rel =
+  let reloc secsym rel =
     if p rel.symbol then (
       (* kind *)
       let kind = match !machine, rel.rtype with
@@ -422,8 +419,6 @@ let add_reloc_table obj obj_name p =
         (Lazy.force secsym);
       int_to_buf data (Int32.to_int rel.addr);
 
-      if rel.addr <= !min then min := rel.addr;
-      if rel.addr >= !max then max := rel.addr;
       false
     ) else true
   in
@@ -437,36 +432,23 @@ let add_reloc_table obj obj_name p =
         sec.sec_name <- Printf.sprintf ".flexrefptrsection%i" (Oo.id (object end));
       end;
 
-    let min = ref Int32.max_int and max = ref Int32.min_int in
     let sym = lazy (let s = Symbol.intern sec 0l in
                     syms := s :: !syms;
                     s) in
 
-    sec.relocs <- filter (reloc sym min max) sec.relocs;
-    if (sec.sec_opts &&& 0x80000000l = 0l) && !min <= !max then
-      nonwr := (!min,!max,Lazy.force sym) :: !nonwr
+    sec.relocs <- filter (reloc sym) sec.relocs
   in
   List.iter section obj.sections;
   int_to_buf data 0;
+  int_to_buf data 0;
+  int_to_buf data 0;
   strsym.value <- Int32.of_int (Buffer.length data);
   Buffer.add_buffer data strings;
-  nonwrsym.value <- Int32.of_int (Buffer.length data);
-  List.iter
-    (fun (min,max,secsym) ->
-      Reloc.abs !machine sect (Int32.of_int (Buffer.length data)) secsym;
-      int_to_buf data (Int32.to_int min);
-      Reloc.abs !machine sect (Int32.of_int (Buffer.length data)) secsym;
-      int_to_buf data (Int32.to_int  max);
-      int_to_buf data 0;
-    )
-    !nonwr;
-  int_to_buf data 0;
-  int_to_buf data 0;
   sect.data <- `String (Buffer.to_bytes data);
   obj.sections <- sect :: obj.sections;
   obj.symbols <-
     (Symbol.export sname sect 0l) ::
-    strsym :: nonwrsym :: List.filter (fun x -> not (p x)) obj.symbols
+    strsym :: List.filter (fun x -> not (p x)) obj.symbols
     @ !syms;
   sname
 
