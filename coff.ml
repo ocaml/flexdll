@@ -901,11 +901,15 @@ module Lib = struct
     let obj size name =
 (*      Printf.printf "-> %s (size %i)\n" name size;  *)
       let pos = pos_in ic in
-      if size > 18 && read_str ic pos 6 = "\000\000\255\255\000\000"
-      then imports := Import.read ic pos size :: !imports
-      else objects := (name,
-                       Coff.get ic pos pos
-                         (Printf.sprintf "%s(%s)" libname name)) :: !objects
+      let buf = read ic pos 6 in
+      let coff = int16 buf 0 != 0 || int16 buf 2 != 0xFFFF in
+      let version = int16 buf 4 in
+      if size > 18 && not coff && version = 0 then
+        imports := Import.read ic pos size :: !imports
+      else if coff || (not coff && version >= 2) then
+        objects := (name,
+                    Coff.get ic pos pos
+                      (Printf.sprintf "%s(%s)" libname name)) :: !objects
     in
     let rec read_member () =
       let buf = read ic (pos_in ic) 60 in
