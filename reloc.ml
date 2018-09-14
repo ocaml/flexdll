@@ -68,7 +68,7 @@ let read_file fn =
 let get_output ?(use_bash = false) ?(accept_error=false) cmd =
   let fn = Filename.temp_file "flexdll" "" in
   let cmd' = cmd ^ " > " ^ (Filename.quote fn) in
-    if String.length cmd' < 8182 && not use_bash then
+    if String.length cmd' < 8161 && not use_bash then
       begin
         if (Sys.command cmd' <> 0) && not accept_error
         then failwith ("Cannot run " ^ cmd);
