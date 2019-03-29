@@ -1217,7 +1217,11 @@ let normalize_path path =
   let rec loop acc path =
     match path with
     | "."  :: path -> loop acc path
-    | ".." :: path -> loop (List.tl acc) path
+    | ".." :: path -> begin
+        match acc with
+        | ".." :: _ | [] -> loop (".." :: acc) path
+        | _ :: acc -> loop acc path
+      end
     | elem :: path -> loop (elem :: acc) path
     | [] -> List.rev acc
   in
