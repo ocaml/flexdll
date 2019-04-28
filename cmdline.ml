@@ -249,6 +249,9 @@ let parse_cmdline () =
         String.sub s 0 2 :: String.sub s 2 (String.length s - 2) :: tr rest
     | s :: rest when String.length s >= 5 && String.sub s 0 5 = "/link" ->
         "-link" :: String.sub s 5 (String.length s - 5) :: tr rest
+    (* Convert gcc linker option prefix -Wl, to flexlink linker prefix -link *)
+    | s :: rest when String.length s >= 6 && String.sub s 0 5 = "-Wl,-" ->
+        "-link" :: String.sub s 4 (String.length s - 4) :: tr rest
     | "-arg" :: x :: rest ->
         tr (Array.to_list (Arg.read_arg x)) @ rest
     | "-arg0" :: x :: rest ->
