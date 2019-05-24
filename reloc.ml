@@ -1002,7 +1002,7 @@ let build_dll link_exe output_file files exts extra_args =
         let c = open_out implib in output_string c "x"; close_out c;
         let _impexp = add_temp (Filename.chop_suffix implib ".lib" ^ ".exp") in
         let extra_args =
-          if !custom_crt then "/nodefaultlib:LIBCMT /nodefaultlib:MSVCRT " ^ extra_args
+          if !custom_crt then "/nodefaultlib:MSVCRT " ^ extra_args
           else "msvcrt.lib " ^ extra_args
         in
 
