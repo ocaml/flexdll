@@ -13,6 +13,13 @@
 open Coff
 open Cmdline
 
+let debug ?(dry_mode = {contents=false}) min_level fmt =
+  let print msg =
+    if !dry_mode || !verbose >= min_level then
+      Printf.printf "%s\n%!" msg
+  in
+    Printf.ksprintf print fmt
+
 let search_path = ref []
 let default_libs = ref []
 
@@ -208,7 +215,7 @@ let run_command cmdline cmd =
     output_string oc cmd;
     close_out oc;
 
-    if !verbose >= 1 then Printf.printf "(call with bash: %s)\n%!" fn;
+    debug 1 "(call with bash: %s)" fn;
     if Sys.command (Printf.sprintf "bash %s" fn) <> 0 then
       failwith "Error during linking\n"
   end else
@@ -561,7 +568,7 @@ let collect f l =
     l
 
 let cmd_verbose cmd =
-  if !verbose >= 1 then Printf.printf "+ %s\n" cmd;
+  debug 1 "+ %s" cmd;
   Sys.command cmd
 
 
@@ -690,7 +697,7 @@ let build_dll link_exe output_file files exts extra_args =
       (* Collect aliases *)
       List.iter
         (fun (x, y) ->
-           if !verbose >= 2 then Printf.printf "alias %s -> %s\n" x y;
+           debug 2 "alias %s -> %s" x y;
            Hashtbl.add aliases x y
         )
         (Coff.aliases obj);
@@ -718,7 +725,7 @@ let build_dll link_exe output_file files exts extra_args =
     and collect_file fn =
       if not (Hashtbl.mem collected (String.lowercase_ascii fn)) then begin
         Hashtbl.replace collected (String.lowercase_ascii fn) ();
-        if !verbose >= 2 then Printf.printf "** open: %s\n" fn;
+        debug 2 "** open: %s" fn;
         collect_defined fn (Lib.read fn)
       end
 
@@ -728,8 +735,7 @@ let build_dll link_exe output_file files exts extra_args =
           List.iter (fun (_, obj) -> collect_defined_obj obj) objs;
           List.iter
             (fun (s,_) ->
-               if !verbose >= 2 then
-                 Printf.printf "lib %s import symbol %s\n%!" fn s;
+               debug 2 "lib %s import symbol %s" fn s;
                from_imports := StrSet.add s !from_imports;
                add_def s;
                add_def ("__imp_" ^ s)
@@ -976,7 +982,7 @@ let build_dll link_exe output_file files exts extra_args =
           if x = "" then Filename.chop_extension output_file ^ ".def"
           else x
         in
-        if !verbose >= 1 then Printf.printf "Generate %s\n%!" fn;
+        debug 1 "Generate %s" fn;
         let oc = open_out fn in
         Printf.fprintf oc "LIBRARY %s\n" output_file;
         Printf.fprintf oc "EXPORTS\n";
@@ -1093,7 +1099,7 @@ let build_dll link_exe output_file files exts extra_args =
           (if !implib then "--out-implib " ^ Filename.quote (Filename.chop_extension output_file ^ ".a") else "")
           extra_args
   in
-  if !verbose >= 1 || !dry_mode then Printf.printf "+ %s\n%!" cmd;
+  debug ~dry_mode 1 "+ %s" cmd;
   if not !dry_mode then begin
     let manifest_file = output_file ^ ".manifest" in
     safe_remove manifest_file;
@@ -1117,7 +1123,7 @@ let build_dll link_exe output_file files exts extra_args =
                            else output_file ^ ";#2"))
           (Filename.quote fn)
       in
-      if !verbose >= 1 then Printf.printf "+ %s\n%!" mcmd;
+      debug 1 "+ %s" mcmd;
       if Sys.command mcmd <> 0 then
         failwith "Error while merging the manifest";
       safe_remove manifest_file;
@@ -1319,7 +1325,7 @@ let compile_if_needed file =
       | `LIGHTLD ->
           failwith "Compilation of C code is not supported for this toolchain"
     in
-    if !verbose >= 1 || !dry_mode then Printf.printf "+ %s\n%!" cmd;
+    debug ~dry_mode 1 "+ %s" cmd;
     let exit = if !dry_mode then 0 else Sys.command cmd in
     if pipe <> "" then display_msvc_output stdout file;
     if exit <> 0 then failwith "Error while compiling";
