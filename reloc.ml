@@ -206,7 +206,7 @@ let run_command cmdline cmd =
   (* note: for Cygwin, using bash allow to follow symlinks to find
      gcc... *)
   if !toolchain = `CYGWIN || !toolchain = `CYGWIN64 ||
-     String.length cmd_quiet >= 8192
+     String.length cmd_quiet >= max_command_length
   then begin
     (* Dump the command in a text file and apply bash to it. *)
     let (fn, oc) = open_temp_file "longcmd" "" in
