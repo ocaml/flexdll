@@ -80,7 +80,7 @@ let max_command_length =
 let get_output ?(use_bash = false) ?(accept_error=false) cmd =
   let fn = Filename.temp_file "flexdll" "" in
   let cmd' = cmd ^ " > " ^ (Filename.quote fn) in
-    if String.length cmd' < max_command_length && not use_bash then
+    if String.length cmd' <= max_command_length && not use_bash then
       begin
         if (Sys.command cmd' <> 0) && not accept_error
         then failwith ("Cannot run " ^ cmd);
@@ -202,27 +202,35 @@ let new_cmdline () =
   }
 
 let run_command cmdline cmd =
-  let cmd_quiet =
-    match !toolchain with
-    | `MSVC | `MSVC64 when !verbose < 1 -> cmd ^ " >NUL"
-    | _ -> cmd
+  let pipe_to_null = (!toolchain = `MSVC || !toolchain = `MSVC64) in
+  let silencer = if pipe_to_null then " >NUL 2>NUL" else ""
   in
   (* note: for Cygwin, using bash allow to follow symlinks to find
      gcc... *)
   if !toolchain = `CYGWIN || !toolchain = `CYGWIN64 ||
-     String.length cmd_quiet >= max_command_length
+     String.length cmd + String.length silencer > max_command_length
   then begin
     (* Dump the command in a text file and apply bash to it. *)
     let (fn, oc) = open_temp_file "longcmd" "" in
     output_string oc cmd;
+    if pipe_to_null then
+      output_string oc " &>/dev/null";
     close_out oc;
 
-    debug 1 "(call with bash: %s)" fn;
-    if Sys.command (Printf.sprintf "bash %s" fn) <> 0 then
+    debug 1 "(call with bash: %s)\n%!" fn;
+    let invoke = Printf.sprintf "bash %s" fn in
+    if Sys.command invoke <> 0 then begin
+      if pipe_to_null then begin
+        let oc = open_out fn in
+        output_string oc cmd;
+        close_out oc;
+        ignore (Sys.command invoke)
+      end;
       failwith "Error during linking\n"
+    end
   end else
-    if Sys.command cmd_quiet <> 0 then begin
-      if cmd <> cmd_quiet then ignore (Sys.command cmd);
+    if Sys.command (cmd ^ silencer) <> 0 then begin
+      if pipe_to_null then ignore (Sys.command cmd);
       failwith "Error during linking\n"
     end
 
