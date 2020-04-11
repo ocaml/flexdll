@@ -45,10 +45,10 @@ ifeq ($(findstring clean,$(MAKECMDGOALS)),)
 include Makefile.winsdk
 endif
 
-Makefile.winsdk: findwinsdk
-	bash ./findwinsdk x86 > $@
-	bash ./findwinsdk x64 64 >> $@
+Makefile.winsdk: msvs-detect
+	bash ./msvs-detect --output=make > $@
 
+# NB MSVC_DETECT is expected by OCaml's build system
 MSVC_DETECT=1
 MSVC_FLAGS=/nologo /MD -D_CRT_SECURE_NO_DEPRECATE /GS-
 
@@ -59,7 +59,7 @@ MSVC64_PREFIX=
 MSVCC=cl.exe $(MSVC_FLAGS)
 MSVCC64=cl.exe $(MSVC_FLAGS)
 else
-ifeq ($(SDK),)
+ifeq ($(MSVS_PATH),)
 # Otherwise, assume the 32-bit version of VS 2008 or Win7 SDK is in the path.
 
 MSVCC_ROOT := $(shell which cl.exe 2>/dev/null | cygpath -f - -ad | xargs -d \\n dirname 2>/dev/null | cygpath -f - -m)
@@ -76,8 +76,8 @@ MSVCC = $(MSVCC_ROOT)/cl.exe $(MSVC_FLAGS)
 MSVCC64 = $(MSVCC_ROOT)/amd64/cl.exe $(MSVC_FLAGS)
 else
 MSVCC_ROOT:=
-MSVC_PREFIX=PATH="$(SDK):$(PATH)" LIB="$(SDK_LIB);$(LIB)" INCLUDE="$(SDK_INC);$(INCLUDE)"
-MSVC64_PREFIX=PATH="$(SDK64):$(PATH)" LIB="$(SDK64_LIB);$(LIB)" INCLUDE="$(SDK64_INC);$(INCLUDE)"
+MSVC_PREFIX=PATH="$(MSVS_PATH)$(PATH)" LIB="$(MSVS_LIB)$(LIB)" INCLUDE="$(MSVS_INC)$(INCLUDE)"
+MSVC64_PREFIX=PATH="$(MSVS64_PATH)$(PATH)" LIB="$(MSVS64_LIB)$(LIB)" INCLUDE="$(MSVS64_INC)$(INCLUDE)"
 
 MSVCC = cl.exe $(MSVC_FLAGS)
 MSVCC64 = cl.exe $(MSVC_FLAGS)
@@ -86,8 +86,8 @@ endif
 
 show_root:
 ifeq ($(MSVCC_ROOT),)
-	@echo "$(SDK)"
-	@echo "$(SDK_LIB)"
+	@echo "$(MSVS_PATH)"
+	@echo "$(MSVS_LIB)"
 else
 	@echo "$(MSVCC_ROOT)"
 	@echo "$(MSVC_LIB)"
@@ -234,7 +234,7 @@ package_src:
 	rm -Rf flexdll-$(VERSION)
 	mkdir flexdll-$(VERSION)
 	mkdir flexdll-$(VERSION)/test
-	cp -a $(filter-out Compat.ml version.ml,$(OBJS) $(shell git ls-files Compat*.ml)) Makefile findwinsdk $(COMMON_FILES) version.rc flexdll-$(VERSION)/
+	cp -a $(filter-out Compat.ml version.ml,$(OBJS) $(shell git ls-files Compat*.ml)) Makefile msvs-detect $(COMMON_FILES) version.rc flexdll-$(VERSION)/
 	cp -aR test/Makefile test/*.c flexdll-$(VERSION)/test/
 	tar czf $(PACKAGE) flexdll-$(VERSION)
 	rm -Rf flexdll-$(VERSION)
