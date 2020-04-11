@@ -16,6 +16,10 @@ function run {
 
 function configure_ocaml {
     if [[ -z $HEADER_DIR ]] ; then
+      # Unfortunately, configure fails to set-up bootstrapping if flexlink is
+      # in PATH
+      sed -i -e 's/@iflexdir@/-I"$(ROOTDIR)\/flexdll"/' Makefile.config.in
+
       ./configure --build=i686-pc-cygwin --host=x86_64-pc-windows \
                     --prefix=$OCAMLROOT \
                     --disable-debugger \
