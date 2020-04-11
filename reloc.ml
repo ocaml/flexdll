@@ -312,7 +312,7 @@ let int_to_buf b i =
 let exportable s =
   match !machine with
   | `x86 ->
-      s <> "" && (s.[0] = '_'  || s.[0] = '?')
+      s <> "" && (s.[0] = '_' || s.[0] = '?')
   | `x64 ->
       if String.length s > 2 && s.[0] = '?' && s.[1] = '?' then false
       else true
@@ -393,7 +393,7 @@ let add_reloc_table obj obj_name p =
                           0x0b (* IMAGE_REL_{I386|AMD64}_SECREL*) ) ->
             0x0100 (* debug relocs: ignore *)
 
-        | _, k  ->
+        | _, k ->
             let msg =
               Printf.sprintf "Unsupported relocation kind %04x for %s in %s"
                 k rel.symbol.sym_name obj_name
@@ -456,7 +456,7 @@ let add_reloc_table obj obj_name p =
       Reloc.abs !machine sect (Int32.of_int (Buffer.length data)) secsym;
       int_to_buf data (Int32.to_int min);
       Reloc.abs !machine sect (Int32.of_int (Buffer.length data)) secsym;
-      int_to_buf data (Int32.to_int  max);
+      int_to_buf data (Int32.to_int max);
       int_to_buf data 0;
     )
     !nonwr;
@@ -502,7 +502,7 @@ let add_export_table obj exports symname =
   (* The runtime library assumes that names are sorted! *)
   int_to_buf data (List.length exports);
   List.iter
-    (fun s  ->
+    (fun s ->
        let sym = Symbol.extern s in
        obj.symbols <- sym :: obj.symbols;
        Reloc.abs !machine sect (Int32.of_int (Buffer.length data)) sym;
@@ -527,7 +527,7 @@ let add_master_reloc_table obj names symname =
   let data = Buffer.create 1024 in
   obj.symbols <- (Symbol.export symname sect 0l) :: obj.symbols;
   List.iter
-    (fun s  ->
+    (fun s ->
        let sym = Symbol.extern s in
        obj.symbols <- sym :: obj.symbols;
        Reloc.abs !machine sect (Int32.of_int (Buffer.length data)) sym;
@@ -799,7 +799,7 @@ let build_dll link_exe output_file files exts extra_args =
 
   (* Second step: transitive closure, starting from given objects *)
 
-  let libobjects  = Hashtbl.create 16 in
+  let libobjects = Hashtbl.create 16 in
   let reloctbls = ref [] in
   let exported = ref StrSet.empty in
 
@@ -1217,7 +1217,7 @@ let setup_toolchain () =
       |> remove_duplicate_paths
     in
     search_path := !dirs @ lib_search_dirs;
-    if !verbose >= 1  then begin
+    if !verbose >= 1 then begin
       print_endline "lib search dirs:";
       List.iter (Printf.printf "  %s\n%!") lib_search_dirs;
     end;
@@ -1359,8 +1359,8 @@ let all_files () =
   | `CYGWIN -> "cygwin.o"
   | `CYGWIN64 -> "cygwin64.o"
   | `MINGW64 -> "mingw64.o"
-  | `GNAT     -> "gnat.o"
-  | `GNAT64     -> "gnat64.o"
+  | `GNAT -> "gnat.o"
+  | `GNAT64 -> "gnat64.o"
   | `MINGW | `LIGHTLD -> "mingw.o" in
   if !exe_mode <> `DLL then
     if !add_flexdll_obj then f ("flexdll_" ^ tc) :: files

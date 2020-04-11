@@ -344,7 +344,7 @@ module Symbol = struct
     }
 
   let is_extern = function
-    |  { storage = 2; section = `Num 0; value = 0l } -> true
+    | { storage = 2; section = `Num 0; value = 0l } -> true
     | _ -> false
 
   let is_export = function
@@ -481,7 +481,7 @@ end
 module Section = struct
   let create name flags = {
     sec_pos = (-1); sec_name = name; data = `String (Bytes.of_string ""); relocs = [];
-    vaddress = 0l; vsize = 0l;  sec_opts = flags;
+    vaddress = 0l; vsize = 0l; sec_opts = flags;
   }
 
   let nreloc_ovfl = 0x01000000l
@@ -869,7 +869,7 @@ module Lib = struct
       let buf = read ic (pos_in ic) 60 in
       let base = pos_in ic in
       let size = int_of_string (strz (Bytes.sub buf 48 10) 0 ' ') in
-      let name = strz (Bytes.sub buf 0 16) 0 ' '  in
+      let name = strz (Bytes.sub buf 0 16) 0 ' ' in
       begin match name with
         | "/" | "" -> ()
         | "//" -> strtbl := read ic (pos_in ic) size
