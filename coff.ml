@@ -296,8 +296,7 @@ let rec dump ic pos len w =
     | '\032'..'\127' as c -> print_char c
     | _ -> print_char '.'
   done;
-  Printf.printf "\n";
-  flush stdout;
+  Printf.printf "\n%!";
   dump ic (pos + l) (len - l) w
 
 module Symbol = struct
@@ -736,7 +735,7 @@ module Coff = struct
                 s.auxs <- Bytes.make (Bytes.length auxs) '\000'
             | _ ->
                 Symbol.dump s;
-                Printf.printf "aux=%S\n" (Bytes.to_string s.auxs);
+                Printf.printf "aux=%S\n%!" (Bytes.to_string s.auxs);
                 assert false);
          (match s.section with
             | `Num i when i > 0 && i <= Array.length sections ->
@@ -773,7 +772,7 @@ module Coff = struct
     Printf.printf "opts:    0x%x\n" x.opts;
     List.iter Symbol.dump x.symbols;
     List.iter Section.dump x.sections;
-    ()
+    flush stdout
 
   let put oc x =
     emit_int16 oc x.machine;

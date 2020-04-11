@@ -406,7 +406,7 @@ let add_reloc_table obj obj_name p =
                 k rel.symbol.sym_name obj_name
             in
             failwith msg
-(*            Printf.eprintf "%s\n" msg;
+(*            Printf.eprintf "%s\n%!" msg;
             0x0001 *)
       in
       int_to_buf data kind;
@@ -612,7 +612,7 @@ let patch_output filename =
       in
       begin try Stacksize.set_stack_reserve filename x
       with exn ->
-        Printf.eprintf "Cannot set stack reserve: %s"
+        Printf.eprintf "Cannot set stack reserve: %s\n%!"
           (Printexc.to_string exn)
       end
   | None -> ()
@@ -824,7 +824,7 @@ let build_dll link_exe output_file files exts extra_args =
 
   let add_reloc name obj imps =
     if !show_imports && not (StrSet.is_empty imps) then (
-      Printf.printf "** Imported symbols for %s:\n" name;
+      Printf.printf "** Imported symbols for %s:\n%!" name;
       StrSet.iter print_endline imps
     );
     let sym = add_reloc_table obj name (fun s -> StrSet.mem s.sym_name imps) in
@@ -896,7 +896,7 @@ let build_dll link_exe output_file files exts extra_args =
           (* the linker will find this object in this library *)
       else begin
         if !explain then
-          Printf.printf "Library object %s(%s) needs to be rewritten\n"
+          Printf.printf "Library object %s(%s) needs to be rewritten\n%!"
             libname objname;
         Hashtbl.add redirect libname
           (close_obj (Printf.sprintf "%s(%s)" libname objname) imps obj)
@@ -909,6 +909,7 @@ let build_dll link_exe output_file files exts extra_args =
     StrSet.iter print_endline !exported;
     Printf.printf "** Symbols from import libs:\n";
     StrSet.iter print_endline !imported_from_implib;
+    flush stdout
   );
 
   if !reexport_from_implibs then
@@ -919,7 +920,7 @@ let build_dll link_exe output_file files exts extra_args =
 
   if not (StrSet.is_empty !imported) then begin
 (*
-    Printf.printf "** __imp symbols:\n";
+    Printf.printf "** __imp symbols:\n%!";
     StrSet.iter print_endline !imported;
 *)
     add_import_table obj (StrSet.elements !imported);
@@ -1225,7 +1226,8 @@ let setup_toolchain () =
     search_path := !dirs @ lib_search_dirs;
     if !verbose >= 1 then begin
       print_endline "lib search dirs:";
-      List.iter (Printf.printf "  %s\n%!") lib_search_dirs;
+      List.iter (Printf.printf "  %s\n") lib_search_dirs;
+      flush stdout
     end;
     default_libs :=
       ["-lmingw32"; "-lgcc"; "-lmoldname"; "-lmingwex"; "-lmsvcrt";
@@ -1346,7 +1348,8 @@ let dump fn =
         objs;
       List.iter
         (fun (s,i) -> Printf.printf "** import: %s (%i)\n" s i)
-        imports
+        imports;
+      flush stdout
   | `Obj o ->
       Coff.dump o
 
@@ -1403,7 +1406,8 @@ let main () =
     if !use_default_libs then begin
       Printf.printf "** Default libraries:\n";
       List.iter print_endline !default_libs;
-    end
+    end;
+    flush stdout
    );
   let files = all_files () in
   match !mode with
