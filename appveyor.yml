@@ -10,10 +10,10 @@ environment:
     CYG_CACHE: C:/cygwin/var/cache/setup
   matrix:
     - OCAMLBRANCH: 4.03
+      SKIP_OCAML_TEST: no
     - OCAMLBRANCH: 4.04
     - OCAMLBRANCH: 4.05
     - OCAMLBRANCH: 4.06
-      SKIP_OCAML_TEST: no
     - OCAMLBRANCH: 4.07
       SKIP_OCAML_TEST: no
     - OCAMLBRANCH: trunk
