@@ -15,15 +15,33 @@ function run {
 }
 
 function configure_ocaml {
-    cp config/m-nt.h $HEADER_DIR/m.h
-    cp config/s-nt.h $HEADER_DIR/s.h
+    if [[ -z $HEADER_DIR ]] ; then
+      # Unfortunately, configure fails to set-up bootstrapping if flexlink is
+      # in PATH
+      sed -i -e 's/@iflexdir@/-I"$(ROOTDIR)\/flexdll"/' Makefile.config.in
 
-    sed -e "s|PREFIX=.*|PREFIX=$OCAMLROOT|" \
-        -e "s|OTHERLIBRARIES=.*|OTHERLIBRARIES=|" \
-        -e "s|WITH_DEBUGGER=.*|WITH_DEBUGGER=|" \
-        -e "s|WITH_OCAMLDOC=.*|WITH_OCAMLDOC=|" \
-        config/Makefile.msvc64 > $CONFIG_DIR/Makefile
-    #run "Content of config/Makefile" cat $CONFIG_DIR/Makefile
+      ./configure --build=i686-pc-cygwin --host=x86_64-pc-windows \
+                    --prefix=$OCAMLROOT \
+                    --disable-debugger \
+                    --disable-ocamldoc \
+                    --disable-systhreads \
+                    --disable-str-lib \
+                    --disable-unix-lib \
+                    --disable-bigarray-lib \
+                    $(GRAPHICS_DISABLE) \
+                    --disable-debug-runtime
+    else
+      # "Classic" configuration
+      cp config/m-nt.h $HEADER_DIR/m.h
+      cp config/s-nt.h $HEADER_DIR/s.h
+
+      sed -e "s|PREFIX=.*|PREFIX=$OCAMLROOT|" \
+          -e "s|OTHERLIBRARIES=.*|OTHERLIBRARIES=|" \
+          -e "s|WITH_DEBUGGER=.*|WITH_DEBUGGER=|" \
+          -e "s|WITH_OCAMLDOC=.*|WITH_OCAMLDOC=|" \
+          config/Makefile.msvc64 > $CONFIG_DIR/Makefile
+      #run "Content of config/Makefile" cat $CONFIG_DIR/Makefile
+    fi
 }
 
 echo ** OCAMLROOT=$OCAMLROOT
@@ -49,7 +67,8 @@ cd ocaml
 
 MAKEOCAML=make
 CONFIG_DIR=config
-HEADER_DIR=runtime/caml
+GRAPHICS_DISABLE=
+HEADER_DIR=
 
 case $OCAMLBRANCH in
     4.03|4.04)
@@ -61,6 +80,9 @@ case $OCAMLBRANCH in
         ;;
     4.06|4.07)
         HEADER_DIR=byterun/caml
+        ;;
+    4.08)
+        GRAPHICS_DISABLE=--disable-graph-lib
 esac
 
 if [ $OCAMLBRANCH = "4.03" ] ; then
