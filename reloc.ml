@@ -64,11 +64,16 @@ let read_file fn =
   close_in ic;
   List.rev !r
 
+(* This is the longest command which can be passed to [Sys.command] *)
+let max_command_length =
+  let processor = try Sys.getenv "COMSPEC" with Not_found -> "cmd.exe" in
+  (* The 4 is from the " /c " *)
+  8191 - String.length processor - 4
 
 let get_output ?(use_bash = false) ?(accept_error=false) cmd =
   let fn = Filename.temp_file "flexdll" "" in
   let cmd' = cmd ^ " > " ^ (Filename.quote fn) in
-    if String.length cmd' < 8182 && not use_bash then
+    if String.length cmd' < max_command_length && not use_bash then
       begin
         if (Sys.command cmd' <> 0) && not accept_error
         then failwith ("Cannot run " ^ cmd);
@@ -201,7 +206,7 @@ let run_command cmdline cmd =
   (* note: for Cygwin, using bash allow to follow symlinks to find
      gcc... *)
   if !toolchain = `CYGWIN || !toolchain = `CYGWIN64 ||
-     String.length cmd_quiet >= 8192
+     String.length cmd_quiet >= max_command_length
   then begin
     (* Dump the command in a text file and apply bash to it. *)
     let (fn, oc) = open_temp_file "longcmd" "" in
