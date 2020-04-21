@@ -498,7 +498,7 @@ let add_export_table obj exports symname =
   let strings = Buffer.create 1024 in
   let strsym = Symbol.intern sect 0l in
   obj.symbols <- strsym :: (Symbol.export symname sect 0l) :: obj.symbols;
-  let exports = List.sort Pervasives.compare exports in
+  let exports = List.sort Stdlib.compare exports in
   (* The runtime library assumes that names are sorted! *)
   int_to_buf data (List.length exports);
   List.iter
