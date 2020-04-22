@@ -92,7 +92,11 @@ fi
 configure_ocaml
 
 if [ ! -f $OCAMLROOT/STAMP ] || [ "$(git rev-parse HEAD)" != "$(cat $OCAMLROOT/STAMP)" ]; then
-    run "make world.opt" $MAKEOCAML flexdll world.opt
+    if [ "$OCAMLBRANCH" = "trunk" ] ; then
+      run "make world opt" $MAKEOCAML flexdll world opt
+    else
+      run "make world.opt" $MAKEOCAML flexdll world.opt
+    fi
     run "make install" $MAKEOCAML install
 
     git rev-parse HEAD > $OCAMLROOT/STAMP
