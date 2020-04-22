@@ -634,6 +634,9 @@ let needed imported defined unalias obj =
     | Some s when not (StrSet.mem name defined) ->
         imported := StrSet.add s !imported;
         if StrSet.mem s defined then s else name
+    | None when not (StrSet.mem name defined) && StrSet.mem ("__imp_" ^ name) defined ->
+        imported := StrSet.add ("__imp_" ^ name) !imported;
+        "__imp_" ^ name
     | _ -> name
   in
   List.fold_left
@@ -662,7 +665,10 @@ let build_dll link_exe output_file files exts extra_args =
   let loaded_filenames : (string,unit) Hashtbl.t = Hashtbl.create 16 in
   let read_file fn =
     if Lib.is_dll fn then `Lib ([], dll_exports fn)
-    else Lib.read fn
+    else begin
+      if !verbose >= 2 then Printf.printf "** open: %s\n" fn;
+      Lib.read fn
+    end
   in
   let files = List.map (fun fn -> fn, read_file fn) files in
 
@@ -1244,7 +1250,7 @@ let setup_toolchain () =
       List.iter (Printf.printf "  %s\n%!") lib_search_dirs;
     end;
     default_libs :=
-      ["-lmingw32"; "-lgcc"; "-lmoldname"; "-lmingwex"; "-lmsvcrt";
+      ["-lmingw32"; "-lgcc"; "-lgcc_eh"; "-lmoldname"; "-lmingwex"; "-lmsvcrt";
        "-luser32"; "-lkernel32"; "-ladvapi32"; "-lshell32" ];
     if !exe_mode = `EXE then default_libs := "crt2.o" :: !default_libs
     else default_libs := "dllcrt2.o" :: !default_libs
