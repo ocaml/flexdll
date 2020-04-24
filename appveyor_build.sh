@@ -36,9 +36,7 @@ function configure_ocaml {
       cp config/s-nt.h $HEADER_DIR/s.h
 
       sed -e "s|PREFIX=.*|PREFIX=$OCAMLROOT|" \
-          -e "s|OTHERLIBRARIES=.*|OTHERLIBRARIES=|" \
-          -e "s|WITH_DEBUGGER=.*|WITH_DEBUGGER=|" \
-          -e "s|WITH_OCAMLDOC=.*|WITH_OCAMLDOC=|" \
+          -e 's/\(OTHERLIBRARIES\|WITH_DEBUGGER\|WITH_OCAMLDOC\|DEBUGGER\|EXTRALIBS\|WITH_OCAMLBUILD\|CAMLP4\)=.*/\1=/' \
           config/Makefile.msvc64 > $CONFIG_DIR/Makefile
       #run "Content of config/Makefile" cat $CONFIG_DIR/Makefile
     fi
@@ -55,13 +53,14 @@ echo ** OCAMLROOT=$OCAMLROOT
 #echo "APPVEYOR_REPO_NAME = $APPVEYOR_REPO_NAME"
 #echo "APPVEYOR_REPO_BRANCH = $APPVEYOR_REPO_BRANCH"
 
+APPVEYOR_BUILD_FOLDER=$(echo "$APPVEYOR_BUILD_FOLDER" | cygpath -f -)
 cd $APPVEYOR_BUILD_FOLDER
 
 git tag merge
 
 # Do not perform end-of-line conversion
 git config --global core.autocrlf false
-git clone https://github.com/ocaml/ocaml.git --branch $OCAMLBRANCH --depth 1 --recurse-submodules ocaml
+git clone https://github.com/ocaml/ocaml.git --branch $OCAMLBRANCH${OCAMLREV:+.}$OCAMLREV --depth 1 --recurse-submodules ocaml
 
 cd ocaml
 
@@ -71,7 +70,7 @@ GRAPHICS_DISABLE=
 HEADER_DIR=
 
 case $OCAMLBRANCH in
-    4.03|4.04)
+    3.11|3.12|4.00|4.01|4.02|4.03|4.04)
         MAKEOCAML="make -f Makefile.nt"
         HEADER_DIR=config
         ;;
@@ -92,8 +91,36 @@ fi
 configure_ocaml
 
 if [ ! -f $OCAMLROOT/STAMP ] || [ "$(git rev-parse HEAD)" != "$(cat $OCAMLROOT/STAMP)" ]; then
-    if [ "$OCAMLBRANCH" = "trunk" ] ; then
-      run "make world opt" $MAKEOCAML flexdll world opt
+    if [ ${OCAMLBRANCH/./} -lt 403 ] ; then
+      rm -rf $OCAMLROOT
+      mkdir -p /cygdrive/c/flexdll
+      mv "$APPVEYOR_BUILD_FOLDER/flexdll.zip" /cygdrive/c/flexdll
+      pushd /cygdrive/c/flexdll
+      unzip -q flexdll.zip
+      popd
+      mkdir -p ../flexdll-src
+      pushd ../flexdll-src
+      tar -xzf "$APPVEYOR_BUILD_FOLDER/flexdll.tar.gz"
+      cd flexdll-*
+      make CHAINS=msvc64 MSVC_DETECT=0 support
+      mkdir -p $OCAMLROOT/bin
+      cp -v *.obj /cygdrive/c/flexdll/
+      cp -v *.obj $OCAMLROOT/bin/
+      cp /cygdrive/c/flexdll/default_amd64.manifest $OCAMLROOT/bin/
+      popd
+      # GPR#405
+      sed -i -e '/kernel/a#pragma comment(lib , "ucrt.lib")\n#pragma comment(lib , "vcruntime.lib")' stdlib/headernt.c
+      sed -i -e 's/def _WIN32/ndef _UCRT/' byterun/caml/misc.h
+      # MPR#6319
+      sed -i -e '/chmod -w/d' Makefile.nt
+      # Unavailable configuration
+      sed -i -e '/^opt.opt:/,+1s/ocamlbuild.native\|camlp4opt\|ocamldoc.opt//g' \
+             -e '/[^(]cd ocamldoc/d' \
+             -e '/partial-install/d' \
+             -e '/^opt:/s/other.*//' \
+             -e '/^all:/,+1s/ocamldoc.byte\|ocamlbuild.byte\|camlp4out//g' Makefile.nt
+      run "make world.opt" $MAKEOCAML world opt opt.opt
+      cp /cygdrive/c/flexdll/flexlink.exe $OCAMLROOT/bin/
     else
       run "make world.opt" $MAKEOCAML flexdll world.opt
     fi
