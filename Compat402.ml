@@ -19,11 +19,5 @@ module Bytes = struct
 end
 let output_bytes = output_string
 
-module Buffer = struct
-  include Buffer
-
-  let to_bytes = contents
-end
-
 (* Introduced in 4.01.0 *)
 let ( |> ) x f = f x
