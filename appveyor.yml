@@ -21,6 +21,11 @@ environment:
     - OCAMLBRANCH: 4.05
     - OCAMLBRANCH: 4.06
     - OCAMLBRANCH: 4.07
+    - OCAMLBRANCH: 4.08
+    - OCAMLBRANCH: 4.09
+    - OCAMLBRANCH: 4.10
+      SKIP_OCAML_TEST: no
+    - OCAMLBRANCH: 4.11
       SKIP_OCAML_TEST: no
     - OCAMLBRANCH: trunk
       SKIP_OCAML_TEST: no
