@@ -56,6 +56,7 @@ let footer =
 "Notes:
 * The -I, -l and -L options do not need to be separated from their argument.
 * An option like /linkXXX is an abbrevation for '-link XXX'.
+* An option like -Wl,-XXX is an abbreviation for '-link -XXX'.
 * FlexDLL's object files are searched by default in the same directory as
   flexlink, or in the directory given by the environment variable FLEXDIR
   if it is defined.
