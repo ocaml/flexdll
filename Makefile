@@ -39,17 +39,20 @@ CHAINS = mingw mingw64 cygwin cygwin64 msvc msvc64
 
 # Compilers
 
+# NB MSVC_DETECT is expected by OCaml's build system
+MSVC_DETECT=1
+
 # Attempt to locate the Windows SDK
 
+ifeq ($(MSVC_DETECT),1)
 ifeq ($(findstring clean,$(MAKECMDGOALS)),)
 include Makefile.winsdk
+endif
 endif
 
 Makefile.winsdk: msvs-detect
 	bash ./msvs-detect --output=make > $@
 
-# NB MSVC_DETECT is expected by OCaml's build system
-MSVC_DETECT=1
 MSVC_FLAGS=/nologo /MD -D_CRT_SECURE_NO_DEPRECATE /GS-
 
 ifeq ($(MSVC_DETECT),0)
