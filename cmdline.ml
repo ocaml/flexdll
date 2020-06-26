@@ -56,6 +56,7 @@ let footer =
 "Notes:
 * The -I, -l and -L options do not need to be separated from their argument.
 * An option like /linkXXX is an abbrevation for '-link XXX'.
+* An option like -Wl,-XXX is an abbreviation for '-link -XXX'.
 * FlexDLL's object files are searched by default in the same directory as
   flexlink, or in the directory given by the environment variable FLEXDIR
   if it is defined.
@@ -249,6 +250,9 @@ let parse_cmdline () =
         String.sub s 0 2 :: String.sub s 2 (String.length s - 2) :: tr rest
     | s :: rest when String.length s >= 5 && String.sub s 0 5 = "/link" ->
         "-link" :: String.sub s 5 (String.length s - 5) :: tr rest
+    (* Convert gcc linker option prefix -Wl, to flexlink linker prefix -link *)
+    | s :: rest when String.length s >= 6 && String.sub s 0 5 = "-Wl,-" ->
+        "-link" :: String.sub s 4 (String.length s - 4) :: tr rest
     | "-arg" :: x :: rest ->
         tr (Array.to_list (Arg.read_arg x)) @ rest
     | "-arg0" :: x :: rest ->
