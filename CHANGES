@@ -5,6 +5,12 @@ Next version
 - GPR#64: Fix problem with setting page permission during relocation (report
   by Dmitry Bely)
 - GPR#48: Enable linking of C++ object files for mingw ports (David Allsopp)
+- GPR#81, GPR#84: use msvs-detect (from metastack/msvs-tools) for detecting Windows SDK
+  or Visual Studio (David Allsopp)
+- GPR#78: Eliminate deprecation warnings on OCaml 4.08+ (Bernhard Schommer)
+- GPR#68: fix incorrect calculation of maximum path length (Bryan Phelps and David Allsopp)
+- GPR#3: Recognise data symbols in import libraries (Andreas Hauptmann)
+- GPR#73: Pass GCC-style linker options (-Wl,...) onto the the linker (Michael Soegtrop)
 
 Version 0.37
 - Bug fix: the IMAGE_SCN_LNK_NRELOC_OVFL section flag was not propertly reset when
