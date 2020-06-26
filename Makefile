@@ -141,7 +141,15 @@ COMPILER-$(OCAML_VERSION):
 
 test_ver = $(shell if [ $(OCAML_VERSION) -lt $(1) ] ; then echo lt ; fi)
 
-Compat.ml: COMPILER-$(OCAML_VERSION) $(if $(call test_ver,4020),Compat402.ml) $(if $(call test_ver,4030),Compat403.ml) $(if $(call test_ver,4050),Compat405.ml) $(if $(call test_ver,4060),Compat406.ml) $(if $(call test_ver,4070),Compat407.ml)
+# This list must be in order
+COMPAT_MODULES := $(if $(call test_ver,4010),Compat401) \
+                  $(if $(call test_ver,4020),Compat402) \
+                  $(if $(call test_ver,4030),Compat403) \
+                  $(if $(call test_ver,4050),Compat405) \
+                  $(if $(call test_ver,4060),Compat406) \
+                  $(if $(call test_ver,4070),Compat407)
+
+Compat.ml: COMPILER-$(OCAML_VERSION) $(addsuffix .ml, $(COMPAT_MODULES))
 	cat $^ > $@
 
 flexlink.exe: $(OBJS) $(RES)

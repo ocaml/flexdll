@@ -180,11 +180,8 @@ let build_diversion lst =
       ) (List.filter (fun f -> f <> "") lst)
   in
   let utf16, lst =
-    match List.map toutf16 lst with
-    | lst ->
-        true, lst
-    | exception Not_utf8 ->
-        false, lst
+    try true, List.map toutf16 lst
+    with Not_utf8 -> false, lst
   in
   if utf16 then output_string oc "\xFF\xFE"; (* LE BOM *)
   List.iter (fun s -> output_string oc s) lst;

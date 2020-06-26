@@ -9,6 +9,9 @@
 module Buffer = struct
   include Buffer
 
+  (* Strictly speaking this should be in Compat402.ml *)
+  let to_bytes = contents
+
   (* Taken from 4.06.0 *)
   let add_utf_16le_uchar b u = match Uchar.to_int u with
   | u when u < 0 -> assert false
