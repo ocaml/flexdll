@@ -13,6 +13,13 @@
 open Coff
 open Cmdline
 
+let debug ?(dry_mode = {contents=false}) min_level fmt =
+  let print msg =
+    if !dry_mode || !verbose >= min_level then
+      Printf.printf "%s\n%!" msg
+  in
+    Printf.ksprintf print fmt
+
 let search_path = ref []
 let default_libs = ref []
 
@@ -213,7 +220,7 @@ let run_command cmdline cmd =
     output_string oc cmd;
     close_out oc;
 
-    if !verbose >= 1 then Printf.printf "(call with bash: %s)\n%!" fn;
+    debug 1 "(call with bash: %s)" fn;
     if Sys.command (Printf.sprintf "bash %s" fn) <> 0 then
       failwith "Error during linking\n"
   end else
@@ -317,7 +324,7 @@ let int_to_buf b i =
 let exportable s =
   match !machine with
   | `x86 ->
-      s <> "" && (s.[0] = '_'  || s.[0] = '?')
+      s <> "" && (s.[0] = '_' || s.[0] = '?')
   | `x64 ->
       if String.length s > 2 && s.[0] = '?' && s.[1] = '?' then false
       else true
@@ -398,13 +405,13 @@ let add_reloc_table obj obj_name p =
                           0x0b (* IMAGE_REL_{I386|AMD64}_SECREL*) ) ->
             0x0100 (* debug relocs: ignore *)
 
-        | _, k  ->
+        | _, k ->
             let msg =
               Printf.sprintf "Unsupported relocation kind %04x for %s in %s"
                 k rel.symbol.sym_name obj_name
             in
             failwith msg
-(*            Printf.eprintf "%s\n" msg;
+(*            Printf.eprintf "%s\n%!" msg;
             0x0001 *)
       in
       int_to_buf data kind;
@@ -461,7 +468,7 @@ let add_reloc_table obj obj_name p =
       Reloc.abs !machine sect (Int32.of_int (Buffer.length data)) secsym;
       int_to_buf data (Int32.to_int min);
       Reloc.abs !machine sect (Int32.of_int (Buffer.length data)) secsym;
-      int_to_buf data (Int32.to_int  max);
+      int_to_buf data (Int32.to_int max);
       int_to_buf data 0;
     )
     !nonwr;
@@ -507,7 +514,7 @@ let add_export_table obj exports symname =
   (* The runtime library assumes that names are sorted! *)
   int_to_buf data (List.length exports);
   List.iter
-    (fun s  ->
+    (fun s ->
        let sym = Symbol.extern s in
        obj.symbols <- sym :: obj.symbols;
        Reloc.abs !machine sect (Int32.of_int (Buffer.length data)) sym;
@@ -532,7 +539,7 @@ let add_master_reloc_table obj names symname =
   let data = Buffer.create 1024 in
   obj.symbols <- (Symbol.export symname sect 0l) :: obj.symbols;
   List.iter
-    (fun s  ->
+    (fun s ->
        let sym = Symbol.extern s in
        obj.symbols <- sym :: obj.symbols;
        Reloc.abs !machine sect (Int32.of_int (Buffer.length data)) sym;
@@ -566,7 +573,7 @@ let collect f l =
     l
 
 let cmd_verbose cmd =
-  if !verbose >= 1 then Printf.printf "+ %s\n" cmd;
+  debug 1 "+ %s" cmd;
   Sys.command cmd
 
 
@@ -610,7 +617,7 @@ let patch_output filename =
       in
       begin try Stacksize.set_stack_reserve filename x
       with exn ->
-        Printf.eprintf "Cannot set stack reserve: %s"
+        Printf.eprintf "Cannot set stack reserve: %s\n%!"
           (Printexc.to_string exn)
       end
   | None -> ()
@@ -711,7 +718,7 @@ let build_dll link_exe output_file files exts extra_args =
       (* Collect aliases *)
       List.iter
         (fun (x, y) ->
-           if !verbose >= 2 then Printf.printf "alias %s -> %s\n" x y;
+           debug 2 "alias %s -> %s" x y;
            Hashtbl.add aliases x y
         )
         (Coff.aliases obj);
@@ -743,7 +750,7 @@ let build_dll link_exe output_file files exts extra_args =
     and collect_file fn =
       if not (Hashtbl.mem collected (String.lowercase_ascii fn)) then begin
         Hashtbl.replace collected (String.lowercase_ascii fn) ();
-        if !verbose >= 2 then Printf.printf "** open: %s\n" fn;
+        debug 2 "** open: %s" fn;
         collect_defined fn (Lib.read fn)
       end
 
@@ -753,8 +760,7 @@ let build_dll link_exe output_file files exts extra_args =
           List.iter (fun (_, obj) -> collect_defined_obj obj) objs;
           List.iter
             (fun (s,_) ->
-               if !verbose >= 2 then
-                 Printf.printf "lib %s import symbol %s\n%!" fn s;
+               debug 2 "lib %s import symbol %s" fn s;
                from_imports := StrSet.add s !from_imports;
                add_def s;
                add_def ("__imp_" ^ s)
@@ -827,7 +833,7 @@ let build_dll link_exe output_file files exts extra_args =
 
   (* Second step: transitive closure, starting from given objects *)
 
-  let libobjects  = Hashtbl.create 16 in
+  let libobjects = Hashtbl.create 16 in
   let reloctbls = ref [] in
   let exported = ref StrSet.empty in
 
@@ -846,7 +852,7 @@ let build_dll link_exe output_file files exts extra_args =
 
   let add_reloc name obj imps =
     if !show_imports && not (StrSet.is_empty imps) then (
-      Printf.printf "** Imported symbols for %s:\n" name;
+      Printf.printf "** Imported symbols for %s:\n%!" name;
       StrSet.iter print_endline imps
     );
     let sym = add_reloc_table obj name (fun s -> StrSet.mem s.sym_name imps) in
@@ -918,7 +924,7 @@ let build_dll link_exe output_file files exts extra_args =
           (* the linker will find this object in this library *)
       else begin
         if !explain then
-          Printf.printf "Library object %s(%s) needs to be rewritten\n"
+          Printf.printf "Library object %s(%s) needs to be rewritten\n%!"
             libname objname;
         Hashtbl.add redirect libname
           (close_obj (Printf.sprintf "%s(%s)" libname objname) imps obj)
@@ -931,6 +937,7 @@ let build_dll link_exe output_file files exts extra_args =
     StrSet.iter print_endline !exported;
     Printf.printf "** Symbols from import libs:\n";
     StrSet.iter print_endline !imported_from_implib;
+    flush stdout
   );
 
   if !reexport_from_implibs then
@@ -941,7 +948,7 @@ let build_dll link_exe output_file files exts extra_args =
 
   if not (StrSet.is_empty !imported) then begin
 (*
-    Printf.printf "** __imp symbols:\n";
+    Printf.printf "** __imp symbols:\n%!";
     StrSet.iter print_endline !imported;
 *)
     add_import_table obj (StrSet.elements !imported);
@@ -1004,7 +1011,7 @@ let build_dll link_exe output_file files exts extra_args =
           if x = "" then Filename.chop_extension output_file ^ ".def"
           else x
         in
-        if !verbose >= 1 then Printf.printf "Generate %s\n%!" fn;
+        debug 1 "Generate %s" fn;
         let oc = open_out fn in
         Printf.fprintf oc "LIBRARY %s\n" output_file;
         Printf.fprintf oc "EXPORTS\n";
@@ -1121,7 +1128,7 @@ let build_dll link_exe output_file files exts extra_args =
           (if !implib then "--out-implib " ^ Filename.quote (Filename.chop_extension output_file ^ ".a") else "")
           extra_args
   in
-  if !verbose >= 1 || !dry_mode then Printf.printf "+ %s\n%!" cmd;
+  debug ~dry_mode 1 "+ %s" cmd;
   if not !dry_mode then begin
     let manifest_file = output_file ^ ".manifest" in
     safe_remove manifest_file;
@@ -1145,7 +1152,7 @@ let build_dll link_exe output_file files exts extra_args =
                            else output_file ^ ";#2"))
           (Filename.quote fn)
       in
-      if !verbose >= 1 then Printf.printf "+ %s\n%!" mcmd;
+      debug 1 "+ %s" mcmd;
       if Sys.command mcmd <> 0 then
         failwith "Error while merging the manifest";
       safe_remove manifest_file;
@@ -1245,9 +1252,10 @@ let setup_toolchain () =
       |> remove_duplicate_paths
     in
     search_path := !dirs @ lib_search_dirs;
-    if !verbose >= 1  then begin
+    if !verbose >= 1 then begin
       print_endline "lib search dirs:";
-      List.iter (Printf.printf "  %s\n%!") lib_search_dirs;
+      List.iter (Printf.printf "  %s\n") lib_search_dirs;
+      flush stdout
     end;
     default_libs :=
       ["-lmingw32"; "-lgcc"; "-lgcc_eh"; "-lmoldname"; "-lmingwex"; "-lmsvcrt";
@@ -1347,7 +1355,7 @@ let compile_if_needed file =
       | `LIGHTLD ->
           failwith "Compilation of C code is not supported for this toolchain"
     in
-    if !verbose >= 1 || !dry_mode then Printf.printf "+ %s\n%!" cmd;
+    debug ~dry_mode 1 "+ %s" cmd;
     let exit = if !dry_mode then 0 else Sys.command cmd in
     if pipe <> "" then display_msvc_output stdout file;
     if exit <> 0 then failwith "Error while compiling";
@@ -1368,7 +1376,8 @@ let dump fn =
         objs;
       List.iter
         (fun (s,i) -> Printf.printf "** import: %s (%i)\n" s i)
-        imports
+        imports;
+      flush stdout
   | `Obj o ->
       Coff.dump o
 
@@ -1387,8 +1396,8 @@ let all_files () =
   | `CYGWIN -> "cygwin.o"
   | `CYGWIN64 -> "cygwin64.o"
   | `MINGW64 -> "mingw64.o"
-  | `GNAT     -> "gnat.o"
-  | `GNAT64     -> "gnat64.o"
+  | `GNAT -> "gnat.o"
+  | `GNAT64 -> "gnat64.o"
   | `MINGW | `LIGHTLD -> "mingw.o" in
   if !exe_mode <> `DLL then
     if !add_flexdll_obj then f ("flexdll_" ^ tc) :: files
@@ -1425,7 +1434,8 @@ let main () =
     if !use_default_libs then begin
       Printf.printf "** Default libraries:\n";
       List.iter print_endline !default_libs;
-    end
+    end;
+    flush stdout
    );
   let files = all_files () in
   match !mode with
