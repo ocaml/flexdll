@@ -1,5 +1,6 @@
 Next version
 - GPR#103: Delete objects from C files compiled by flexlink (David Allsopp, report by Xavier Leroy)
+- GPR#85: Split multiple arguments passed with a single -Wl (David Allsopp)
 
 Version 0.41
 - GPR#98: Eliminate Warning 6 compiling coff.ml (David Allsopp)
