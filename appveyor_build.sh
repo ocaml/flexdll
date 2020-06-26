@@ -28,7 +28,7 @@ function configure_ocaml {
                     --disable-str-lib \
                     --disable-unix-lib \
                     --disable-bigarray-lib \
-                    $(GRAPHICS_DISABLE) \
+                    $GRAPHICS_DISABLE \
                     --disable-debug-runtime
     else
       # "Classic" configuration
