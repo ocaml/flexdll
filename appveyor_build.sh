@@ -99,6 +99,11 @@ fi
 configure_ocaml
 
 if [ ! -f $OCAMLROOT/STAMP ] || [ "$(git rev-parse HEAD)" != "$(cat $OCAMLROOT/STAMP)" ] || [ "$(sed -ne 's/ *SYSTEM *= *//p' "$(ocamlc -where | tr -d '\r')/Makefile.config" | tr -d '\r')" != "$OCAML_SYSTEM" ] ; then
+    if [ ! -f $OCAMLROOT/STAMP ] ; then
+        echo "Building the compiler"
+    else
+        echo "Rebuilding the compiler"
+    fi
     if [ ${OCAMLBRANCH/./} -lt 403 ] ; then
       rm -rf $OCAMLROOT
       mkdir -p /cygdrive/c/flexdll
