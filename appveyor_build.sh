@@ -179,4 +179,18 @@ if [ "$SKIP_OCAML_TEST" = no ] ; then
     run "make world" $MAKEOCAML flexdll world
 fi
 
+if [ "$ARTEFACTS" = 'yes' ] ; then
+    pushd "$APPVEYOR_BUILD_FOLDER" &> /dev/null
 
+    make package_bin installer
+    SUFFIX="$(git describe)"
+    VERSION="$(sed -ne 's/^VERSION *= *//p' Makefile)"
+    if [ "$SUFFIX" != "$VERSION" ] ; then
+      mv "flexdll-bin-$VERSION.zip" "flexdll-bin-$SUFFIX.zip"
+      mv "flexdll-$VERSION-setup.exe" "flexdll-$SUFFIX-setup.exe"
+    fi
+    appveyor PushArtifact "flexdll-$SUFFIX-setup.exe"
+    appveyor PushArtifact "flexdll-bin-$SUFFIX.zip"
+
+    popd &> /dev/null
+fi
