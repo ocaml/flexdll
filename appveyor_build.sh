@@ -162,21 +162,21 @@ done
 
 popd
 
-if [ "$SKIP_OCAML_TEST" != no ] ; then
-  exit 0
-fi
+if [ "$SKIP_OCAML_TEST" = no ] ; then
+    if [ -f ocamlopt ] ; then
+        git clean -dfx > /dev/null
+        cd flexdll
+        git clean -dfx > /dev/null
+        cd ..
+        configure_ocaml
+    fi
 
-if [ -f ocamlopt ] ; then
-    git clean -dfx > /dev/null
     cd flexdll
-    git clean -dfx > /dev/null
+    git remote add local $(echo "$APPVEYOR_BUILD_FOLDER"| cygpath -f -) -f --tags
+    run "git checkout $APPVEYOR_REPO_COMMIT" git checkout merge
     cd ..
-    configure_ocaml
+
+    run "make world" $MAKEOCAML flexdll world
 fi
 
-cd flexdll
-git remote add local $(echo "$APPVEYOR_BUILD_FOLDER"| cygpath -f -) -f --tags
-run "git checkout $APPVEYOR_REPO_COMMIT" git checkout merge
-cd ..
 
-run "make world" $MAKEOCAML flexdll world
