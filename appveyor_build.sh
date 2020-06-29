@@ -96,14 +96,15 @@ if [ $OCAMLBRANCH = "4.03" ] ; then
   sed -i -e "s/:=.*/:=/" config/Makefile.msvc64
 fi
 
-configure_ocaml
-
 if [ ! -f $OCAMLROOT/STAMP ] || [ "$(git rev-parse HEAD)" != "$(cat $OCAMLROOT/STAMP)" ] || [ "$(sed -ne 's/ *SYSTEM *= *//p' "$(ocamlc -where | tr -d '\r')/Makefile.config" | tr -d '\r')" != "$OCAML_SYSTEM" ] ; then
     if [ ! -f $OCAMLROOT/STAMP ] ; then
         echo "Building the compiler"
     else
         echo "Rebuilding the compiler"
     fi
+
+    configure_ocaml
+
     if [ ${OCAMLBRANCH/./} -lt 403 ] ; then
       rm -rf $OCAMLROOT
       mkdir -p /cygdrive/c/flexdll
@@ -140,6 +141,12 @@ if [ ! -f $OCAMLROOT/STAMP ] || [ "$(git rev-parse HEAD)" != "$(cat $OCAMLROOT/S
       run "make world.opt" $MAKEOCAML flexdll world.opt
     fi
     run "make install" $MAKEOCAML install
+    git clean -dfx > /dev/null
+    if [ -e flexdll/Makefile ] ; then
+        cd flexdll
+        git clean -dfx > /dev/null
+        cd ..
+    fi
 
     git rev-parse HEAD > $OCAMLROOT/STAMP
 fi
@@ -163,13 +170,7 @@ done
 popd
 
 if [ "$SKIP_OCAML_TEST" = no ] ; then
-    if [ -f ocamlopt ] ; then
-        git clean -dfx > /dev/null
-        cd flexdll
-        git clean -dfx > /dev/null
-        cd ..
-        configure_ocaml
-    fi
+    configure_ocaml
 
     cd flexdll
     git remote add local $(echo "$APPVEYOR_BUILD_FOLDER"| cygpath -f -) -f --tags
