@@ -118,7 +118,9 @@ if [ ! -f $OCAMLROOT/STAMP ] || [ "$(git rev-parse HEAD)" != "$(cat $OCAMLROOT/S
       popd
       # GPR#405
       sed -i -e '/kernel/a#pragma comment(lib , "ucrt.lib")\n#pragma comment(lib , "vcruntime.lib")' stdlib/headernt.c
-      sed -i -e 's/def _WIN32/ndef _UCRT/' byterun/caml/misc.h
+      if [ -e byterun/caml/misc.h ] ; then
+        sed -i -e 's/def _WIN32/ndef _UCRT/' byterun/caml/misc.h
+      fi
       # MPR#6319
       sed -i -e '/chmod -w/d' Makefile.nt
       # Unavailable configuration
