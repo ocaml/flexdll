@@ -20,7 +20,7 @@ function configure_ocaml {
       # in PATH
       sed -i -e 's/@iflexdir@/-I"$(ROOTDIR)\/flexdll"/' Makefile.config.in
 
-      ./configure --build=i686-pc-cygwin --host=x86_64-pc-windows \
+      ./configure --build=i686-pc-cygwin --host=$OCAML_TARGET \
                     --prefix=$OCAMLROOT \
                     --disable-debugger \
                     --disable-ocamldoc \
@@ -37,10 +37,18 @@ function configure_ocaml {
 
       sed -e "s|PREFIX=.*|PREFIX=$OCAMLROOT|" \
           -e 's/\(OTHERLIBRARIES\|WITH_DEBUGGER\|WITH_OCAMLDOC\|DEBUGGER\|EXTRALIBS\|WITH_OCAMLBUILD\|CAMLP4\)=.*/\1=/' \
-          config/Makefile.msvc64 > $CONFIG_DIR/Makefile
+          config/Makefile.$OCAML_PORT > $CONFIG_DIR/Makefile
       #run "Content of config/Makefile" cat $CONFIG_DIR/Makefile
     fi
 }
+
+case "$OCAML_PORT" in
+  msvc) OCAML_TARGET=i686-pc-windows; OCAML_SYSTEM=win32;;
+  msvc64) OCAML_TARGET=x86_64-pc-windows; OCAML_SYSTEM=win64;;
+  mingw) OCAML_TARGET=i686-w64-mingw32; OCAML_SYSTEM=mingw;;
+  mingw64) OCAML_TARGET=x86_64-w64-mingw32; OCAML_SYSTEM=mingw64;;
+  *) echo "Unrecognised OCAML_PORT: $OCAML_PORT"; exit 1;;
+esac
 
 echo ** OCAMLROOT=$OCAMLROOT
 
@@ -90,7 +98,7 @@ fi
 
 configure_ocaml
 
-if [ ! -f $OCAMLROOT/STAMP ] || [ "$(git rev-parse HEAD)" != "$(cat $OCAMLROOT/STAMP)" ]; then
+if [ ! -f $OCAMLROOT/STAMP ] || [ "$(git rev-parse HEAD)" != "$(cat $OCAMLROOT/STAMP)" ] || [ "$(sed -ne 's/ *SYSTEM *= *//p' "$(ocamlc -where | tr -d '\r')/Makefile.config" | tr -d '\r')" != "$OCAML_SYSTEM" ] ; then
     if [ ${OCAMLBRANCH/./} -lt 403 ] ; then
       rm -rf $OCAMLROOT
       mkdir -p /cygdrive/c/flexdll
