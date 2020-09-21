@@ -1,3 +1,6 @@
+Next version
+- GPR#90: Fix passing NULL to flexdll_dlopen on non-Cygwin builds (David Allsopp)
+
 Version 0.38
 - GPR#58: Bug fix: fix -custom-crt regression (Dmitry Bely)
 - GPR#61: Ignore x64 debug relocs (Dmitry Bely)

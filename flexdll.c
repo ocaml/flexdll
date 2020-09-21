@@ -425,16 +425,20 @@ void *flexdll_wdlopen(const wchar_t *file, int mode) {
 
 void *flexdll_dlopen(const char *file, int mode)
 {
-  wchar_t * p;
+  wchar_t * p = NULL;
   int nbr;
   void * handle;
 
-  nbr = MultiByteToWideChar(CP_THREAD_ACP, 0, file, -1, NULL, 0);
-  if (nbr == 0) { if (!error) error = 1; return NULL; }
-  p = malloc(nbr*sizeof(*p));
-  MultiByteToWideChar(CP_THREAD_ACP, 0, file, -1, p, nbr);
+  if (file) {
+    nbr = MultiByteToWideChar(CP_THREAD_ACP, 0, file, -1, NULL, 0);
+    if (nbr == 0) { if (!error) error = 1; return NULL; }
+    p = malloc(nbr*sizeof(*p));
+    MultiByteToWideChar(CP_THREAD_ACP, 0, file, -1, p, nbr);
+  }
+
   handle = flexdll_wdlopen(p, mode);
-  free(p);
+
+  if (p) free(p);
 
   return handle;
 }
