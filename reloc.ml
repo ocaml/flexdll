@@ -1075,9 +1075,6 @@ let build_dll link_exe output_file files exts extra_args =
             close_out oc;
             Filename.quote def_file
         in
-        let extra_args =
-          if !machine = `x64 then "-Xlinker --image-base -Xlinker 0x10000 " ^ extra_args else extra_args
-        in
         Printf.sprintf
           "%s %s%s -L. %s %s -o %s %s %s %s %s"
           !gcc

@@ -224,7 +224,7 @@ static void relocate(resolver f, void *data, reloctbl *tbl) {
       s -= (INT_PTR)(ptr -> addr) + 4;
       s += *((INT32*) ptr -> addr);
       if (s != (INT32) s) {
-        sprintf(error_buffer, "flexdll error: cannot relocate RELOC_REL32, target is too far: %p  %p", (void *)((UINT_PTR) s), (void *) ((UINT_PTR)(INT32) s));
+        sprintf(error_buffer, "flexdll error: cannot relocate %s RELOC_REL32, target is too far: %p  %p", ptr->name, (void *)((UINT_PTR) s), (void *) ((UINT_PTR)(INT32) s));
         error = 3;
         goto restore;
       }
