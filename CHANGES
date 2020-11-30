@@ -1,4 +1,4 @@
-Next version
+Version 0.39
 - GPR#89: Stop passing --image-base on Cygwin64 - Cygwin64 DLLs should load at
   0x4:00000000-0x6:00000000 if not rebased or 0x2:00000000-0x4:00000000 if rebased. (David Allsopp)
 - GPR#90: Fix passing NULL to flexdll_dlopen on non-Cygwin builds (David Allsopp)
