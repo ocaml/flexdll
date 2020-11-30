@@ -1,7 +1,6 @@
-extern int x;
+#include "api.h"
 
-__declspec(dllimport) void api1(char *msg);
-__declspec(dllimport) void api2(char *msg);
+extern int x;
 
 void torun() {
   api1("plug2.torun();");
