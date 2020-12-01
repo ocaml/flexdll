@@ -164,8 +164,6 @@ for CHAIN in $CHAINS; do
 done
 
 for CHAIN in $CHAINS; do
-    # Decision on operation of Cygwin64 not yet taken
-    if [ "$CHAIN" = "cygwin64" ] ; then continue; fi
     run "make demo_$CHAIN" make demo_$CHAIN
 done
 
