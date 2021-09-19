@@ -37,6 +37,7 @@ let output_file = ref ""
 let exe_mode : [`DLL | `EXE | `MAINDLL] ref = ref `DLL
 let extra_args = ref []
 let mode : [`NORMAL | `DUMP | `PATCH] ref = ref `NORMAL
+let incbins = ref []
 let defexports = ref []
 let noentry = ref false
 let use_cygpath = ref true
@@ -71,6 +72,13 @@ let specs = [
 
   "-exe", Arg.Unit (fun () -> exe_mode := `EXE),
   " Link the main program as an exe file";
+
+  "-incbin",
+  Arg.Tuple
+   (let r = ref "" in
+    [Arg.Set_string r;
+     Arg.String (fun s -> incbins := (!r, s) :: !incbins)]),
+  "<sym> <file> Include a binary blob";
 
   "-maindll", Arg.Unit (fun () -> exe_mode := `MAINDLL),
   " Link the main program as a dll file";

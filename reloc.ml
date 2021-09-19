@@ -651,6 +651,39 @@ let needed imported defined unalias obj =
     StrSet.empty
     obj.symbols
 
+let read_file buf fn =
+  let ic = open_in_bin fn in
+  let rec loop () =
+    match Buffer.add_channel buf ic 1024 with
+    | exception End_of_file -> close_in_noerr ic
+    | exception exn -> close_in_noerr ic; raise exn
+    | () -> loop ()
+  in
+  loop ()
+
+let build_incbin_obj incbins =
+  let obj = Coff.create !machine in
+  let sec = Section.create ".incbin" 0x0040l in
+  let buf = Buffer.create 512 in
+  let f ofs (sym, file) =
+    read_file buf file;
+    Buffer.add_int32_le buf (Int32.of_int (Buffer.length buf - ofs));
+    let buflen = Buffer.length buf in
+    let sym_data = Symbol.export (sym ^ "_size") sec (Int32.of_int (buflen - 4)) in
+    let sym_size = Symbol.export (sym ^ "_data") sec (Int32.of_int ofs) in
+    Coff.add_symbol obj sym_data;
+    Coff.add_symbol obj sym_size;
+    buflen
+  in
+  let _ : int = List.fold_left f 0 incbins in
+  sec.data <- `String (Buffer.to_bytes buf);
+  Coff.add_section obj sec;
+  let fn = temp_file "incbin" (ext_obj ()) in
+  let oc = open_out_bin fn in
+  match Coff.put oc obj with
+  | () -> close_out_noerr oc; fn
+  | exception exn -> close_out_noerr oc; raise exn
+
 let build_dll link_exe output_file files exts extra_args =
   let main_pgm = link_exe <> `DLL in
 
@@ -1435,6 +1468,10 @@ let main () =
   match !mode with
   | `DUMP -> List.iter dump files
   | `NORMAL ->
+      let files =
+        match !incbins with
+        | [] -> files
+        | l -> build_incbin_obj l :: files in
       build_dll !exe_mode !output_file files !exts
         (String.concat " " (List.map Filename.quote (List.rev !extra_args)))
   | `PATCH ->
