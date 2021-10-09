@@ -327,21 +327,17 @@ module Symbol = struct
 
 
   let get bigobj strtbl ic pos =
-    let size, sec_get, stype_ofs, storage_ofs, auxn_ofs =
-      if bigobj then
-        (20, int32_, 16, 18, 19)
-      else
-        (18, int16, 14, 16, 17) in
+    let size, sec_get = if bigobj then (20, int32_) else (18, int16) in
     let buf = read ic pos size in
-    let auxn = int8 buf auxn_ofs in
+    let auxn = int8 buf (size - 1) in
     { sym_pos = (-1);
       sym_name =
         (if int32_ buf 0 <> 0 then strz buf 0 ~max:8 '\000'
          else strtbl (int32_ buf 4));
       value = int32 buf 8;
       section = `Num (sec_get buf 12);
-      stype = int16 buf stype_ofs;
-      storage = int8 buf storage_ofs;
+      stype = int16 buf (size - 4);
+      storage = int8 buf (size - 2);
       auxn = auxn;
       auxs = read ic (pos + size) (size * auxn);
       extra_info = `None;
@@ -675,6 +671,7 @@ module FileHeader = struct
     else
       `IMAGE_FILE_HEADER (get_image_file_header ic ofs)
 end
+
 module Coff = struct
   let add_section x sect =
     x.sections <- sect :: x.sections
@@ -894,7 +891,6 @@ module Coff = struct
         x.symbols;
       !no
     in
-
     emit_int32 oc (Int32.of_int nbsym);
     if not x.bigobj then begin
       emit_int16 oc 0;
