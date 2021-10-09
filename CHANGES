@@ -1,3 +1,6 @@
+Next version
+- GPR#94: Fix parsing of COFF archives to ignore <XFGHASH> headers, allowing the Windows 11 SDK to be used. (David Allsopp)
+
 Version 0.39
 - GPR#89: Stop passing --image-base on Cygwin64 - Cygwin64 DLLs should load at
   0x4:00000000-0x6:00000000 if not rebased or 0x2:00000000-0x4:00000000 if rebased. (David Allsopp)

@@ -873,8 +873,15 @@ module Lib = struct
         | "/" | "" -> ()
         | "//" -> strtbl := read ic (pos_in ic) size
         | s when s.[0] = '/' ->
-            let ofs = int_of_string (String.sub s 1 (String.length s - 1)) in
-            obj size (strz !strtbl ofs '\000')
+            let ofs =
+              try Scanf.sscanf s "/%u%!" (fun x -> x)
+              with Scanf.Scan_failure _
+                 | Failure _
+                 | End_of_file -> -1
+            in
+              (* Ignore special sections which we don't know about *)
+              if ofs >= 0 then
+                obj size (strz !strtbl ofs '\000')
         | s when s.[String.length s - 1] = '/' ->
             let s = String.sub s 0 (String.length s - 1) in
             obj size s
