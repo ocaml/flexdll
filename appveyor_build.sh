@@ -103,10 +103,11 @@ if [ ! -f $OCAMLROOT/STAMP ] || [ "$(git rev-parse HEAD)" != "$(cat $OCAMLROOT/S
         echo "Rebuilding the compiler"
     fi
 
+    rm -rf $OCAMLROOT
+
     configure_ocaml
 
     if [ ${OCAMLBRANCH/./} -lt 403 ] ; then
-      rm -rf $OCAMLROOT
       mkdir -p /cygdrive/c/flexdll
       mv "$APPVEYOR_BUILD_FOLDER/flexdll.zip" /cygdrive/c/flexdll
       pushd /cygdrive/c/flexdll
