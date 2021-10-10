@@ -640,7 +640,9 @@ module FileHeader = struct
     let opts = int16 buf 18 in
     let symsize = 18 in
     let bigobj = false in
-    {hdrsize; machine; seccount; date; symtable; symcount; opthdr; opts; symsize; bigobj}
+    { hdrsize = hdrsize; machine = machine; seccount = seccount; date = date;
+      symtable = symtable; symcount = symcount; opthdr = opthdr; opts = opts;
+      symsize = symsize; bigobj = bigobj }
 
   let get_header_bigobj ic ofs =
     let hdrsize = 56 in
@@ -654,7 +656,9 @@ module FileHeader = struct
     let symsize = 20 in
     let opthdr = 0 in
     let bigobj = true in
-    {hdrsize; machine; seccount; date; symtable; symcount; opthdr; opts; symsize; bigobj}
+    { hdrsize = hdrsize; machine = machine; seccount = seccount; date = date;
+      symtable = symtable; symcount = symcount; opthdr = opthdr; opts = opts;
+      symsize = symsize; bigobj = bigobj }
 
   let get ic ofs =
     let buf = read ic ofs 6 in
@@ -738,12 +742,11 @@ module Coff = struct
     with Not_found -> []
 
   let get ic ofs base h name =
-    let open FileHeader in
-    let symtable = base + h.symtable in
+    let symtable = base + h.FileHeader.symtable in
 
     (* the string table *)
     let strtbl =
-      let pos = symtable + h.symsize * h.symcount in
+      let pos = symtable + h.FileHeader.symsize * h.FileHeader.symcount in
       if pos = 0 then fun _ -> assert false
       else
         let len = int32_ (read ic pos 4) 0 in
@@ -754,10 +757,10 @@ module Coff = struct
 
     (* the symbol table *)
     let symbols,symtbl =
-      let tbl = Array.make h.symcount None in
+      let tbl = Array.make h.FileHeader.symcount None in
       let rec fill accu i =
-        if i = h.symcount then List.rev accu
-        else let s = Symbol.get h.bigobj strtbl ic (symtable + h.symsize * i) in
+        if i = h.FileHeader.symcount then List.rev accu
+        else let s = Symbol.get h.FileHeader.bigobj strtbl ic (symtable + h.FileHeader.symsize * i) in
         (try tbl.(i) <- Some s
          with Invalid_argument _ -> assert false);
         fill (s :: accu) (i + 1 + s.auxn) in
@@ -765,9 +768,9 @@ module Coff = struct
     in
 
     (* the sections *)
-    let sectable = ofs + h.hdrsize + h.opthdr in
+    let sectable = ofs + h.FileHeader.hdrsize + h.FileHeader.opthdr in
     let sections =
-      Array.init h.seccount
+      Array.init h.FileHeader.seccount
         (fun i -> Section.get base strtbl symtbl ic (sectable + 40 * i))
     in
 
@@ -811,13 +814,13 @@ module Coff = struct
             | _ -> ()))
       symbols;
 
-    { bigobj = h.bigobj;
+    { bigobj = h.FileHeader.bigobj;
       obj_name = name;
-      machine = h.machine;
+      machine = h.FileHeader.machine;
       sections = Array.to_list sections;
-      date = h.date;
+      date = h.FileHeader.date;
       symbols = symbols;
-      opts = h.opts;
+      opts = h.FileHeader.opts;
     }
 
   let aliases x =
