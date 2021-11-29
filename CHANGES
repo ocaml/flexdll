@@ -1,4 +1,6 @@
 Next version
+- GPR#65: Support for compiling objects with /bigobj (Extended COFF) (Dmitry Bely)
+- GPR#80: Silence MSVC filenames for long commands as well as short ones (David Allsopp)
 - GPR#94: Fix parsing of COFF archives to ignore <XFGHASH> headers, allowing the Windows 11 SDK to be used. (David Allsopp)
 
 Version 0.39
