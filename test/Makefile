@@ -1,5 +1,4 @@
 #CC = cl /MD
-#BIGOBJ = /bigobj
 #O = obj
 #CHAIN = msvc
 
@@ -25,10 +24,10 @@ dump.$(O): dump.c
 	$(CC) -I.. -c dump.c
 
 plug1.$(O): plug1.c
-	$(CC) -c plug1.c
+	$(CC) $(PLUG1_CFLAGS) -c plug1.c
 
 plug2.$(O): plug2.c
-	$(CC) $(BIGOBJ) -c plug2.c
+	$(CC) $(PLUG2_CFLAGS) -c plug2.c
 
 plug1.dll: plug1.$(O)
 	$(FLEXLINK) -o plug1.dll plug1.$(O)
