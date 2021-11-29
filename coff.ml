@@ -326,7 +326,7 @@ module Symbol = struct
         section = `Num 0; storage = 2 }
 
 
-  let get bigobj strtbl ic pos =
+  let get ~bigobj strtbl ic pos =
     let size, sec_get = if bigobj then (20, int32_) else (18, int16) in
     let buf = read ic pos size in
     let auxn = int8 buf (size - 1) in
@@ -397,7 +397,7 @@ module Symbol = struct
             "value=0x%08lx, sect=%s, storage=%s, aux=%S\n"
             s.value sect storage (Bytes.to_string s.auxs)
 
-  let put bigobj strtbl oc s =
+  let put ~bigobj strtbl oc s =
     let sec_get, sec_put, type_ofs =
       if bigobj then
         (int32_, (fun oc i -> emit_int32 oc (Int32.of_int i)), 16)
@@ -881,7 +881,7 @@ module Coff = struct
 
     let patch_sym =
       delayed_ptr oc
-        (fun () -> List.iter (Symbol.put x.bigobj strtbl oc) x.symbols)
+        (fun () -> List.iter (Symbol.put ~bigobj:x.bigobj strtbl oc) x.symbols)
     in
     let nbsym =
       let no = ref 0 in
