@@ -1049,6 +1049,15 @@ let build_dll link_exe output_file files exts extra_args =
         let extra_args =
           if !machine = `x64 then (Printf.sprintf "/base:%s " !base_addr) ^ extra_args else extra_args
         in
+
+        let extra_args =
+          (* FlexDLL doesn't process .voltbl sections correctly, so don't allow the linker
+             to process them. *)
+          if Sys.command "link | findstr EMITVOLATILEMETADATA > nul" = 0 then
+            "/EMITVOLATILEMETADATA:NO " ^ extra_args
+          else extra_args
+        in
+
         (* Flexdll requires that all images (main programs and all the DLLs) are
            not too far away. This is needed because of the 32-bit relative relocations
            (e.g. function calls). It seems that passing such a /base argument to link.exe
