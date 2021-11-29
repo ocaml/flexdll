@@ -162,6 +162,7 @@ and section = {
 }
 
 type coff = {
+  bigobj: bool;
   obj_name: string;
   machine: int;
   date: int32;
@@ -169,7 +170,6 @@ type coff = {
   mutable symbols: symbol list;
   opts: int;
 }
-
 
 (* Misc *)
 
@@ -326,19 +326,20 @@ module Symbol = struct
         section = `Num 0; storage = 2 }
 
 
-  let get strtbl ic pos =
-    let buf = read ic pos 18 in
-    let auxn = int8 buf 17 in
+  let get bigobj strtbl ic pos =
+    let size, sec_get = if bigobj then (20, int32_) else (18, int16) in
+    let buf = read ic pos size in
+    let auxn = int8 buf (size - 1) in
     { sym_pos = (-1);
       sym_name =
         (if int32_ buf 0 <> 0 then strz buf 0 ~max:8 '\000'
          else strtbl (int32_ buf 4));
       value = int32 buf 8;
-      section = `Num (int16 buf 12);
-      stype = int16 buf 14;
-      storage = int8 buf 16;
+      section = `Num (sec_get buf 12);
+      stype = int16 buf (size - 4);
+      storage = int8 buf (size - 2);
       auxn = auxn;
-      auxs = read ic (pos + 18) (18 * auxn);
+      auxs = read ic (pos + size) (size * auxn);
       extra_info = `None;
     }
 
@@ -396,7 +397,12 @@ module Symbol = struct
             "value=0x%08lx, sect=%s, storage=%s, aux=%S\n"
             s.value sect storage (Bytes.to_string s.auxs)
 
-  let put strtbl oc s =
+  let put bigobj strtbl oc s =
+    let sec_get, sec_put, type_ofs =
+      if bigobj then
+        (int32_, (fun oc i -> emit_int32 oc (Int32.of_int i)), 16)
+      else
+        (int16, emit_int16, 14) in
     if String.length s.sym_name <= 8
     then (output_string oc s.sym_name;
           emit_zero oc (8 - String.length s.sym_name))
@@ -408,7 +414,7 @@ module Symbol = struct
           failwith (Printf.sprintf
                       "Cannot emit section for symbol %s" s.sym_name)
       | `Section sec -> sec.sec_pos in
-    emit_int16 oc sec;
+    sec_put oc sec;
     emit_int16 oc s.stype;
     emit_int8 oc s.storage;
     emit_int8 oc s.auxn;
@@ -420,8 +426,8 @@ module Symbol = struct
       | { storage = 3; extra_info = `Section s' } when int8 s.auxs 14 = 5 (* IMAGE_COMDAT_SELECT_ASSOCIATIVE *) ->
           (* section def *)
           output_bytes oc (Bytes.sub s.auxs 0 12);
-          emit_int16 oc s'.sec_pos;
-          output_bytes oc (Bytes.sub s.auxs 14 (Bytes.length s.auxs - 14))
+          sec_put oc s'.sec_pos;
+          output_bytes oc (Bytes.sub s.auxs type_ofs (Bytes.length s.auxs - type_ofs))
       | { storage = 3; extra_info = `Section s' } ->
           (* section def *)
           Printf.eprintf "!!! section symbol not supported (symbol: %s -> section:%s)\n%!" s.sym_name s'.sec_name;
@@ -433,7 +439,7 @@ module Symbol = struct
           Printf.eprintf "sel = %i\n" (int8 s.auxs 14);
           assert false
       | _ ->
-          if s.storage = 105 then assert (int16 s.auxs 12 = 0);
+          if s.storage = 105 then assert (sec_get s.auxs 12 = 0);
           output_bytes oc s.auxs
 end
 
@@ -604,6 +610,72 @@ module Section = struct
     send_data, send_reloc
 end
 
+module FileHeader = struct
+  type header = {
+    hdrsize : int;
+    machine : int;
+    seccount : int;
+    date: int32;
+    symtable : int;
+    symcount : int;
+    opthdr : int;
+    opts : int;
+
+    symsize : int;
+    bigobj: bool;
+  }
+
+  let bigobj_classid =
+    "\xC7\xA1\xBA\xD1\xEE\xBA\xA9\x4B\xAF\x20\xFA\xF6\x6A\xA4\xDC\xB8"
+
+  let get_image_file_header ic ofs =
+    let hdrsize = 20 in
+    let buf = read ic ofs hdrsize in
+    let machine = int16 buf 0 in
+    let seccount = int16 buf 2 in
+    let date = int32 buf 4 in
+    let symtable = int32_ buf 8 in
+    let symcount = int32_ buf 12 in
+    let opthdr = int16 buf 16 in
+    let opts = int16 buf 18 in
+    let symsize = 18 in
+    let bigobj = false in
+    { hdrsize = hdrsize; machine = machine; seccount = seccount; date = date;
+      symtable = symtable; symcount = symcount; opthdr = opthdr; opts = opts;
+      symsize = symsize; bigobj = bigobj }
+
+  let get_header_bigobj ic ofs =
+    let hdrsize = 56 in
+    let buf = read ic ofs hdrsize in
+    let machine = int16 buf 6 in
+    let date = int32 buf 8 in
+    let opts = int32_ buf 32 in
+    let seccount = int32_ buf 44 in
+    let symtable = int32_ buf 48 in
+    let symcount = int32_ buf 52 in
+    let symsize = 20 in
+    let opthdr = 0 in
+    let bigobj = true in
+    { hdrsize = hdrsize; machine = machine; seccount = seccount; date = date;
+      symtable = symtable; symcount = symcount; opthdr = opthdr; opts = opts;
+      symsize = symsize; bigobj = bigobj }
+
+  let get ic ofs =
+    let buf = read ic ofs 6 in
+    let sig1 = int16 buf 0 in
+    let sig2 = int16 buf 2 in
+    if sig1 = 0 && sig2 = 0xFFFF then
+      let version = int16 buf 4 in
+      if version = 0 then
+        `IMPORT_OBJECT_HEADER (* names from winnt.h *)
+      else if version = 1 then
+        `ANON_OBJECT_HEADER
+      else (* version >= 2 *)
+        `ANON_OBJECT_HEADER_BIGOBJ (get_header_bigobj ic ofs)
+    else
+      `IMAGE_FILE_HEADER (get_image_file_header ic ofs)
+end
+
 module Coff = struct
   let add_section x sect =
     x.sections <- sect :: x.sections
@@ -616,7 +688,8 @@ module Coff = struct
       | `x64 -> 0x8664
       | `x86 -> 0x14c
     in
-    { obj_name = "generated";
+    { bigobj = false;
+      obj_name = "generated";
       machine = machine; date = 0x4603de0el;
       sections = []; symbols = []; opts = 0 }
 
@@ -668,16 +741,12 @@ module Coff = struct
         | `Lazy _ | `Buf _ -> assert false
     with Not_found -> []
 
-  let get ic ofs base name =
-    let buf = read ic ofs 20 in
-    let opthdr = int16 buf 16 in
-
-    let symtable = base + int32_ buf 8 in
-    let symcount = int32_ buf 12 in
+  let get ic ofs base h name =
+    let symtable = base + h.FileHeader.symtable in
 
     (* the string table *)
     let strtbl =
-      let pos = symtable + 18 * symcount in
+      let pos = symtable + h.FileHeader.symsize * h.FileHeader.symcount in
       if pos = 0 then fun _ -> assert false
       else
         let len = int32_ (read ic pos 4) 0 in
@@ -688,10 +757,10 @@ module Coff = struct
 
     (* the symbol table *)
     let symbols,symtbl =
-      let tbl = Array.make symcount None in
+      let tbl = Array.make h.FileHeader.symcount None in
       let rec fill accu i =
-        if i = symcount then List.rev accu
-        else let s = Symbol.get strtbl ic (symtable + 18 * i) in
+        if i = h.FileHeader.symcount then List.rev accu
+        else let s = Symbol.get h.FileHeader.bigobj strtbl ic (symtable + h.FileHeader.symsize * i) in
         (try tbl.(i) <- Some s
          with Invalid_argument _ -> assert false);
         fill (s :: accu) (i + 1 + s.auxn) in
@@ -699,9 +768,9 @@ module Coff = struct
     in
 
     (* the sections *)
-    let sectable = ofs + 20 + opthdr in
+    let sectable = ofs + h.FileHeader.hdrsize + h.FileHeader.opthdr in
     let sections =
-      Array.init (int16 buf 2)
+      Array.init h.FileHeader.seccount
         (fun i -> Section.get base strtbl symtbl ic (sectable + 40 * i))
     in
 
@@ -745,12 +814,13 @@ module Coff = struct
             | _ -> ()))
       symbols;
 
-    { obj_name = name;
-      machine = int16 buf 0;
+    { bigobj = h.FileHeader.bigobj;
+      obj_name = name;
+      machine = h.FileHeader.machine;
       sections = Array.to_list sections;
-      date = int32 buf 4;
+      date = h.FileHeader.date;
       symbols = symbols;
-      opts = int16 buf 18;
+      opts = h.FileHeader.opts;
     }
 
   let aliases x =
@@ -775,8 +845,6 @@ module Coff = struct
     flush stdout
 
   let put oc x =
-    emit_int16 oc x.machine;
-
     let () =
       let no = ref 0 in
       List.iter
@@ -784,8 +852,24 @@ module Coff = struct
         x.sections
     in
 
-    emit_int16 oc (List.length x.sections);
-    emit_int32 oc x.date;
+    if x.bigobj then begin
+      emit_int16 oc 0; (* Sig1 *)
+      emit_int16 oc 0xffff; (* Sig2 *)
+      emit_int16 oc 2; (* Version *)
+      emit_int16 oc x.machine;
+      emit_int32 oc x.date;
+      output_string oc FileHeader.bigobj_classid;
+      emit_int32 oc 0l;
+      emit_int32 oc (Int32.of_int x.opts);
+      emit_int32 oc 0l;
+      emit_int32 oc 0l;
+      emit_int32 oc (Int32.of_int (List.length x.sections));
+    end
+    else begin
+      emit_int16 oc x.machine;
+      emit_int16 oc (List.length x.sections);
+      emit_int32 oc x.date;
+    end;
 
     let strbuf = Buffer.create 1024 in
     let strtbl s =
@@ -797,7 +881,7 @@ module Coff = struct
 
     let patch_sym =
       delayed_ptr oc
-        (fun () -> List.iter (Symbol.put strtbl oc) x.symbols)
+        (fun () -> List.iter (Symbol.put x.bigobj strtbl oc) x.symbols)
     in
     let nbsym =
       let no = ref 0 in
@@ -811,8 +895,10 @@ module Coff = struct
       !no
     in
     emit_int32 oc (Int32.of_int nbsym);
-    emit_int16 oc 0;
-    emit_int16 oc x.opts;
+    if not x.bigobj then begin
+      emit_int16 oc 0;
+      emit_int16 oc x.opts;
+    end;
 
     let sects =
       List.map (Section.put strtbl oc) x.sections in
@@ -858,11 +944,17 @@ module Lib = struct
     let obj size name =
 (*      Printf.printf "-> %s (size %i)\n" name size;  *)
       let pos = pos_in ic in
-      if size > 18 && read_str ic pos 4 = "\000\000\255\255"
-      then imports := Import.read ic pos size :: !imports
-      else objects := (name,
-                       Coff.get ic pos pos
-                         (Printf.sprintf "%s(%s)" libname name)) :: !objects
+      match FileHeader.get ic pos with
+      | `IMPORT_OBJECT_HEADER ->
+        if size > 18 then
+          imports := Import.read ic pos size :: !imports
+      | `ANON_OBJECT_HEADER_BIGOBJ h
+      | `IMAGE_FILE_HEADER h ->
+        objects := (name,
+                    Coff.get ic pos pos h
+                      (Printf.sprintf "%s(%s)" libname name)) :: !objects
+      | `ANON_OBJECT_HEADER ->
+        () (* ignore *)
     in
     let rec read_member () =
       let buf = read ic (pos_in ic) 60 in
@@ -913,7 +1005,14 @@ module Lib = struct
       Printf.printf "Reading %s...%!" filename; *)
       let r =
         if is_lib ic then `Lib (read_lib ic filename)
-        else let ofs = obj_ofs ic in `Obj (Coff.get ic ofs 0 filename) in
+        else
+          let ofs = obj_ofs ic in
+          let h = match FileHeader.get ic ofs with
+          | `ANON_OBJECT_HEADER_BIGOBJ h
+          | `IMAGE_FILE_HEADER h -> h
+          | `IMPORT_OBJECT_HEADER
+          | `ANON_OBJECT_HEADER -> assert false in
+          `Obj (Coff.get ic ofs 0 h filename) in
 (*      close_in ic; *)  (* do not close: cf `Lazy *)
 (*      let t1 = Unix.gettimeofday () in
       Printf.printf "  Done  (%f ms)\n%!" (t1 -. t0);  *)

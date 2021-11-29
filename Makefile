@@ -207,7 +207,7 @@ flexdll_initer_mingw64.o: flexdll_initer.c
 
 
 demo_msvc: flexlink.exe flexdll_msvc.obj flexdll_initer_msvc.obj
-	$(MSVC_PREFIX) $(MAKE) -C test clean demo CHAIN=msvc CC="$(MSVCC)" O=obj
+	$(MSVC_PREFIX) $(MAKE) -C test clean demo CHAIN=msvc CC="$(MSVCC)" BIGOBJ="/bigobj" O=obj
 
 demo_cygwin: flexlink.exe flexdll_cygwin.o flexdll_initer_cygwin.o
 	$(MAKE) -C test clean demo CHAIN=cygwin CC="$(CYGCC)" O=o
@@ -222,7 +222,7 @@ demo_mingw64: flexlink.exe flexdll_mingw64.o flexdll_initer_mingw64.o
 	$(MAKE) -C test clean demo CHAIN=mingw64 CC="$(MIN64CC)" O=o
 
 demo_msvc64:  flexlink.exe flexdll_msvc64.obj flexdll_initer_msvc64.obj
-	$(MSVC64_PREFIX) $(MAKE) -C test clean demo CHAIN=msvc64 CC="$(MSVCC64)" O=obj
+	$(MSVC64_PREFIX) $(MAKE) -C test clean demo CHAIN=msvc64 CC="$(MSVCC64)" BIGOBJ="/bigobj" O=obj
 
 distclean: clean
 	rm -f Makefile.winsdk
