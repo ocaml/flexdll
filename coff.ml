@@ -760,7 +760,7 @@ module Coff = struct
       let tbl = Array.make h.FileHeader.symcount None in
       let rec fill accu i =
         if i = h.FileHeader.symcount then List.rev accu
-        else let s = Symbol.get h.FileHeader.bigobj strtbl ic (symtable + h.FileHeader.symsize * i) in
+        else let s = Symbol.get ~bigobj:h.FileHeader.bigobj strtbl ic (symtable + h.FileHeader.symsize * i) in
         (try tbl.(i) <- Some s
          with Invalid_argument _ -> assert false);
         fill (s :: accu) (i + 1 + s.auxn) in
