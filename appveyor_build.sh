@@ -50,6 +50,11 @@ case "$OCAML_PORT" in
   *) echo "Unrecognised OCAML_PORT: $OCAML_PORT"; exit 1;;
 esac
 
+case "$OCAMLBRANCH" in
+  *.*|trunk) ;;
+  *) echo "Unrecognised OCAMLBRANCH: $OCAMLBRANCH"; exit 1;;
+esac
+
 echo ** OCAMLROOT=$OCAMLROOT
 
 #echo "APPVEYOR_PULL_REQUEST_NUMBER = $APPVEYOR_PULL_REQUEST_NUMBER"
@@ -71,6 +76,11 @@ git config --global core.autocrlf false
 git clone https://github.com/ocaml/ocaml.git --branch $OCAMLBRANCH${OCAMLREV:+.}$OCAMLREV --depth 1 --recurse-submodules ocaml
 
 cd ocaml
+
+if [[ $OCAMLBRANCH = trunk ]]; then
+  OCAMLBRANCH="$(sed -ne '1s/\([^.]*\.[^.]*\).*/\1/p' VERSION)"
+  echo "trunk VERSION is $OCAMLBRANCH"
+fi
 
 MAKEOCAML=make
 CONFIG_DIR=config
