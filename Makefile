@@ -11,9 +11,15 @@ all: flexlink.exe support
 OCAML_CONFIG_FILE=$(shell cygpath -ad "$(shell ocamlopt -where)/Makefile.config")
 include $(OCAML_CONFIG_FILE)
 OCAMLOPT=ocamlopt
-OCAML_VERSION:=$(shell $(OCAMLOPT) -version|sed -e "s/+.*//" -e "s/\.//g")
+EMPTY=
+SPACE=$(EMPTY) $(EMPTY)
+OCAML_VERSION:=$(firstword $(subst ~, ,$(subst +, ,$(shell $(OCAMLOPT) -version))))
 ifeq ($(OCAML_VERSION),)
 OCAML_VERSION:=0
+COMPAT_VERSION:=0
+else
+COMPAT_VERSION:=$(subst ., ,$(OCAML_VERSION))
+COMPAT_VERSION:=$(subst $(SPACE),,$(firstword $(COMPAT_VERSION))$(foreach i,$(wordlist 2,$(words $(COMPAT_VERSION)),$(COMPAT_VERSION)),$(if $(filter 0 1 2 3 4 5 6 7 8 9,$(i)),0,)$(i)))
 endif
 
 MINGW_PREFIX = i686-w64-mingw32-
@@ -135,21 +141,21 @@ build_mingw64: flexdll_mingw64.o flexdll_initer_mingw64.o
 
 OBJS = version.ml Compat.ml coff.ml cmdline.ml create_dll.ml reloc.ml
 
-COMPILER-$(OCAML_VERSION):
+COMPILER-$(COMPAT_VERSION):
 	rm -f COMPILER-*
-	touch COMPILER-$(OCAML_VERSION)
+	touch COMPILER-$(COMPAT_VERSION)
 
-test_ver = $(shell if [ $(OCAML_VERSION) -lt $(1) ] ; then echo lt ; fi)
+test_ver = $(shell if [ $(COMPAT_VERSION) -lt $(1) ] ; then echo lt ; fi)
 
 # This list must be in order
-COMPAT_MODULES := $(if $(call test_ver,4010),Compat401) \
-                  $(if $(call test_ver,4020),Compat402) \
-                  $(if $(call test_ver,4030),Compat403) \
-                  $(if $(call test_ver,4050),Compat405) \
-                  $(if $(call test_ver,4060),Compat406) \
-                  $(if $(call test_ver,4070),Compat407)
+COMPAT_MODULES := $(if $(call test_ver,40100),Compat401) \
+                  $(if $(call test_ver,40200),Compat402) \
+                  $(if $(call test_ver,40300),Compat403) \
+                  $(if $(call test_ver,40500),Compat405) \
+                  $(if $(call test_ver,40600),Compat406) \
+                  $(if $(call test_ver,40700),Compat407)
 
-Compat.ml: COMPILER-$(OCAML_VERSION) $(addsuffix .ml, $(COMPAT_MODULES))
+Compat.ml: COMPILER-$(COMPAT_VERSION) $(addsuffix .ml, $(COMPAT_MODULES))
 	cat $^ > $@
 
 flexlink.exe: $(OBJS) $(RES)
