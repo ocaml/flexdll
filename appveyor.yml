@@ -27,14 +27,16 @@ environment:
     - OCAMLBRANCH: 4.09
     - OCAMLBRANCH: 4.10
     - OCAMLBRANCH: 4.11
+    - OCAMLBRANCH: 4.12
       OCAML_PORT: mingw
       ARTEFACTS: yes
       MSVS_PREFERENCE: SDK7.0
-    - OCAMLBRANCH: 4.12
-      SKIP_OCAML_TEST: no
     - OCAMLBRANCH: 4.13
       SKIP_OCAML_TEST: no
+    - OCAMLBRANCH: 4.14
+      SKIP_OCAML_TEST: no
     - OCAMLBRANCH: trunk
+      OCAML_PORT: mingw64
       SKIP_OCAML_TEST: no
   OCAMLROOT: C:/OCaml
 

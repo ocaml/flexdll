@@ -50,6 +50,11 @@ case "$OCAML_PORT" in
   *) echo "Unrecognised OCAML_PORT: $OCAML_PORT"; exit 1;;
 esac
 
+case "$OCAMLBRANCH" in
+  *.*|trunk) ;;
+  *) echo "Unrecognised OCAMLBRANCH: $OCAMLBRANCH"; exit 1;;
+esac
+
 echo ** OCAMLROOT=$OCAMLROOT
 
 #echo "APPVEYOR_PULL_REQUEST_NUMBER = $APPVEYOR_PULL_REQUEST_NUMBER"
@@ -72,24 +77,33 @@ git clone https://github.com/ocaml/ocaml.git --branch $OCAMLBRANCH${OCAMLREV:+.}
 
 cd ocaml
 
+if [[ $OCAMLBRANCH = trunk ]]; then
+  OCAMLBRANCH="$(sed -ne '1s/\([^.]*\.[^.]*\).*/\1/p' VERSION)"
+  echo "trunk VERSION is $OCAMLBRANCH"
+fi
+
 MAKEOCAML=make
 CONFIG_DIR=config
 GRAPHICS_DISABLE=
 HEADER_DIR=
 
 case $OCAMLBRANCH in
-    3.11|3.12|4.00|4.01|4.02|4.03|4.04)
-        MAKEOCAML="make -f Makefile.nt"
-        HEADER_DIR=config
-        ;;
-    4.05)
-        HEADER_DIR=config
-        ;;
-    4.06|4.07)
-        HEADER_DIR=byterun/caml
-        ;;
-    4.08)
-        GRAPHICS_DISABLE=--disable-graph-lib
+  3.11|3.12|4.00|4.01|4.02|4.03|4.04)
+    MAKEOCAML="make -f Makefile.nt"
+    HEADER_DIR=config;;
+  4.05)
+    HEADER_DIR=config;;
+  4.06|4.07)
+    HEADER_DIR=byterun/caml;;
+  4.08)
+    GRAPHICS_DISABLE=--disable-graph-lib;;
+  5.0|5.00)
+    case "$OCAML_PORT" in
+      mingw)
+        export PATH="$PATH:/usr/i686-w64-mingw32/sys-root/mingw/bin";;
+      mingw64)
+        export PATH="$PATH:/usr/x86_64-w64-mingw32/sys-root/mingw/bin";;
+    esac;;
 esac
 
 if [ $OCAMLBRANCH = "4.03" ] ; then
