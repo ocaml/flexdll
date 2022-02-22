@@ -36,6 +36,7 @@ environment:
     - OCAMLBRANCH: 4.14
       SKIP_OCAML_TEST: no
     - OCAMLBRANCH: trunk
+      OCAML_PORT: mingw64
       SKIP_OCAML_TEST: no
   OCAMLROOT: C:/OCaml
 
