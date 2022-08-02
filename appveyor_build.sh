@@ -103,7 +103,7 @@ case $OCAMLBRANCH in
     FLEXDLL_BOOTSTRAP_WORKS=0;;
   4.09|4.10|4.11|4.12)
     FLEXDLL_BOOTSTRAP_WORKS=0;;
-  5.0|5.00)
+  5.0|5.00|5.1)
     case "$OCAML_PORT" in
       mingw)
         export PATH="$PATH:/usr/i686-w64-mingw32/sys-root/mingw/bin";;
