@@ -34,10 +34,9 @@ let discard_section s =
  ||| 0x02000000l) <> 0l (* Discardable *)
 
 let sect_data s =
-  match force_section_data s with
+  match s.data with
   | `String data -> data
   | `Buf _ -> assert false
-  | `Lazy _ -> assert false
   | `Sxdata _ -> assert false
   | `Uninit 0 -> Bytes.of_string ""
   | `Uninit size ->

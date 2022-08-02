@@ -154,7 +154,6 @@ and section = {
   mutable data:
       [ `String of bytes | `Uninit of int
     | `Buf of Buf.t list
-    | `Lazy of in_channel * int * int
     | `Sxdata of symbol array
 ];
   mutable relocs: reloc list;
@@ -260,14 +259,6 @@ let delayed_ptr oc f =
      patch_int32 oc bak (Int32.of_int (pos_out oc));
      f ()
   )
-
-let force_section_data sec =
-  match sec.data with
-    | `Lazy (ic,pos,len) ->
-        let r = `String (read ic pos len) in
-        sec.data <- r;
-        r
-    | x -> x
 
 let copy_data ic pos oc len =
   (* TODO: bufferized copy when len > threshold *)
@@ -529,7 +520,6 @@ module Section = struct
              (fun i -> match symtbl.(int32_ s (i * 4)) with None -> assert false | Some s -> s))
       else if int32_ buf 20 = 0 then `Uninit size
       else `String (read ic (filebase + int32_ buf 20) size)
-(*        `Lazy (ic, filebase + int32_ buf 20, size) *)
     in
 
     { sec_pos = (-1);
@@ -551,7 +541,6 @@ module Section = struct
   let size s =
     match s.data with
     | `String s -> Bytes.length s
-    | `Lazy (_,_,len) -> len
     | `Uninit len -> len
     | `Buf bufs -> List.fold_left (fun s b -> s + Buf.length b) 0 bufs
     | `Sxdata syms -> Array.length syms * 4
@@ -570,8 +559,6 @@ module Section = struct
     let send_data = match x.data with
       | `String s ->
           delayed_ptr oc (fun () -> output_bytes oc s)
-      | `Lazy (ic,pos,len) ->
-          delayed_ptr oc (fun () -> copy_data ic pos oc len)
       | `Uninit _len ->
           emit_int32 oc 0l; (fun () -> ())
       | `Buf bufs ->
@@ -735,10 +722,10 @@ module Coff = struct
   let directives obj =
     try
       let sec = List.find (fun s -> s.sec_name = ".drectve") obj.sections in
-      match force_section_data sec with
+      match sec.data with
         | `String s -> parse_directives (Bytes.to_string s)
         | `Uninit _ | `Sxdata _ -> []
-        | `Lazy _ | `Buf _ -> assert false
+        | `Buf _ -> assert false
     with Not_found -> []
 
   let get ic ofs base h name =
@@ -1019,10 +1006,11 @@ module Lib = struct
           | `IMAGE_FILE_HEADER h -> h
           | `IMPORT_OBJECT_HEADER
           | `ANON_OBJECT_HEADER -> assert false in
-          `Obj (Coff.get ic ofs 0 h filename) in
-(*      close_in ic; *)  (* do not close: cf `Lazy *)
+          `Obj (Coff.get ic ofs 0 h filename)
+      in
 (*      let t1 = Unix.gettimeofday () in
       Printf.printf "  Done  (%f ms)\n%!" (t1 -. t0);  *)
+      close_in ic;
       r
     with exn ->
       close_in ic;

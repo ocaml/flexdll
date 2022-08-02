@@ -1,3 +1,6 @@
+Next version
+- GPR#103: Delete objects from C files compiled by flexlink (David Allsopp, report by Xavier Leroy)
+
 Version 0.41
 - GPR#98: Eliminate Warning 6 compiling coff.ml (David Allsopp)
 - GPR#99: Harden version number parsing from ocamlopt -version (David Allsopp)
