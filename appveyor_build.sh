@@ -16,9 +16,11 @@ function run {
 
 function configure_ocaml {
     if [[ -z $HEADER_DIR ]] ; then
-      # Unfortunately, configure fails to set-up bootstrapping if flexlink is
-      # in PATH
-      sed -i -e 's/@iflexdir@/-I"$(ROOTDIR)\/flexdll"/' Makefile.config.in
+      if [[ $FLEXDLL_BOOTSTRAP_WORKS -eq 0 ]]; then
+        # Unfortunately, configure fails to set-up bootstrapping if flexlink is
+        # in PATH
+        sed -i -e 's/@iflexdir@/-I"$(ROOTDIR)\/flexdll"/' Makefile.config.in
+      fi
 
       ./configure --build=i686-pc-cygwin --host=$OCAML_TARGET \
                     --prefix=$OCAMLROOT \
@@ -86,6 +88,7 @@ MAKEOCAML=make
 CONFIG_DIR=config
 GRAPHICS_DISABLE=
 HEADER_DIR=
+FLEXDLL_BOOTSTRAP_WORKS=1
 
 case $OCAMLBRANCH in
   3.11|3.12|4.00|4.01|4.02|4.03|4.04)
@@ -96,8 +99,11 @@ case $OCAMLBRANCH in
   4.06|4.07)
     HEADER_DIR=byterun/caml;;
   4.08)
-    GRAPHICS_DISABLE=--disable-graph-lib;;
-  5.0|5.00)
+    GRAPHICS_DISABLE=--disable-graph-lib
+    FLEXDLL_BOOTSTRAP_WORKS=0;;
+  4.09|4.10|4.11|4.12)
+    FLEXDLL_BOOTSTRAP_WORKS=0;;
+  5.0|5.00|5.1)
     case "$OCAML_PORT" in
       mingw)
         export PATH="$PATH:/usr/i686-w64-mingw32/sys-root/mingw/bin";;
