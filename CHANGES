@@ -1,4 +1,5 @@
 Next version
+- GPR#106: Support -l: syntax, to allow static linking of specific libraries (David Allsopp)
 - GPR#103: Delete objects from C files compiled by flexlink (David Allsopp, report by Xavier Leroy)
 - GPR#85: Split multiple arguments passed with a single -Wl (David Allsopp)
 
