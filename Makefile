@@ -145,18 +145,19 @@ COMPILER-$(COMPAT_VERSION):
 	rm -f COMPILER-*
 	touch COMPILER-$(COMPAT_VERSION)
 
-test_ver = $(shell if [ $(COMPAT_VERSION) -lt $(1) ] ; then echo lt ; fi)
+test_ver = $(shell if [ $(COMPAT_VERSION) -ge $(1) ] ; then echo ge ; fi)
 
 # This list must be in order
-COMPAT_MODULES := $(if $(call test_ver,40100),Compat401) \
-                  $(if $(call test_ver,40200),Compat402) \
-                  $(if $(call test_ver,40300),Compat403) \
-                  $(if $(call test_ver,40500),Compat405) \
-                  $(if $(call test_ver,40600),Compat406) \
-                  $(if $(call test_ver,40700),Compat407)
+COMPAT_LEVEL := \
+  $(strip $(if $(call test_ver,40100),401) \
+          $(if $(call test_ver,40200),402) \
+          $(if $(call test_ver,40300),403) \
+          $(if $(call test_ver,40500),405) \
+          $(if $(call test_ver,40600),406) \
+          $(if $(call test_ver,40700),407))
 
-Compat.ml: COMPILER-$(COMPAT_VERSION) $(addsuffix .ml, $(COMPAT_MODULES))
-	cat $^ > $@
+Compat.ml: Compat.ml.in COMPILER-$(COMPAT_VERSION)
+	sed -e '$(if $(COMPAT_LEVEL),/^$(subst $(SPACE),:\|^,$(COMPAT_LEVEL)):/d;)s/^[0-9]*://' $< > $@
 
 flexlink.exe: $(OBJS) $(RES)
 	@echo Building flexlink.exe with TOOLCHAIN=$(TOOLCHAIN) for OCaml $(OCAML_VERSION)

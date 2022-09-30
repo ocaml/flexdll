@@ -252,7 +252,10 @@ let parse_cmdline () =
         "-link" :: String.sub s 5 (String.length s - 5) :: tr rest
     (* Convert gcc linker option prefix -Wl, to flexlink linker prefix -link *)
     | s :: rest when String.length s >= 6 && String.sub s 0 5 = "-Wl,-" ->
-        "-link" :: String.sub s 4 (String.length s - 4) :: tr rest
+        let args =
+          String.split_on_char ',' (String.sub s 4 (String.length s - 4))
+        in
+          List.fold_right (fun arg args -> "-link" :: arg :: args) args (tr rest)
     | "-arg" :: x :: rest ->
         tr (Array.to_list (Arg.read_arg x)) @ rest
     | "-arg0" :: x :: rest ->
