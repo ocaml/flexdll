@@ -32,8 +32,9 @@ environment:
       ARTEFACTS: yes
       MSVS_PREFERENCE: SDK7.0
     - OCAMLBRANCH: 4.13
-      SKIP_OCAML_TEST: no
     - OCAMLBRANCH: 4.14
+      SKIP_OCAML_TEST: no
+    - OCAMLBRANCH: 5.0
       SKIP_OCAML_TEST: no
     - OCAMLBRANCH: trunk
       OCAML_PORT: mingw64
