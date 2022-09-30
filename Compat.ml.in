@@ -100,21 +100,32 @@
 
 407:module Stdlib = Pervasives
 
-403:module String = struct
-403:  include String
-403:
+404:module String = struct
+404:  include String
+402:
 402:  let init n f =
 402:    let s = create n in
 402:    for i = 0 to n - 1 do
 402:      unsafe_set s i (f i)
 402:    done;
 402:    s
-402:
+403:
 403:  let lowercase_ascii s =
 403:    init (length s) (fun i -> Char.lowercase_ascii (unsafe_get s i))
 403:  let uppercase_ascii s =
 403:    init (length s) (fun i -> Char.uppercase_ascii (unsafe_get s i))
-403:end
+404:
+404:  let split_on_char sep s =
+404:    let r = ref [] in
+404:    let j = ref (length s) in
+404:    for i = length s - 1 downto 0 do
+404:      if unsafe_get s i = sep then begin
+404:        r := sub s (i + 1) (!j - i - 1) :: !r;
+404:        j := i
+404:      end
+404:    done;
+404:    sub s 0 !j :: !r
+404:end
 
 402:type bytes = string
 402:let output_bytes = output_string
