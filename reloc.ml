@@ -263,13 +263,13 @@ let rec find_file_in = function
         | Some x -> Some x
         | None -> find_file_in rest
 
-let find_file fn =
+let find_file suffixes fn =
   let l =
     List.flatten
       (List.map
          (fun dir ->
             let fn = Filename.concat dir fn in
-            [ fn; fn ^ ".lib"; fn ^ ".dll.a"; fn ^ ".a" ]
+            fn :: (List.map (fun suff -> fn ^ suff) suffixes)
          ) (""::!search_path)) in
   match find_file_in l with
     | Some x -> Some x
@@ -293,16 +293,22 @@ let find_file =
     with Not_found ->
       try Hashtbl.find memo (k ^ ".lib")
       with Not_found ->
-        let fns =
+        let fns, suffixes =
+          (* XXX Not sure why we do these extensions for _both_ MSVC and
+                 mingw-w64 rather than .lib for MSVC and the .a ones for
+                 mingw-w64? *)
+          let standard_suffixes = [".lib"; ".dll.a"; ".a"] in
           if String.length fn > 2 && String.sub fn 0 2 = "-l" then
             let base = String.sub fn 2 (String.length fn - 2) in
-            if !toolchain = `MSVC || !toolchain = `MSVC64 then
-              ["lib" ^ base; base]
+            if String.length base > 0 && base.[0] = ':' then
+              [String.sub base 1 (String.length base - 1)], []
+            else if !toolchain = `MSVC || !toolchain = `MSVC64 then
+              ["lib" ^ base; base], standard_suffixes
             else
-              ["lib" ^ base]
-          else [fn] in
+              ["lib" ^ base], standard_suffixes
+          else [fn], standard_suffixes in
         let r =
-          match map_until_found find_file fns with
+          match map_until_found (find_file suffixes) fns with
           | Some fn -> fn
           | None ->
               failwith (Printf.sprintf "Cannot find file %S" fn)
