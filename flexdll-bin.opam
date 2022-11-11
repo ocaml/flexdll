@@ -1,0 +1,30 @@
+opam-version: "2.0"
+version: "0.42"
+authors: "Alain Frisch"
+maintainer: "David Allsopp <david@tarides.com>"
+bug-reports: "https://github.com/ocaml/flexdll/issues"
+homepage: "https://github.com/ocaml/flexdll#readme"
+license: "Zlib"
+synopsis: "FlexDLL Binary Release"
+description: "Precompiled flexlink.exe binary (built using 32-bit mingw-w64)
+required for building OCaml 3.11.0-4.02.3"
+build: [
+  ["./flexlink.exe" "-vnum"] {dev}
+  [make "MSVC_DETECT=0" "support"
+        "CHAINS=mingw" {ocaml-option-32bit:installed & ocaml-option-mingw:installed}
+        "CHAINS=mingw64" {!ocaml-option-32bit:installed & ocaml-option-mingw:installed}
+        "CHAINS=msvc" {ocaml-option-32bit:installed & ocaml-option-msvc:installed}
+        "CHAINS=msvc64" {!ocaml-option-32bit:installed & ocaml-option-msvc:installed}
+        "CHAINS=cygwin" {ocaml-option-32bit:installed & !ocaml-option-mingw:installed & !ocaml-option-msvc:installed}
+        "CHAINS=cygwin64" {!ocaml-option-32bit:installed & !ocaml-option-mingw:installed & !ocaml-option-msvc:installed}]
+]
+depopts: [
+  "ocaml-option-32bit"
+  "ocaml-option-mingw"
+  "ocaml-option-msvc"
+]
+available: os = "win32" | os = "cygwin"
+flags: avoid-version
+post-messages: [
+  "This package cannot be pinned to a repository commit" {dev & failure}
+]

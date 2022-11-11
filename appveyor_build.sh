@@ -202,10 +202,12 @@ if [ "$ARTEFACTS" = 'yes' ] ; then
     VERSION="$(sed -ne 's/^VERSION *= *//p' Makefile)"
     if [ "$SUFFIX" != "$VERSION" ] ; then
       mv "flexdll-bin-$VERSION.zip" "flexdll-bin-$SUFFIX.zip"
+      mv "flexlink-bin-$VERSION.zip" "flexlink-bin-$SUFFIX.zip"
       mv "flexdll-$VERSION-setup.exe" "flexdll-$SUFFIX-setup.exe"
     fi
     appveyor PushArtifact "flexdll-$SUFFIX-setup.exe"
     appveyor PushArtifact "flexdll-bin-$SUFFIX.zip"
+    appveyor PushArtifact "flexlink-bin-$SUFFIX.zip"
 
     popd &> /dev/null
 fi

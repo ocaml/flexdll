@@ -284,13 +284,14 @@ upload_src: package_src upload
 # Binary package
 
 PACKAGE_BIN = flexdll-bin-$(VERSION)$(PACKAGE_BIN_SUFFIX).zip
+FLEXLINK_BIN = flexlink-bin-$(VERSION)$(PACKAGE_BIN_SUFFIX).zip
 INSTALLER = flexdll-$(VERSION)$(PACKAGE_BIN_SUFFIX)-setup.exe
 
 package_bin:
 	$(MAKE) clean all
-	rm -f $(PACKAGE_BIN)
-	zip $(PACKAGE_BIN) $(COMMON_FILES) \
-	    flexlink.exe flexdll_*.obj flexdll_*.o flexdll.c flexdll_initer.c
+	rm -f $(PACKAGE_BIN) $(FLEXLINK_BIN)
+	zip $(PACKAGE_BIN) $(COMMON_FILES) flexlink.exe flexdll_*.obj flexdll_*.o
+	zip $(FLEXLINK_BIN) $(COMMON_FILES) flexlink.exe Makefile flexdll-bin.install flexdll-bin.opam
 
 do_upload_bin:
 	rsync $(PACKAGE_BIN) $(URL)
