@@ -5,7 +5,10 @@
 ##
 
 
-VERSION = 0.43
+# Fetch the version number from its source, in flexdll.opam
+VERSION = \
+  $(eval VERSION := $$(shell sed -ne 's/^version: *"\(.*\)"/\1/p' flexdll.opam))$(VERSION)
+
 all: flexlink.exe support
 
 OCAML_CONFIG_FILE=$(shell cygpath -ad "$(shell ocamlopt -where 2>/dev/null)/Makefile.config" 2>/dev/null)
@@ -13,6 +16,7 @@ include $(OCAML_CONFIG_FILE)
 OCAMLOPT=ocamlopt
 EMPTY=
 SPACE=$(EMPTY) $(EMPTY)
+COMMA=,
 OCAML_VERSION:=$(firstword $(subst ~, ,$(subst +, ,$(shell $(OCAMLOPT) -version 2>/dev/null))))
 ifeq ($(OCAML_VERSION),)
 OCAML_VERSION:=0
@@ -31,7 +35,7 @@ MIN64CC = $(MINGW64_PREFIX)gcc
 CYGWIN64_PREFIX = x86_64-pc-cygwin-
 CYG64CC = $(CYGWIN64_PREFIX)gcc
 
-version.ml: Makefile
+version.ml: Makefile flexdll.opam
 	echo "let version = \"$(VERSION)\"" > version.ml
 	echo "let mingw_prefix = \"$(MINGW_PREFIX)\"" >> version.ml
 	echo "let mingw64_prefix = \"$(MINGW64_PREFIX)\"" >> version.ml
@@ -160,11 +164,32 @@ flexlink.exe: $(OBJS) $(RES)
 	rm -f $@
 	$(RES_PREFIX) $(OCAMLOPT) -o $@ $(LINKFLAGS) $(OBJS)
 
-version.res: version.rc
-	$(RES_PREFIX) rc $<
+# VERSION at present is x.y, but there would be no reason not to have x.y.z in
+# future. Windows versions have four components. $(FLEXDLL_FULL_VERSION) adds
+# additional .0s to the right of $(VERSION) such that $(FLEXDLL_FULL_VERSION)
+# has four version components.
+# Thus if VERSION=0.43, then FLEXDLL_FULL_VERSION=0.43.0.0
+# $(FLEXDLL_VS_VERSION_INFO) is the same value, but using a ',' to separate the
+# items rather than a '.', as this is the format used in a VS_VERSION_INFO block
+# in Resource Compiler format.
+FLEXDLL_FULL_VERSION = \
+  $(subst $(SPACE),.,$(wordlist 1, 4, $(subst .,$(SPACE),$(VERSION)) 0 0 0))
+FLEXDLL_VS_VERSION_INFO = $(subst .,$(COMMA),$(FLEXDLL_FULL_VERSION))
 
-version_res.o: version.rc
-	$(TOOLPREF)windres -i $< -o $@
+RC_FLAGS = \
+  /d FLEXDLL_VS_VERSION_INFO=$(FLEXDLL_VS_VERSION_INFO) \
+  /d FLEXDLL_FULL_VERSION="$(FLEXDLL_FULL_VERSION)"
+
+# cf. https://sourceware.org/bugzilla/show_bug.cgi?id=27843
+WINDRES_FLAGS = \
+  -D FLEXDLL_VS_VERSION_INFO=$(FLEXDLL_VS_VERSION_INFO) \
+  -D FLEXDLL_FULL_VERSION=\\\"$(FLEXDLL_FULL_VERSION)\\\"
+
+version.res: version.rc flexdll.opam
+	$(RES_PREFIX) rc /nologo $(RC_FLAGS) $<
+
+version_res.o: version.rc flexdll.opam
+	$(TOOLPREF)windres $(WINDRES_FLAGS) -i $< -o $@
 
 flexdll_msvc.obj: flexdll.c flexdll.h
 	$(MSVC_PREFIX) $(MSVCC) /DMSVC -c /Fo"$@" $<
@@ -239,7 +264,7 @@ package_src:
 	rm -Rf flexdll-$(VERSION)
 	mkdir flexdll-$(VERSION)
 	mkdir flexdll-$(VERSION)/test
-	cp -a $(filter-out version.ml,$(OBJS:Compat.ml=Compat.ml.in)) Makefile msvs-detect $(COMMON_FILES) version.rc flexdll.install flexdll-$(VERSION)/
+	cp -a $(filter-out version.ml,$(OBJS:Compat.ml=Compat.ml.in)) Makefile msvs-detect $(COMMON_FILES) version.rc flexdll.install flexdll.opam flexdll-$(VERSION)/
 	cp -aR test/Makefile test/*.c flexdll-$(VERSION)/test/
 	tar czf $(PACKAGE) flexdll-$(VERSION)
 	rm -Rf flexdll-$(VERSION)

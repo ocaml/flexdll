@@ -8,6 +8,7 @@ share: [
   "default_amd64.manifest"
   "flexdll.c"
   "flexdll.h"
+  "flexdll.opam"
   "flexdll_initer.c"
   "reloc.ml"
   "version.rc"
