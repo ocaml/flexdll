@@ -8,12 +8,12 @@
 VERSION = 0.42
 all: flexlink.exe support
 
-OCAML_CONFIG_FILE=$(shell cygpath -ad "$(shell ocamlopt -where)/Makefile.config")
+OCAML_CONFIG_FILE=$(shell cygpath -ad "$(shell ocamlopt -where 2>/dev/null)/Makefile.config" 2>/dev/null)
 include $(OCAML_CONFIG_FILE)
 OCAMLOPT=ocamlopt
 EMPTY=
 SPACE=$(EMPTY) $(EMPTY)
-OCAML_VERSION:=$(firstword $(subst ~, ,$(subst +, ,$(shell $(OCAMLOPT) -version))))
+OCAML_VERSION:=$(firstword $(subst ~, ,$(subst +, ,$(shell $(OCAMLOPT) -version 2>/dev/null))))
 ifeq ($(OCAML_VERSION),)
 OCAML_VERSION:=0
 COMPAT_VERSION:=0
