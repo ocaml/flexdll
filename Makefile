@@ -239,7 +239,7 @@ package_src:
 	rm -Rf flexdll-$(VERSION)
 	mkdir flexdll-$(VERSION)
 	mkdir flexdll-$(VERSION)/test
-	cp -a $(filter-out version.ml,$(OBJS:Compat.ml=Compat.ml.in)) Makefile msvs-detect $(COMMON_FILES) version.rc flexdll-$(VERSION)/
+	cp -a $(filter-out version.ml,$(OBJS:Compat.ml=Compat.ml.in)) Makefile msvs-detect $(COMMON_FILES) version.rc flexdll.install flexdll-$(VERSION)/
 	cp -aR test/Makefile test/*.c flexdll-$(VERSION)/test/
 	tar czf $(PACKAGE) flexdll-$(VERSION)
 	rm -Rf flexdll-$(VERSION)
