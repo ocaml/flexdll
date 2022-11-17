@@ -1300,7 +1300,7 @@ let setup_toolchain () =
            Filename.dirname (get_output1 ~use_bash:true "gcc -print-libgcc-file-name");
           ];
       default_libs := ["-lkernel32"; "-luser32"; "-ladvapi32";
-                       "-lshell32"; "-lcygwin"; "-lgcc"]
+                       "-lshell32"; "-lcygwin"; "-lgcc_s"; "-lgcc"]
   | `MSVC | `MSVC64 ->
       search_path := !dirs @
         parse_libpath (try Sys.getenv "LIB" with Not_found -> "");
