@@ -214,6 +214,18 @@ let specs = [
 
   "--", Arg.Rest (fun s -> extra_args := s :: !extra_args),
   " Following arguments are passed verbatim to the linker";
+
+  "-version", Arg.Unit
+    (fun () ->
+      Printf.printf "FlexDLL version %s\nFlexDLL directory: %s\n"
+                    Version.version
+                    (Filename.dirname Sys.executable_name);
+      exit 0
+    ),
+  " Print linker version and FlexDLL directory and exit";
+
+  "-vnum", Arg.Unit (fun () -> print_endline Version.version; exit 0),
+  " Print linker version number and exit";
 ]
 
 
