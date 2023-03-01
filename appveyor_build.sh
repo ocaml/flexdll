@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -e
+
 function run {
     NAME=$1
     shift
