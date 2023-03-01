@@ -51,7 +51,7 @@ MSVC_DETECT=1
 # Attempt to locate the Windows SDK
 
 ifeq ($(MSVC_DETECT),1)
-ifeq ($(findstring clean,$(MAKECMDGOALS)),)
+ifeq ($(if $(MAKECMDGOALS),$(if $(strip $(filter-out clean,$(MAKECMDGOALS))),,1)),)
 include Makefile.winsdk
 endif
 endif
@@ -128,8 +128,7 @@ else
 LINKFLAGS = -cclib "-link $(RES)"
 endif
 
-support:
-	for i in $(CHAINS); do $(MAKE) --no-print-directory build_$$i || break ; done
+support: $(addprefix build_, $(CHAINS))
 
 build_gnat: flexdll_gnat.o flexdll_initer_gnat.o
 build_msvc: flexdll_msvc.obj flexdll_initer_msvc.obj
