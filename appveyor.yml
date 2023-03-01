@@ -5,9 +5,9 @@ image: Visual Studio 2015
 
 environment:
   global:
-    CYG_ROOT: C:/cygwin
+    CYG_ROOT: C:/cygwin64
     CYG_MIRROR: http://mirrors.kernel.org/sourceware/cygwin/
-    CYG_CACHE: C:/cygwin/var/cache/setup
+    CYG_CACHE: C:/cygwin64/var/cache/setup
     OCAML_PORT: msvc64
     ARTEFACTS: no
   matrix:
@@ -48,12 +48,12 @@ cache:
 install:
   # Make sure the Cygwin path comes before the Git one (otherwise
   # cygpath behaves crazily), but after the MSVC one.
-  - set Path=C:\cygwin\bin;%OCAMLROOT%\bin;C:\flexdll;%Path%
+  - set Path=C:\cygwin64\bin;%OCAMLROOT%\bin;C:\flexdll;%Path%
   - '%CYG_ROOT%\bin\bash -lc "cygcheck -dc cygwin"'
-  - if exist "%CYG_ROOT%\setup-x86.exe" del "%CYG_ROOT%\setup-x86.exe"
-  - appveyor DownloadFile "https://cygwin.com/setup-x86.exe" -FileName "%CYG_ROOT%\setup-x86.exe"
-  - '"%CYG_ROOT%\setup-x86.exe" --quiet-mode --no-shortcuts --no-startmenu --no-desktop --only-site --root "%CYG_ROOT%" --site "%CYG_MIRROR%" --local-package-dir "%CYG_CACHE%" --packages cygwin64-gcc-core,unzip,zip > nul'
-  - '%CYG_ROOT%\bin\bash -lc "x86_64-pc-cygwin-gcc --version" > nul || "%CYG_ROOT%\setup-x86.exe" --quiet-mode --no-shortcuts --no-startmenu --no-desktop --only-site --root "%CYG_ROOT%" --site "%CYG_MIRROR%" --local-package-dir "%CYG_CACHE%" --upgrade-also > nul'
+  - if exist "%CYG_ROOT%\setup-x86_64.exe" del "%CYG_ROOT%\setup-x86_64.exe"
+  - appveyor DownloadFile "https://cygwin.com/setup-x86_64.exe" -FileName "%CYG_ROOT%\setup-x86_64.exe"
+  - '"%CYG_ROOT%\setup-x86_64.exe" --quiet-mode --no-shortcuts --no-startmenu --no-desktop --only-site --root "%CYG_ROOT%" --site "%CYG_MIRROR%" --local-package-dir "%CYG_CACHE%" --packages gcc-core,unzip,zip > nul'
+  - '%CYG_ROOT%\bin\bash -lc "x86_64-pc-cygwin-gcc --version" > nul || "%CYG_ROOT%\setup-x86_64.exe" --quiet-mode --no-shortcuts --no-startmenu --no-desktop --only-site --root "%CYG_ROOT%" --site "%CYG_MIRROR%" --local-package-dir "%CYG_CACHE%" --upgrade-also > nul'
   - '%CYG_ROOT%\bin\bash -lc "cygcheck -dc cygwin"'
   - call "C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\bin\amd64\vcvars64.bat"
   - appveyor DownloadFile "https://github.com/alainfrisch/flexdll/archive/0.37.tar.gz" -FileName "flexdll.tar.gz"
