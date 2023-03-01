@@ -22,7 +22,7 @@ function configure_ocaml {
         sed -i -e 's/@iflexdir@/-I"$(ROOTDIR)\/flexdll"/' Makefile.config.in
       fi
 
-      ./configure --build=i686-pc-cygwin --host=$OCAML_TARGET \
+      ./configure --build=x86_64-pc-cygwin --host=$OCAML_TARGET \
                     --prefix=$OCAMLROOT \
                     --disable-debugger \
                     --disable-ocamldoc \
@@ -171,7 +171,7 @@ pushd $APPVEYOR_BUILD_FOLDER
 
 run "make flexlink.exe" make MSVC_DETECT=0 flexlink.exe
 
-CHAINS="mingw mingw64 cygwin cygwin64 msvc msvc64"
+CHAINS="mingw mingw64 cygwin64 msvc msvc64"
 
 for CHAIN in $CHAINS; do
     run "make build_$CHAIN" make build_$CHAIN

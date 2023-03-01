@@ -52,8 +52,8 @@ install:
   - '%CYG_ROOT%\bin\bash -lc "cygcheck -dc cygwin"'
   - if exist "%CYG_ROOT%\setup-x86_64.exe" del "%CYG_ROOT%\setup-x86_64.exe"
   - appveyor DownloadFile "https://cygwin.com/setup-x86_64.exe" -FileName "%CYG_ROOT%\setup-x86_64.exe"
-  - '"%CYG_ROOT%\setup-x86_64.exe" --quiet-mode --no-shortcuts --no-startmenu --no-desktop --only-site --root "%CYG_ROOT%" --site "%CYG_MIRROR%" --local-package-dir "%CYG_CACHE%" --packages gcc-core,unzip,zip > nul'
-  - '%CYG_ROOT%\bin\bash -lc "x86_64-pc-cygwin-gcc --version" > nul || "%CYG_ROOT%\setup-x86_64.exe" --quiet-mode --no-shortcuts --no-startmenu --no-desktop --only-site --root "%CYG_ROOT%" --site "%CYG_MIRROR%" --local-package-dir "%CYG_CACHE%" --upgrade-also > nul'
+  - '"%CYG_ROOT%\setup-x86_64.exe" --quiet-mode --no-shortcuts --no-startmenu --no-desktop --only-site --root "%CYG_ROOT%" --site "%CYG_MIRROR%" --local-package-dir "%CYG_CACHE%" --packages unzip,zip > nul'
+  - '%CYG_ROOT%\bin\bash -lc "zip --version" > nul || "%CYG_ROOT%\setup-x86_64.exe" --quiet-mode --no-shortcuts --no-startmenu --no-desktop --only-site --root "%CYG_ROOT%" --site "%CYG_MIRROR%" --local-package-dir "%CYG_CACHE%" --upgrade-also > nul'
   - '%CYG_ROOT%\bin\bash -lc "cygcheck -dc cygwin"'
   - call "C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\bin\amd64\vcvars64.bat"
   - appveyor DownloadFile "https://github.com/alainfrisch/flexdll/archive/0.37.tar.gz" -FileName "flexdll.tar.gz"
