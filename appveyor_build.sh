@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -e
+
 function run {
     NAME=$1
     shift
@@ -22,7 +24,7 @@ function configure_ocaml {
         sed -i -e 's/@iflexdir@/-I"$(ROOTDIR)\/flexdll"/' Makefile.config.in
       fi
 
-      ./configure --build=i686-pc-cygwin --host=$OCAML_TARGET \
+      ./configure --build=x86_64-pc-cygwin --host=$OCAML_TARGET \
                     --prefix=$OCAMLROOT \
                     --disable-debugger \
                     --disable-ocamldoc \
@@ -52,11 +54,6 @@ case "$OCAML_PORT" in
   *) echo "Unrecognised OCAML_PORT: $OCAML_PORT"; exit 1;;
 esac
 
-case "$OCAMLBRANCH" in
-  *.*|trunk) ;;
-  *) echo "Unrecognised OCAMLBRANCH: $OCAMLBRANCH"; exit 1;;
-esac
-
 echo ** OCAMLROOT=$OCAMLROOT
 
 #echo "APPVEYOR_PULL_REQUEST_NUMBER = $APPVEYOR_PULL_REQUEST_NUMBER"
@@ -79,10 +76,19 @@ git clone https://github.com/ocaml/ocaml.git --branch $OCAMLBRANCH${OCAMLREV:+.}
 
 cd ocaml
 
-if [[ $OCAMLBRANCH = trunk ]]; then
-  OCAMLBRANCH="$(sed -ne '1s/\([^.]*\.[^.]*\).*/\1/p' VERSION)"
-  echo "trunk VERSION is $OCAMLBRANCH"
-fi
+case "$OCAMLBRANCH" in
+  trunk|[0-9].[0-9])
+    if [ "$OCAMLBRANCH" = 'trunk' ]; then
+      OCAML_RELEASE="$(sed -ne '1s/\([^.]*\.[^.]*\).*/\1/p' VERSION)"
+      echo "trunk VERSION is $OCAML_RELEASE"
+    else
+      OCAML_RELEASE="$OCAMLBRANCH"
+    fi
+    OCAML_RELEASE="${OCAML_RELEASE%.*}0${OCAML_RELEASE#*.}";;
+  [0-9].[0-9][0-9])
+    OCAML_RELEASE="${OCAMLBRANCH/./}";;
+  *) echo "Unsupported OCAMLBRANCH: $OCAMLBRANCH"; exit 1;;
+esac
 
 MAKEOCAML=make
 CONFIG_DIR=config
@@ -90,22 +96,22 @@ GRAPHICS_DISABLE=
 HEADER_DIR=
 FLEXDLL_BOOTSTRAP_WORKS=1
 
-case $OCAMLBRANCH in
-  3.11|3.12|4.00|4.01|4.02|4.03|4.04)
+case $OCAML_RELEASE in
+  311|312|400|401|402|403|404)
     MAKEOCAML="make -f Makefile.nt"
     HEADER_DIR=config;;
-  4.05)
+  405)
     HEADER_DIR=config;;
-  4.06|4.07)
+  406|407)
     HEADER_DIR=byterun/caml;;
-  4.08)
+  408)
     GRAPHICS_DISABLE=--disable-graph-lib
     FLEXDLL_BOOTSTRAP_WORKS=0;;
-  4.09|4.10|4.11|4.12)
+  409|410|411|412)
     FLEXDLL_BOOTSTRAP_WORKS=0;;
 esac
 
-if [ $OCAMLBRANCH = "4.03" ] ; then
+if [ $OCAML_RELEASE -eq 403 ] ; then
   sed -i -e "s/:=.*/:=/" config/Makefile.msvc64
 fi
 
@@ -120,7 +126,7 @@ if [ ! -f $OCAMLROOT/STAMP ] || [ "$(git rev-parse HEAD)" != "$(cat $OCAMLROOT/S
 
     configure_ocaml
 
-    if [ ${OCAMLBRANCH/./} -lt 403 ] ; then
+    if [ $OCAML_RELEASE -lt 403 ] ; then
       mkdir -p /cygdrive/c/flexdll
       mv "$APPVEYOR_BUILD_FOLDER/flexdll.zip" /cygdrive/c/flexdll
       pushd /cygdrive/c/flexdll
@@ -171,7 +177,7 @@ pushd $APPVEYOR_BUILD_FOLDER
 
 run "make flexlink.exe" make MSVC_DETECT=0 flexlink.exe
 
-CHAINS="mingw mingw64 cygwin cygwin64 msvc msvc64"
+CHAINS="mingw mingw64 cygwin64 msvc msvc64"
 
 for CHAIN in $CHAINS; do
     run "make build_$CHAIN" make build_$CHAIN
@@ -197,7 +203,7 @@ fi
 if [ "$ARTEFACTS" = 'yes' ] ; then
     pushd "$APPVEYOR_BUILD_FOLDER" &> /dev/null
 
-    make package_bin installer
+    make CHAINS="$CHAINS" package_bin installer
     SUFFIX="$(git describe)"
     VERSION="$(sed -ne 's/^VERSION *= *//p' Makefile)"
     if [ "$SUFFIX" != "$VERSION" ] ; then
