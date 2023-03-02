@@ -195,7 +195,7 @@ type cmdline = {
 let new_cmdline () =
   let rf = match !toolchain with
   | `MSVC | `MSVC64 | `LIGHTLD -> true
-  | `MINGW | `MINGW64 | `GNAT | `GNAT64 | `CYGWIN | `CYGWIN64 -> false
+  | `MINGW | `MINGW64 | `GNAT | `GNAT64 | `CYGWIN64 -> false
   in
   {
    may_use_response_file = rf;
@@ -207,7 +207,7 @@ let run_command cmdline cmd =
   in
   (* note: for Cygwin, using bash allow to follow symlinks to find
      gcc... *)
-  if !toolchain = `CYGWIN || !toolchain = `CYGWIN64 ||
+  if !toolchain = `CYGWIN64 ||
      String.length cmd + String.length silencer > max_command_length
   then begin
     (* Dump the command in a text file and apply bash to it. *)
@@ -608,7 +608,7 @@ let parse_dll_exports fn =
 let dll_exports fn = match !toolchain with
   | `MSVC | `MSVC64 | `LIGHTLD ->
       failwith "Creation of import library not supported for this toolchain"
-  | `GNAT | `GNAT64 | `CYGWIN | `CYGWIN64 | `MINGW | `MINGW64 ->
+  | `GNAT | `GNAT64 | `CYGWIN64 | `MINGW | `MINGW64 ->
       let dmp = temp_file "dyndll" ".dmp" in
       if cmd_verbose (Printf.sprintf "%s -p %s > %s" !objdump fn dmp) <> 0
       then failwith "Error while extracting exports from a DLL";
@@ -1112,7 +1112,7 @@ let build_dll link_exe output_file files exts extra_args =
           !subsystem
           files descr
           extra_args
-    | `CYGWIN | `CYGWIN64 ->
+    | `CYGWIN64 ->
         let def_file =
           if main_pgm then ""
           else
@@ -1312,7 +1312,7 @@ let setup_toolchain () =
       search_path := !dirs;
       add_flexdll_obj := false;
       noentry := true
-  | `CYGWIN | `CYGWIN64 ->
+  | `CYGWIN64 ->
       gcc := "gcc";
       objdump := "objdump";
       search_path :=
@@ -1383,7 +1383,7 @@ let compile_if_needed file =
             (mk_dirs_opt "/I")
             file
             pipe
-      | `CYGWIN | `CYGWIN64 ->
+      | `CYGWIN64 ->
           Printf.sprintf
             "gcc -c -o %s %s %s"
             (Filename.quote tmp_obj)
@@ -1437,7 +1437,6 @@ let all_files () =
   let tc = match !toolchain with
   | `MSVC -> "msvc.obj"
   | `MSVC64 -> "msvc64.obj"
-  | `CYGWIN -> "cygwin.o"
   | `CYGWIN64 -> "cygwin64.o"
   | `MINGW64 -> "mingw64.o"
   | `GNAT -> "gnat.o"
@@ -1459,7 +1458,7 @@ let main () =
       match !toolchain, !cygpath_arg with
       | _, `Yes -> true
       | _, `No -> false
-      | (`GNAT|`GNAT64|`MINGW|`MINGW64|`CYGWIN|`CYGWIN64), `None ->
+      | (`GNAT|`GNAT64|`MINGW|`MINGW64|`CYGWIN64), `None ->
           begin match Sys.os_type with
           | "Unix" | "Cygwin" ->
               Sys.command "cygpath -S 2>/dev/null >/dev/null" = 0
