@@ -640,16 +640,16 @@ let patch_output filename =
    Indeed, we will create "__imp_X" (with a redirection to "X").
    Collect such cases in "imported".
 *)
-let needed imported defined unalias unalternate obj =
+let needed imported defined resolve_alias resolve_alternate obj =
   let rec normalize name =
     try
-      let r = unalias name in
+      let r = resolve_alias name in
       if r <> name then normalize r else r
     with Not_found ->
       (* Fall back to alternate name if and only if name was not found.
          https://devblogs.microsoft.com/oldnewthing/20200731-00/?p=104024 *)
       try
-        let r = unalternate name in
+        let r = resolve_alternate name in
         if r <> name then normalize r else r
       with Not_found ->
         name
@@ -714,7 +714,7 @@ let build_dll link_exe output_file files exts extra_args =
   in
   (* Collect all the available symbols, including those defined
      in default libraries *)
-  let defined, from_imports, unalias, unalternate =
+  let defined, from_imports, resolve_alias, resolve_alternate =
     let aliases = Hashtbl.create 16 in
     let alternates = Hashtbl.create 16 in
     let defined = ref StrSet.empty in
@@ -853,7 +853,7 @@ let build_dll link_exe output_file files exts extra_args =
   let imported = ref StrSet.empty in
 
   let imports obj =
-    let n = needed imported defined unalias unalternate obj in
+    let n = needed imported defined resolve_alias resolve_alternate obj in
     imported_from_implib := StrSet.union !imported_from_implib (StrSet.inter n from_imports);
     let undefs = StrSet.diff n defined in
     StrSet.filter
@@ -933,7 +933,7 @@ let build_dll link_exe output_file files exts extra_args =
             if !explain then
               Printf.printf "%s needs %s (not found)\n%!" fn s
       )
-      (needed imported defined unalias unalternate obj)
+      (needed imported defined resolve_alias resolve_alternate obj)
 
   and link_libobj (libname,objname,obj) =
     if Hashtbl.mem libobjects (libname,objname) then ()
