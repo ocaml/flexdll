@@ -640,12 +640,19 @@ let patch_output filename =
    Indeed, we will create "__imp_X" (with a redirection to "X").
    Collect such cases in "imported".
 *)
-let needed imported defined unalias obj =
+let needed imported defined resolve_alias resolve_alternate obj =
   let rec normalize name =
     try
-      let r = unalias name in
+      let r = resolve_alias name in
       if r <> name then normalize r else r
-    with Not_found -> name
+    with Not_found ->
+      (* Fall back to alternate name if and only if name was not found.
+         https://devblogs.microsoft.com/oldnewthing/20200731-00/?p=104024 *)
+      try
+        let r = resolve_alternate name in
+        if r <> name then normalize r else r
+      with Not_found ->
+        name
   in
   let normalize_imp name =
     match check_prefix "__imp_" name with
@@ -707,8 +714,9 @@ let build_dll link_exe output_file files exts extra_args =
   in
   (* Collect all the available symbols, including those defined
      in default libraries *)
-  let defined, from_imports, unalias =
+  let defined, from_imports, resolve_alias, resolve_alternate =
     let aliases = Hashtbl.create 16 in
+    let alternates = Hashtbl.create 16 in
     let defined = ref StrSet.empty in
     let from_imports = ref StrSet.empty in (* symbols from import libraries *)
     let add_def s = defined := StrSet.add s !defined in
@@ -734,6 +742,21 @@ let build_dll link_exe output_file files exts extra_args =
         )
         (Coff.aliases obj);
 
+      (* Collect alternatenames *)
+      let collect_alternatenames alternatenames =
+        List.iter (fun s -> match String.split_on_char '=' s with
+            | [alternate_name; true_name] ->
+                debug 2 "alternatename %s -> %s" alternate_name true_name;
+                Hashtbl.add alternates alternate_name true_name
+            | _ ->
+                debug 1 "alternatenames unrecognized: %s" s;
+          ) alternatenames
+      in
+      List.iter (function
+          | ("alternatename", alternatenames) ->
+              collect_alternatenames alternatenames
+          | _ -> ())
+        (Coff.directives obj);
 
       (* Iterates through DEFAULTLIB directives *)
       let register_deflib fn =
@@ -793,7 +816,7 @@ let build_dll link_exe output_file files exts extra_args =
     if !machine = `x64 then add_def "__ImageBase"
     else add_def "___ImageBase";
 
-    !defined, !from_imports, (Hashtbl.find aliases)
+    !defined, !from_imports, (Hashtbl.find aliases), (Hashtbl.find alternates)
   in
 
   (* Determine which objects from the given libraries should be linked
@@ -830,7 +853,7 @@ let build_dll link_exe output_file files exts extra_args =
   let imported = ref StrSet.empty in
 
   let imports obj =
-    let n = needed imported defined unalias obj in
+    let n = needed imported defined resolve_alias resolve_alternate obj in
     imported_from_implib := StrSet.union !imported_from_implib (StrSet.inter n from_imports);
     let undefs = StrSet.diff n defined in
     StrSet.filter
@@ -910,7 +933,7 @@ let build_dll link_exe output_file files exts extra_args =
             if !explain then
               Printf.printf "%s needs %s (not found)\n%!" fn s
       )
-      (needed imported defined unalias obj)
+      (needed imported defined resolve_alias resolve_alternate obj)
 
   and link_libobj (libname,objname,obj) =
     if Hashtbl.mem libobjects (libname,objname) then ()
