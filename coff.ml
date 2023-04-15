@@ -950,7 +950,17 @@ module Lib = struct
       let name = strz (Bytes.sub buf 0 16) 0 ' ' in
       begin match name with
         | "/" | "" -> ()
-        | "//" -> strtbl := read ic (pos_in ic) size
+        | "//" ->
+            let tbl = read ic (pos_in ic) size in
+            (* GNU-produced archive files are supposed to be printable if the
+               archive members contain text, so the entries in the list are
+               newline-padded, not null-padded. Let's fix that here. *)
+            for i = 0 to Bytes.length tbl - 1 do
+              if Bytes.get tbl i = '\n' then
+                let i = if i > 0 && Bytes.get tbl (i-1) = '/' then i-1 else i in
+                Bytes.set tbl i '\000'
+            done;
+            strtbl := tbl
         | s when s.[0] = '/' ->
             let ofs =
               try Scanf.sscanf s "/%u%!" (fun x -> x)
