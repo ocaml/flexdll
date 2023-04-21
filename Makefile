@@ -8,12 +8,28 @@
 VERSION = 0.42
 all: flexlink.exe support
 
-OCAML_CONFIG_FILE=$(shell cygpath -ad "$(shell ocamlopt -where 2>/dev/null)/Makefile.config" 2>/dev/null)
+export override OCAML_DETECT_CMD = detect
+SHELL_IS_CMD := \
+  $(if $(filter %OCAML_DETECT_CMD%, $(shell echo %OCAML_DETECT_CMD%)),,true)
+unexport OCAML_DETECT_CMD
+undefine DETECT_WINDOWS_SHELL
+
+NULL_DEVICE := $(if $(SHELL_IS_CMD), NUL, /dev/null)
+
+ifeq ($(SHELL_IS_CMD),)
+RM_F = rm -f $(1)
+TOUCH = touch
+else
+RM_F = $(if $(wildcard $(1)),del /f $(subst /,\,$(wildcard ($1))))
+TOUCH = type NUL >
+endif
+
+OCAML_CONFIG_FILE=$(shell cygpath -ad "$(shell ocamlopt -where 2>$(NULL_DEVICE))/Makefile.config" 2>$(NULL_DEVICE))
 include $(OCAML_CONFIG_FILE)
 OCAMLOPT=ocamlopt
 EMPTY=
 SPACE=$(EMPTY) $(EMPTY)
-OCAML_VERSION:=$(firstword $(subst ~, ,$(subst +, ,$(shell $(OCAMLOPT) -version 2>/dev/null))))
+OCAML_VERSION:=$(firstword $(subst ~, ,$(subst +, ,$(shell $(OCAMLOPT) -version 2>$(NULL_DEVICE)))))
 ifeq ($(OCAML_VERSION),)
 OCAML_VERSION:=0
 COMPAT_VERSION:=0
@@ -144,8 +160,8 @@ build_mingw64: flexdll_mingw64.o flexdll_initer_mingw64.o
 OBJS = version.ml Compat.ml coff.ml cmdline.ml create_dll.ml reloc.ml
 
 COMPILER-$(COMPAT_VERSION):
-	rm -f COMPILER-*
-	touch COMPILER-$(COMPAT_VERSION)
+	$(call RM_F, COMPILER-*)
+	$(TOUCH) COMPILER-$(COMPAT_VERSION)
 
 test_ver = $(shell if [ $(COMPAT_VERSION) -ge $(1) ] ; then echo ge ; fi)
 
@@ -159,11 +175,15 @@ COMPAT_LEVEL = $(eval COMPAT_LEVEL := \
            $$(if $$(call test_ver,40700),407)))$(COMPAT_LEVEL)
 
 Compat.ml: Compat.ml.in COMPILER-$(COMPAT_VERSION)
+ifeq ($(SHELL_IS_CMD),)
 	sed -e '$(if $(COMPAT_LEVEL),/^$(subst $(SPACE),@\|^,$(COMPAT_LEVEL))@/d;)s/^[0-9]*@//' $< > $@
+else
+	Compat.cmd $(COMPAT_VERSION) $< > $@
+endif
 
 flexlink.exe: $(OBJS) $(RES)
 	@echo Building flexlink.exe with TOOLCHAIN=$(TOOLCHAIN) for OCaml $(OCAML_VERSION)
-	rm -f flexlink.exe
+	$(call RM_F, flexlink.exe)
 	$(RES_PREFIX) $(OCAMLOPT) -o flexlink.exe $(LINKFLAGS) $(OBJS)
 
 version.res: version.rc
