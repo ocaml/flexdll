@@ -152,7 +152,7 @@ COMPAT_LEVEL := \
           $(if $(call test_ver,40700),407))
 
 Compat.ml: Compat.ml.in COMPILER-$(COMPAT_VERSION)
-	sed -e '$(if $(COMPAT_LEVEL),/^$(subst $(SPACE),:\|^,$(COMPAT_LEVEL)):/d;)s/^[0-9]*://' $< > $@
+	sed -e '$(if $(COMPAT_LEVEL),/^$(subst $(SPACE),@\|^,$(COMPAT_LEVEL))@/d;)s/^[0-9]*@//' $< > $@
 
 flexlink.exe: $(OBJS) $(RES)
 	@echo Building flexlink.exe with TOOLCHAIN=$(TOOLCHAIN) for OCaml $(OCAML_VERSION)
