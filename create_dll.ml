@@ -9,6 +9,7 @@
 (* Create a DLL from a set of "closed" COFF files (no imported symbol). *)
 
 include (struct
+open Compat
 open Coff
 
 let (&&&) = Int32.logand

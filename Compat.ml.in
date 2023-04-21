@@ -98,6 +98,10 @@
 403:    else c
 403:end
 
+408:module Option = struct
+408:  let value o ~default = match o with Some v -> v | None -> default
+408:end
+
 407:module Stdlib = Pervasives
 
 404:module String = struct

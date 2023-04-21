@@ -6,7 +6,7 @@
 (*   en Automatique.                                                    *)
 (************************************************************************)
 
-include Compat
+open Compat
 
 let underscore = ref true
     (* Are "normal" symbols prefixed with an underscore? *)
@@ -39,8 +39,7 @@ let extra_args = ref []
 let mode : [`NORMAL | `DUMP | `PATCH] ref = ref `NORMAL
 let defexports = ref []
 let noentry = ref false
-let use_cygpath = ref true
-let cygpath_arg : [`Yes | `No | `None] ref = ref `None
+let use_cygpath : [`Yes | `No | `Try] ref = ref `Try
 let implib = ref false
 let deffile = ref None
 let stack_reserve = ref None
@@ -147,10 +146,10 @@ let specs = [
   "-patch", Arg.Unit (fun () -> mode := `PATCH),
   " Only patch the target image (to be used with -stack)";
 
-  "-nocygpath", Arg.Unit (fun () -> cygpath_arg := `No),
+  "-nocygpath", Arg.Unit (fun () -> use_cygpath := `No),
   " Do not use cygpath (default for msvc, mingw)";
 
-  "-cygpath", Arg.Unit (fun () -> cygpath_arg := `Yes),
+  "-cygpath", Arg.Unit (fun () -> use_cygpath := `Yes),
   " Use cygpath (default for cygwin)";
 
   "-no-merge-manifest", Arg.Set no_merge_manifest,

@@ -10,6 +10,7 @@
    compute relocation and export tables, rewrite some COFF files,
    call the native linker *)
 
+open Compat
 open Coff
 open Cmdline
 
@@ -247,16 +248,35 @@ let quote_files cmdline lst =
 
 (* Looking for files *)
 
-let cygpath l =
-  get_output "cygpath -m %s" (String.concat " " (List.map Filename.quote l))
+let cygpath l cont =
+  let accept_error = (!use_cygpath = `Try && l <> []) in
+  let l =
+    let args = String.concat " " (List.map Filename.quote l) in
+    get_output ~accept_error "cygpath -m %s" args
+  in
+  if accept_error && l = [] then begin
+    use_cygpath := `No;
+    None
+  end else
+    cont l
 
 let cygpath1 fn =
-  get_output1 "cygpath -m %s" fn
+  let accept_error = (!use_cygpath = `Try) in
+  match get_output ~accept_error "cygpath -m %s" fn with
+  | output::_ ->
+      if accept_error then
+        use_cygpath := `Yes;
+      Some output
+  | [] when accept_error ->
+      use_cygpath := `No;
+      None
+  | [] ->
+      raise (Failure "cygpath did not return any output")
 
 let file_exists fn =
   if Sys.file_exists fn && not (Sys.is_directory fn) then Some fn
-  else if !use_cygpath && Sys.file_exists (fn ^ ".lnk") then
-    Some (cygpath1 fn)
+  else if !use_cygpath <> `No && Sys.file_exists (fn ^ ".lnk") then
+    cygpath1 fn
   else None
 
 let rec find_file_in = function
@@ -276,7 +296,10 @@ let find_file suffixes fn =
          ) (""::!search_path)) in
   match find_file_in l with
     | Some x -> Some x
-    | None -> if !use_cygpath then find_file_in (cygpath l) else None
+    | None ->
+        if !use_cygpath <> `No then
+          cygpath l find_file_in
+        else None
 
 let rec map_until_found f = function
   | [] ->
@@ -1452,25 +1475,14 @@ let main () =
   parse_cmdline ();
   setup_toolchain ();
 
-  use_cygpath :=
-    begin
-      match !toolchain, !cygpath_arg with
-      | _, `Yes -> true
-      | _, `No -> false
-      | (`GNAT|`GNAT64|`MINGW|`MINGW64|`CYGWIN64), `None ->
-          begin match Sys.os_type with
-          | "Unix" | "Cygwin" ->
-              Sys.command "cygpath -S 2>/dev/null >/dev/null" = 0
-          | "Win32" ->
-              Sys.command "cygpath -S 2>NUL >NUL" = 0
-          | _ -> assert false
-          end
-      | (`MSVC|`MSVC64|`LIGHTLD), `None -> false
-    end;
-
-
   if !verbose >= 2 then (
-    Printf.printf "** Use cygpath: %b\n" !use_cygpath;
+    let use_cygpath =
+      match !use_cygpath with
+      | `Yes -> "true"
+      | `No -> "false"
+      | `Try -> "maybe"
+    in
+    Printf.printf "** Use cygpath: %s\n" use_cygpath;
     Printf.printf "** Search path:\n";
     List.iter print_endline !search_path;
     if !use_default_libs then begin
@@ -1487,8 +1499,8 @@ let main () =
         (String.concat " " (List.map Filename.quote (List.rev !extra_args)))
   | `PATCH ->
       let output_file =
-        if !use_cygpath then
-          cygpath1 !output_file
+        if !use_cygpath <> `No then
+          Option.value ~default:!output_file (cygpath1 !output_file)
         else
           !output_file in
       patch_output output_file

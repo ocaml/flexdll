@@ -5,6 +5,8 @@ Next version
 - GPR#114: Support for /alternatename directive. Fixes GPR#113 (Jonah Beckford)
 - GPR#116: Remove Cygwin32 (David Allsopp)
 - GPR#117: Fix handling of object names of length > 16 in archive files. Fixes GPR#110 (Nicolás Ojeda Bär)
+- GPR#118: Defer the detection of cygpath to the first time it's actually
+  required, reducing the overall number of calls. (David Allsopp)
 
 Version 0.42
 - GPR#106: Support -l: syntax, to allow static linking of specific libraries (David Allsopp)
