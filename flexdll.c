@@ -47,8 +47,98 @@ typedef struct dlunit {
 } dlunit;
 typedef void *resolver(void*, const char*);
 
-static int error = 0;
-static char error_buffer[256];
+/* Error reporting */
+/* The latest error must be kept in some variable so that flexdll_dlerror can
+ * report it but this causes data races (and possible segmentation faults) in
+ * multithreaded programs if that variable is global. So this must use
+ * thread-local storage instead.
+ *
+ * To ensure compatibility, the implementation does not require compiler support
+ * for thread-local storage (__thread) and instead relies on functions
+ * TlsGetValue, TlsSetValue, etc.
+ *
+ * This implementation is structured around the function get_tls_error that
+ * returns a structure containing, for the current thread, the code (and a
+ * buffer for the corresponding message) of the last flexdll error. It accepts
+ * an argument to choose whether the structure should be reset:
+ *
+ * - TLS_ERROR_RESET will reset what is stored in the structure, so this is
+ *   intended for initialisation entry points (flexdll_dlopen, flexdll_relocate)
+ * - TLS_ERROR_NOP will keep the current content of the structure, for all other
+ *   entry points (flexdll_dlerror, ll_dlerror)
+ *
+ * The other exported entrypoints do not need to access the error storage.
+ */
+
+typedef struct error_s {
+  int code;
+  char message[256];
+} err_t;
+
+#define TLS_ERROR_NOP 0
+#define TLS_ERROR_RESET 1
+
+#define TLS_ACCESS_ERRMSG "error accessing thread-local storage"
+
+static err_t *get_tls_error(int op) {
+  static volatile DWORD error_idx = TLS_OUT_OF_INDEXES;
+  DWORD new_idx, last_error;
+  err_t *error;
+
+  /* We store the last system error to restore it on leaving, so that
+   * get_tls_error is transparent with regards to GetLastError */
+  last_error = GetLastError();
+
+  if(error_idx == TLS_OUT_OF_INDEXES) {
+    new_idx = TlsAlloc();
+    if(new_idx == TLS_OUT_OF_INDEXES) {
+      /* If we cannot allocate the structure required to report errors... */
+      /* Maybe we should set the last error to some standard value
+       * that correspond to such cases instead of resetting it? */
+      SetLastError(last_error);
+      return NULL;
+    }
+    /* According to documentation DWORD and LONG take both 32 bits so
+     * this uses InterlockedCompareExchange to store a DWORD */
+    if (InterlockedCompareExchange((LONG*)&error_idx, (LONG)new_idx, (LONG)TLS_OUT_OF_INDEXES) != (LONG)TLS_OUT_OF_INDEXES) {
+      if(!TlsFree(new_idx)) {
+        SetLastError(last_error);
+        return NULL;
+      }
+    }
+  }
+
+  error = TlsGetValue(error_idx);
+  if(error == NULL) {
+    error = malloc(sizeof(err_t));
+    if(error == NULL) {
+      SetLastError(last_error);
+      return NULL;
+    }
+    if(!TlsSetValue(error_idx, error)) {
+      free(error);
+      SetLastError(last_error);
+      return NULL;
+    }
+    error->code = 0;
+    error->message[0] = 0;
+  }
+
+  SetLastError(last_error);
+
+  switch(op) {
+  case TLS_ERROR_NOP:
+    break;
+  case TLS_ERROR_RESET:
+    error->code = 0;
+    error->message[0] = 0;
+    break;
+  default:
+    return NULL;
+  }
+
+  return error;
+}
 
 /* Emulate a low-level dlopen-like interface */
 
@@ -104,16 +194,21 @@ static void *ll_dlsym(void *handle, char *name) {
 
 static char *ll_dlerror(void)
 {
-  DWORD msglen =
+  DWORD msglen;
+  err_t * err;
+  err = get_tls_error(TLS_ERROR_NOP);
+  if(err == NULL) return TLS_ACCESS_ERRMSG;
+
+  msglen =
     FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
-                  NULL,           /* message source */
-                  GetLastError(), /* error number */
-                  0,              /* default language */
-                  error_buffer,         /* destination */
-                  sizeof(error_buffer), /* size of destination */
-                  NULL);          /* no inserts */
+                  NULL,                 /* message source */
+                  GetLastError(),       /* error number */
+                  0,                    /* default language */
+                  err->message,         /* destination */
+                  sizeof(err->message), /* size of destination */
+                  NULL);                /* no inserts */
   if (msglen == 0) return "unknown error";
-  else return error_buffer;
+  else return err->message;
 }
 
 #endif
@@ -147,16 +242,16 @@ static void dump_master_reloctbl(reloctbl **ptr) {
 }
 
 /* Avoid the use of snprintf */
-static void cannot_resolve_msg(char *name) {
+static void cannot_resolve_msg(char *name, err_t *err) {
   static char msg[] = "Cannot resolve ";
   static int l = sizeof(msg) - 1;
   int n = strlen(name);
-  memcpy(error_buffer,msg,l);
-  memcpy(error_buffer+l,name,min(n,sizeof(error_buffer) - l - 1));
-  error_buffer[l+n] = 0;
+  memcpy(err->message,msg,l);
+  memcpy(err->message+l,name,min(n,sizeof(err->message) - l - 1));
+  err->message[l+n] = 0;
 }
 
-static void relocate(resolver f, void *data, reloctbl *tbl) {
+static void relocate(resolver f, void *data, reloctbl *tbl, err_t *err) {
   reloc_entry *ptr;
   nonwr *wr;
   INT_PTR s;
@@ -178,8 +273,8 @@ static void relocate(resolver f, void *data, reloctbl *tbl) {
 
     s = (UINT_PTR) f(data,ptr->name);
     if (!s) {
-      error = 2;
-      cannot_resolve_msg(ptr->name);
+      err->code = 2;
+      cannot_resolve_msg(ptr->name, err);
       goto restore;
     }
 
@@ -224,8 +319,8 @@ static void relocate(resolver f, void *data, reloctbl *tbl) {
       s -= (INT_PTR)(ptr -> addr) + 4;
       s += *((INT32*) ptr -> addr);
       if (s != (INT32) s) {
-        sprintf(error_buffer, "flexdll error: cannot relocate %s RELOC_REL32, target is too far: %p  %p", ptr->name, (void *)((UINT_PTR) s), (void *) ((UINT_PTR)(INT32) s));
-        error = 3;
+        sprintf(err->message, "flexdll error: cannot relocate %s RELOC_REL32, target is too far: %p  %p", ptr->name, (void *)((UINT_PTR) s), (void *) ((UINT_PTR)(INT32) s));
+        err->code = 3;
         goto restore;
       }
       *((UINT32*) ptr->addr) = s;
@@ -234,8 +329,8 @@ static void relocate(resolver f, void *data, reloctbl *tbl) {
       s -= (INT_PTR)(ptr -> addr) + 8;
       s += *((INT32*) ptr -> addr);
       if (s != (INT32) s) {
-        sprintf(error_buffer, "flexdll error: cannot relocate RELOC_REL32_4, target is too far: %p  %p",(void *)((UINT_PTR) s), (void *) ((UINT_PTR)(INT32) s));
-        error = 3;
+        sprintf(err->message, "flexdll error: cannot relocate RELOC_REL32_4, target is too far: %p  %p",(void *)((UINT_PTR) s), (void *) ((UINT_PTR)(INT32) s));
+        err->code = 3;
         goto restore;
       }
       *((UINT32*) ptr->addr) = s;
@@ -244,8 +339,8 @@ static void relocate(resolver f, void *data, reloctbl *tbl) {
       s -= (INT_PTR)(ptr -> addr) + 5;
       s += *((INT32*) ptr -> addr);
       if (s != (INT32) s) {
-        sprintf(error_buffer, "flexdll error: cannot relocate RELOC_REL32_1, target is too far: %p  %p",(void *)((UINT_PTR) s), (void *) ((UINT_PTR)(INT32) s));
-        error = 3;
+        sprintf(err->message, "flexdll error: cannot relocate RELOC_REL32_1, target is too far: %p  %p",(void *)((UINT_PTR) s), (void *) ((UINT_PTR)(INT32) s));
+        err->code = 3;
         goto restore;
       }
       *((UINT32*) ptr->addr) = s;
@@ -254,8 +349,8 @@ static void relocate(resolver f, void *data, reloctbl *tbl) {
       s -= (INT_PTR)(ptr -> addr) + 6;
       s += *((INT32*) ptr -> addr);
       if (s != (INT32) s) {
-        sprintf(error_buffer, "flexdll error: cannot relocate RELOC_REL32_2, target is too far: %p  %p",(void *)((UINT_PTR) s), (void *) ((UINT_PTR)(INT32) s));
-        error = 3;
+        sprintf(err->message, "flexdll error: cannot relocate RELOC_REL32_2, target is too far: %p  %p",(void *)((UINT_PTR) s), (void *) ((UINT_PTR)(INT32) s));
+        err->code = 3;
         goto restore;
       }
       *((UINT32*) ptr->addr) = s;
@@ -276,8 +371,8 @@ static void relocate(resolver f, void *data, reloctbl *tbl) {
   }
 }
 
-static void relocate_master(resolver f, void *data, reloctbl **ptr) {
-  while (0 == error && *ptr) relocate(f,data,*ptr++);
+static void relocate_master(resolver f, void *data, reloctbl **ptr, err_t *err) {
+  while (0 == err->code && *ptr) relocate(f,data,*ptr++,err);
 }
 
 /* Symbol tables */
@@ -357,9 +452,13 @@ static void *find_symbol_global(void *data, const char *name) {
 }
 
 int flexdll_relocate(void *tbl) {
+  err_t * err;
+  err = get_tls_error(TLS_ERROR_RESET);
+  if(err == NULL) return 0;
+
   if (!tbl) { printf("No master relocation table\n"); return 0; }
-  relocate_master(find_symbol_global, NULL, tbl);
-  if (error) return 0;
+  relocate_master(find_symbol_global, NULL, tbl, err);
+  if (err->code) return 0;
   return 1;
 }
 
@@ -374,7 +473,9 @@ void *flexdll_wdlopen(const wchar_t *file, int mode) {
   int exec = (mode & FLEXDLL_RTLD_NOEXEC ? 0 : 1);
   void* relocate = (exec ? &flexdll_relocate : 0);
 
-  error = 0;
+  err_t * err;
+  err = get_tls_error(TLS_ERROR_RESET);
+  if(err == NULL) return NULL;
   if (!file) return &main_unit;
 
 #ifdef CYGWIN
@@ -396,7 +497,7 @@ void *flexdll_wdlopen(const wchar_t *file, int mode) {
 #endif /* CYGWIN */
 
   handle = ll_dlopen(file, exec);
-  if (!handle) { if (!error) error = 1; return NULL; }
+  if (!handle) { if (!err->code) err->code = 1; return NULL; }
 
   unit = units;
   while ((NULL != unit) && (unit->handle != handle)) unit = unit->next;
@@ -415,7 +516,7 @@ void *flexdll_wdlopen(const wchar_t *file, int mode) {
     /* Relocation has already been done if the flexdll's DLL entry point
        is used */
     flexdll_relocate(ll_dlsym(handle, "reloctbl"));
-    if (error) { flexdll_dlclose(unit); return NULL; }
+    if (err->code) { flexdll_dlclose(unit); return NULL; }
   }
 
   return unit;
@@ -429,9 +530,13 @@ void *flexdll_dlopen(const char *file, int mode)
   int nbr;
   void * handle;
 
+  err_t * err;
+  err = get_tls_error(TLS_ERROR_RESET);
+  if(err == NULL) return NULL;
+
   if (file) {
     nbr = MultiByteToWideChar(CP_THREAD_ACP, 0, file, -1, NULL, 0);
-    if (nbr == 0) { if (!error) error = 1; return NULL; }
+    if (nbr == 0) { if (!err->code) err->code = 1; return NULL; }
     p = malloc(nbr*sizeof(*p));
     MultiByteToWideChar(CP_THREAD_ACP, 0, file, -1, p, nbr);
   }
@@ -462,11 +567,15 @@ void *flexdll_dlsym(void *u, const char *name) {
 }
 
 char *flexdll_dlerror() {
-  switch (error) {
+  err_t * err;
+  err = get_tls_error(TLS_ERROR_NOP);
+  if(err == NULL) return TLS_ACCESS_ERRMSG;
+
+  switch (err->code) {
   case 0: return NULL;
-  case 1: error = 0; return ll_dlerror();
-  case 2: error = 0; return error_buffer;
-  case 3: error = 0; return error_buffer;
+  case 1: err->code = 0; return ll_dlerror();
+  case 2: err->code = 0; return err->message;
+  case 3: err->code = 0; return err->message;
   }
   return NULL;
 }

@@ -1,6 +1,7 @@
 Next version
 - GPR#108: Add -lgcc_s to Cygwin's link libraries, upstreaming a patch from the
   Cygwin flexdll package (David Allsopp)
+- GPR#112: Put error global variables into thread-local storage (Samuel Hym, Nicolás Ojeda Bär)
 - GPR#114: Support for /alternatename directive. Fixes GPR#113 (Jonah Beckford)
 - GPR#117: Fix handling of object names of length > 16 in archive files. Fixes GPR#110 (Nicolás Ojeda Bär)
 
