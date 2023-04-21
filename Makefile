@@ -31,10 +31,17 @@ MIN64CC = $(MINGW64_PREFIX)gcc
 CYGWIN64_PREFIX = x86_64-pc-cygwin-
 CYG64CC = $(CYGWIN64_PREFIX)gcc
 
+define NEWLINE
+
+
+endef
+$(SPACE) :=
+
 version.ml: Makefile
-	echo "let version = \"$(VERSION)\"" > version.ml
-	echo "let mingw_prefix = \"$(MINGW_PREFIX)\"" >> version.ml
-	echo "let mingw64_prefix = \"$(MINGW64_PREFIX)\"" >> version.ml
+	$(file >$@,$\
+    let version = "$(VERSION)"$(NEWLINE)$\
+    let mingw_prefix = "$(MINGW_PREFIX)"$(NEWLINE)$\
+    let mingw64_prefix = "$(MINGW64_PREFIX)")
 
 # Supported tool-chains
 
