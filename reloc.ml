@@ -96,11 +96,14 @@ let get_output ?(use_bash = false) ?(accept_error=false) cmd =
       Sys.remove fn;
       r
 
-let get_output1 ?use_bash cmd =
-  match get_output ?use_bash cmd with
-  | output::_ -> output
-  | [] -> raise (Failure ("command " ^ cmd ^ " did not return any output"))
+let get_output1 ?use_bash ?accept_error fmt =
+  Printf.ksprintf (fun cmd ->
+    match get_output ?use_bash ?accept_error cmd with
+    | output::_ -> output
+    | [] -> raise (Failure ("command " ^ cmd ^ " did not return any output"))) fmt
 
+let get_output ?use_bash ?accept_error fmt =
+  Printf.ksprintf (get_output ?use_bash ?accept_error) fmt
 
 (* Preparing command line *)
 
@@ -245,10 +248,10 @@ let quote_files cmdline lst =
 (* Looking for files *)
 
 let cygpath l =
-  get_output (Printf.sprintf "cygpath -m %s" (String.concat " " (List.map Filename.quote l)))
+  get_output "cygpath -m %s" (String.concat " " (List.map Filename.quote l))
 
 let cygpath1 fn =
-  get_output1 (Printf.sprintf "cygpath -m %s" fn)
+  get_output1 "cygpath -m %s" fn
 
 let file_exists fn =
   if Sys.file_exists fn && not (Sys.is_directory fn) then Some fn
@@ -1219,7 +1222,7 @@ let read_gnatls () =
    (* This function is used by the GNAT toolchain to compute the include
       directory. gnatls actually returns with an error code different to 0, so
       we need to accept the error here. *)
-   let str_l = get_output ~accept_error:true ("gnatls -v") in
+   let str_l = get_output ~accept_error:true "gnatls -v" in
    let ada_include =
      List.hd (List.filter (fun s -> ends_with s "adainclude") str_l) in
    Filename.dirname (strip ada_include)
@@ -1290,7 +1293,7 @@ let setup_toolchain () =
       | [] -> []
     in
     let lib_search_dirs =
-      get_output (!gcc ^ " -print-search-dirs")
+      get_output "%s -print-search-dirs" !gcc
       |> get_lib_search_dirs
       |> List.map normalize_path
       |> remove_duplicate_paths
@@ -1339,7 +1342,7 @@ let setup_toolchain () =
     search_path :=
       !dirs @
       [
-       Filename.dirname (get_output1 (!gcc ^ " -print-libgcc-file-name"));
+       Filename.dirname (get_output1 "%s -print-libgcc-file-name" !gcc);
        read_gnatls ();
       ];
     default_libs :=
