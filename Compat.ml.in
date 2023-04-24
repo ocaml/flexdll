@@ -99,6 +99,7 @@
 403:end
 
 408:module Option = struct
+408:  let some v = Some v
 408:  let value o ~default = match o with Some v -> v | None -> default
 408:end
 
@@ -130,6 +131,12 @@
 404:    done;
 404:    sub s 0 !j :: !r
 404:end
+
+401:module Sys = struct
+401:  include Sys
+401:
+401:  let win32 = (Sys.os_type = "Win32")
+401:end
 
 402:type bytes = string
 402:let output_bytes = output_string

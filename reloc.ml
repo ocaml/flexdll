@@ -279,6 +279,9 @@ let file_exists fn =
     cygpath1 fn
   else None
 
+let dir_exists_no_cygpath fn =
+  Sys.file_exists fn && (try Sys.is_directory fn with Sys_error _ -> false)
+
 let rec find_file_in = function
   | [] -> None
   | fn::rest ->
@@ -1264,6 +1267,13 @@ let nsplit str sep =
     loop [] 0
 
 let normalize_path path =
+  let path =
+    if Sys.win32 then
+      let back_to_forward c = if c = '\\' then '/' else c in
+      String.init (String.length path) (fun i -> back_to_forward path.[i])
+    else
+      path
+  in
   let path = nsplit path '/' in
   let rec loop acc path =
     match path with
@@ -1277,7 +1287,7 @@ let normalize_path path =
     | [] -> List.rev acc
   in
   let path = loop [] path in
-  String.concat "/" path
+  String.concat Filename.dir_sep path
 
 let remove_duplicate_paths paths =
   let set = Hashtbl.create 16 in
@@ -1299,21 +1309,45 @@ let setup_toolchain () =
   let mingw_libs pre =
     gcc := pre ^ "gcc";
     objdump := pre ^ "objdump";
-    let rec get_lib_search_dirs input =
+    let rec get_lib_search_dirs install libraries input =
       match input with
       | entry :: input ->
-          begin try
+          if String.length entry > 9 && String.sub entry 0 9 = "install: " then
+            get_lib_search_dirs (String.sub entry 9 (String.length entry - 9)) libraries input
+          else begin try
             match split entry '=' with
-            | "libraries: ", paths -> nsplit paths ':'
-            | _ -> get_lib_search_dirs input
+            | "libraries: ", paths -> get_lib_search_dirs install paths input
+            | _ -> get_lib_search_dirs install libraries input
           with Not_found ->
-            get_lib_search_dirs input
+            get_lib_search_dirs install libraries input
           end
-      | [] -> []
+      | [] ->
+          let install =
+            if install <> "" then
+              (* Ensure install does not end with a separator (or
+                 Sys.is_directory will fail) *)
+              Filename.concat install Filename.current_dir_name
+              |> Filename.dirname
+            else
+              ""
+          in
+          let separator, run_through_cygpath =
+            if Sys.win32 then
+              if dir_exists_no_cygpath install then
+                ';', false
+              else
+                ':', (!use_cygpath <> `No)
+            else
+              ':', false
+          in
+          let libraries = nsplit libraries separator in
+          if run_through_cygpath then
+            Option.value ~default:libraries (cygpath libraries Option.some)
+          else
+            libraries
     in
     let lib_search_dirs =
-      get_output "%s -print-search-dirs" !gcc
-      |> get_lib_search_dirs
+      get_lib_search_dirs "" "" (get_output "%s -print-search-dirs" !gcc)
       |> List.map normalize_path
       |> remove_duplicate_paths
     in

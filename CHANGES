@@ -6,7 +6,11 @@ Next version
 - GPR#116: Remove Cygwin32 (David Allsopp)
 - GPR#117: Fix handling of object names of length > 16 in archive files. Fixes GPR#110 (Nicolás Ojeda Bär)
 - GPR#118: Defer the detection of cygpath to the first time it's actually
-  required, reducing the overall number of calls. (David Allsopp)
+  required, reducing the overall number of calls. Further, detect whether
+  mingw-w64 gcc's library path requires cygpath, which further reduces the
+  calls when using Cygwin's build of mingw-w64 as the search path is then
+  converted only once. In passing, this trivially adds support for MSYS2's
+  mingw-w64 compilers, fixing GPR#97. (David Allsopp)
 
 Version 0.42
 - GPR#106: Support -l: syntax, to allow static linking of specific libraries (David Allsopp)
