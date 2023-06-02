@@ -159,7 +159,7 @@ This main program can be compiled and linked like the commands below
 
     # CYGWIN
     gcc -I[...] -c dump.c
-    flexlink -chain cygwin -exe -o dump.exe dump.o
+    flexlink -chain cygwin64 -exe -o dump.exe dump.o
 ````
 
 The compilation step is completely standard, but in order to link the
@@ -192,7 +192,7 @@ commands:
 
     # CYGWIN
     gcc -D_CYGWIN_  -c plug1.c
-    flexlink -chain cygwin -o plug1.dll plug1.o
+    flexlink -chain cygwin64 -o plug1.dll plug1.o
 ````
 
 And now you can ask the main program to load the plugin:
@@ -516,7 +516,7 @@ Command line for the flexlink wrapper
       -I <dir>            Add a directory where to search for files
       -L <dir>            Add a directory where to search for files
       -l <lib>            Library file
-      -chain {msvc|msvc64|cygwin|mingw|mingw64|ld}
+      -chain {msvc|msvc64|cygwin64|mingw|mingw64|ld}
                           Choose which linker to use
       -defaultlib <obj>   External object (no export, no import)
       -save-temps         Do not delete intermediate files

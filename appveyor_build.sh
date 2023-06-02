@@ -203,7 +203,7 @@ fi
 if [ "$ARTEFACTS" = 'yes' ] ; then
     pushd "$APPVEYOR_BUILD_FOLDER" &> /dev/null
 
-    make CHAINS="$CHAINS" package_bin installer
+    make package_bin installer
     SUFFIX="$(git describe)"
     VERSION="$(sed -ne 's/^VERSION *= *//p' Makefile)"
     if [ "$SUFFIX" != "$VERSION" ] ; then

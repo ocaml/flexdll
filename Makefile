@@ -1,7 +1,7 @@
 ## Tips to build flexdll:
 ##
 ##  To use an already configured 64-bit MSVC toolchain:
-##     make all MSVC_DETECT=0 CHAINS="mingw mingw64 cygwin cygwin64 msvc64"
+##     make all MSVC_DETECT=0 CHAINS="mingw mingw64 cygwin64 msvc64"
 ##
 
 
@@ -28,9 +28,6 @@ MINCC = $(MINGW_PREFIX)gcc
 MINGW64_PREFIX = x86_64-w64-mingw32-
 MIN64CC = $(MINGW64_PREFIX)gcc
 
-CYGWIN_PREFIX = i686-pc-cygwin-
-CYGCC = $(CYGWIN_PREFIX)gcc
-
 CYGWIN64_PREFIX = x86_64-pc-cygwin-
 CYG64CC = $(CYGWIN64_PREFIX)gcc
 
@@ -41,7 +38,7 @@ version.ml: Makefile
 
 # Supported tool-chains
 
-CHAINS = mingw mingw64 cygwin cygwin64 msvc msvc64
+CHAINS = mingw mingw64 cygwin64 msvc msvc64
 
 # Compilers
 
@@ -133,7 +130,6 @@ support: $(addprefix build_, $(CHAINS))
 build_gnat: flexdll_gnat.o flexdll_initer_gnat.o
 build_msvc: flexdll_msvc.obj flexdll_initer_msvc.obj
 build_msvc64: flexdll_msvc64.obj flexdll_initer_msvc64.obj
-build_cygwin: flexdll_cygwin.o flexdll_initer_cygwin.o
 build_cygwin64: flexdll_cygwin64.o flexdll_initer_cygwin64.o
 build_mingw: flexdll_mingw.o flexdll_initer_mingw.o
 build_mingw64: flexdll_mingw64.o flexdll_initer_mingw64.o
@@ -175,9 +171,6 @@ flexdll_msvc.obj: flexdll.h flexdll.c
 flexdll_msvc64.obj: flexdll.h flexdll.c
 	$(MSVC64_PREFIX) $(MSVCC64) /DMSVC /DMSVC64 -c /Fo"flexdll_msvc64.obj" flexdll.c
 
-flexdll_cygwin.o: flexdll.h flexdll.c
-	$(CYGCC) -c -DCYGWIN -o flexdll_cygwin.o flexdll.c
-
 flexdll_cygwin64.o: flexdll.h flexdll.c
 	$(CYG64CC) -c -DCYGWIN -o flexdll_cygwin64.o flexdll.c
 
@@ -196,9 +189,6 @@ flexdll_initer_msvc.obj: flexdll_initer.c
 flexdll_initer_msvc64.obj: flexdll_initer.c
 	$(MSVC64_PREFIX) $(MSVCC64) -c /Fo"flexdll_initer_msvc64.obj" flexdll_initer.c
 
-flexdll_initer_cygwin.o: flexdll_initer.c
-	$(CYGCC) -c -o flexdll_initer_cygwin.o flexdll_initer.c
-
 flexdll_initer_cygwin64.o: flexdll_initer.c
 	$(CYG64CC) -c -o flexdll_initer_cygwin64.o flexdll_initer.c
 
@@ -214,9 +204,6 @@ flexdll_initer_mingw64.o: flexdll_initer.c
 
 demo_msvc: flexlink.exe flexdll_msvc.obj flexdll_initer_msvc.obj
 	$(MSVC_PREFIX) $(MAKE) -C test clean demo CHAIN=msvc CC="$(MSVCC)" PLUG2_CFLAGS="/bigobj" O=obj
-
-demo_cygwin: flexlink.exe flexdll_cygwin.o flexdll_initer_cygwin.o
-	$(MAKE) -C test clean demo CHAIN=cygwin CC="$(CYGCC)" O=o
 
 demo_cygwin64: flexlink.exe flexdll_cygwin64.o flexdll_initer_cygwin64.o
 	$(MAKE) -C test clean demo CHAIN=cygwin64 CC="$(CYG64CC)" O=o RUN="PATH=\"/cygdrive/c/cygwin64/bin:$(PATH)\""

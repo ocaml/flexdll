@@ -20,7 +20,7 @@ let use_default_libs = ref true
 let subsystem = ref "console"
 let explain = ref false
 let builtin_linker = ref false
-let toolchain : [ `MSVC | `MSVC64 | `MINGW | `MINGW64 | `GNAT | `GNAT64 | `CYGWIN | `CYGWIN64 | `LIGHTLD ] ref = ref `MSVC
+let toolchain : [ `MSVC | `MSVC64 | `MINGW | `MINGW64 | `GNAT | `GNAT64 | `CYGWIN64 | `LIGHTLD ] ref = ref `MSVC
 let save_temps = ref false
 let show_exports = ref false
 let show_imports = ref false
@@ -99,13 +99,12 @@ let specs = [
   "-l", Arg.String (fun s -> files := ("-l" ^ s) :: !files),
   "<lib> Library file";
 
-  "-chain", Arg.Symbol (["msvc";"msvc64";"cygwin";"cygwin64";"mingw";"mingw64";"gnat";"gnat64";"ld"],
+  "-chain", Arg.Symbol (["msvc";"msvc64";"cygwin64";"mingw";"mingw64";"gnat";"gnat64";"ld"],
 			(fun s ->
                           machine := `x86; underscore := true;
                           toolchain := match s with
 			  | "msvc" -> `MSVC
 			  | "msvc64" -> machine := `x64; underscore := false; `MSVC64
-			  | "cygwin" -> `CYGWIN
 			  | "cygwin64" -> machine := `x64; underscore := false; `CYGWIN64
 			  | "mingw" -> `MINGW
 			  | "gnat" -> `GNAT
