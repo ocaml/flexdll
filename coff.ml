@@ -9,7 +9,7 @@
 (* This module implements a reader/writer for COFF object files
    and libraries. *)
 
-include Compat
+open Compat
 
 module Buf : sig
   type t

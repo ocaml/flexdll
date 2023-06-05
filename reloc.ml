@@ -10,6 +10,7 @@
    compute relocation and export tables, rewrite some COFF files,
    call the native linker *)
 
+open Compat
 open Coff
 open Cmdline
 
@@ -96,11 +97,14 @@ let get_output ?(use_bash = false) ?(accept_error=false) cmd =
       Sys.remove fn;
       r
 
-let get_output1 ?use_bash cmd =
-  match get_output ?use_bash cmd with
-  | output::_ -> output
-  | [] -> raise (Failure ("command " ^ cmd ^ " did not return any output"))
+let get_output1 ?use_bash ?accept_error fmt =
+  Printf.ksprintf (fun cmd ->
+    match get_output ?use_bash ?accept_error cmd with
+    | output::_ -> output
+    | [] -> raise (Failure ("command " ^ cmd ^ " did not return any output"))) fmt
 
+let get_output ?use_bash ?accept_error fmt =
+  Printf.ksprintf (get_output ?use_bash ?accept_error) fmt
 
 (* Preparing command line *)
 
@@ -244,17 +248,39 @@ let quote_files cmdline lst =
 
 (* Looking for files *)
 
-let cygpath l =
-  get_output (Printf.sprintf "cygpath -m %s" (String.concat " " (List.map Filename.quote l)))
+let cygpath l cont =
+  let accept_error = (!use_cygpath = `Try && l <> []) in
+  let l =
+    let args = String.concat " " (List.map Filename.quote l) in
+    get_output ~accept_error "cygpath -m %s" args
+  in
+  if accept_error && l = [] then begin
+    use_cygpath := `No;
+    None
+  end else
+    cont l
 
 let cygpath1 fn =
-  get_output1 (Printf.sprintf "cygpath -m %s" fn)
+  let accept_error = (!use_cygpath = `Try) in
+  match get_output ~accept_error "cygpath -m %s" fn with
+  | output::_ ->
+      if accept_error then
+        use_cygpath := `Yes;
+      Some output
+  | [] when accept_error ->
+      use_cygpath := `No;
+      None
+  | [] ->
+      raise (Failure "cygpath did not return any output")
 
 let file_exists fn =
   if Sys.file_exists fn && not (Sys.is_directory fn) then Some fn
-  else if !use_cygpath && Sys.file_exists (fn ^ ".lnk") then
-    Some (cygpath1 fn)
+  else if !use_cygpath <> `No && Sys.file_exists (fn ^ ".lnk") then
+    cygpath1 fn
   else None
+
+let dir_exists_no_cygpath fn =
+  Sys.file_exists fn && (try Sys.is_directory fn with Sys_error _ -> false)
 
 let rec find_file_in = function
   | [] -> None
@@ -273,7 +299,10 @@ let find_file suffixes fn =
          ) (""::!search_path)) in
   match find_file_in l with
     | Some x -> Some x
-    | None -> if !use_cygpath then find_file_in (cygpath l) else None
+    | None ->
+        if !use_cygpath <> `No then
+          cygpath l find_file_in
+        else None
 
 let rec map_until_found f = function
   | [] ->
@@ -620,10 +649,6 @@ let patch_output filename =
   | Some x ->
       let filename =
         if not (Sys.file_exists filename) && (Sys.file_exists (filename ^ ".exe")) then filename ^ ".exe"
-        else filename
-      in
-      let filename =
-        if !use_cygpath then cygpath1 filename
         else filename
       in
       begin try Stacksize.set_stack_reserve filename x
@@ -1219,7 +1244,7 @@ let read_gnatls () =
    (* This function is used by the GNAT toolchain to compute the include
       directory. gnatls actually returns with an error code different to 0, so
       we need to accept the error here. *)
-   let str_l = get_output ~accept_error:true ("gnatls -v") in
+   let str_l = get_output ~accept_error:true "gnatls -v" in
    let ada_include =
      List.hd (List.filter (fun s -> ends_with s "adainclude") str_l) in
    Filename.dirname (strip ada_include)
@@ -1242,6 +1267,13 @@ let nsplit str sep =
     loop [] 0
 
 let normalize_path path =
+  let path =
+    if Sys.win32 then
+      let back_to_forward c = if c = '\\' then '/' else c in
+      String.init (String.length path) (fun i -> back_to_forward path.[i])
+    else
+      path
+  in
   let path = nsplit path '/' in
   let rec loop acc path =
     match path with
@@ -1255,7 +1287,7 @@ let normalize_path path =
     | [] -> List.rev acc
   in
   let path = loop [] path in
-  String.concat "/" path
+  String.concat Filename.dir_sep path
 
 let remove_duplicate_paths paths =
   let set = Hashtbl.create 16 in
@@ -1277,21 +1309,45 @@ let setup_toolchain () =
   let mingw_libs pre =
     gcc := pre ^ "gcc";
     objdump := pre ^ "objdump";
-    let rec get_lib_search_dirs input =
+    let rec get_lib_search_dirs install libraries input =
       match input with
       | entry :: input ->
-          begin try
+          if String.length entry > 9 && String.sub entry 0 9 = "install: " then
+            get_lib_search_dirs (String.sub entry 9 (String.length entry - 9)) libraries input
+          else begin try
             match split entry '=' with
-            | "libraries: ", paths -> nsplit paths ':'
-            | _ -> get_lib_search_dirs input
+            | "libraries: ", paths -> get_lib_search_dirs install paths input
+            | _ -> get_lib_search_dirs install libraries input
           with Not_found ->
-            get_lib_search_dirs input
+            get_lib_search_dirs install libraries input
           end
-      | [] -> []
+      | [] ->
+          let install =
+            if install <> "" then
+              (* Ensure install does not end with a separator (or
+                 Sys.is_directory will fail) *)
+              Filename.concat install Filename.current_dir_name
+              |> Filename.dirname
+            else
+              ""
+          in
+          let separator, run_through_cygpath =
+            if Sys.win32 then
+              if dir_exists_no_cygpath install then
+                ';', false
+              else
+                ':', (!use_cygpath <> `No)
+            else
+              ':', false
+          in
+          let libraries = nsplit libraries separator in
+          if run_through_cygpath then
+            Option.value ~default:libraries (cygpath libraries Option.some)
+          else
+            libraries
     in
     let lib_search_dirs =
-      get_output (!gcc ^ " -print-search-dirs")
-      |> get_lib_search_dirs
+      get_lib_search_dirs "" "" (get_output "%s -print-search-dirs" !gcc)
       |> List.map normalize_path
       |> remove_duplicate_paths
     in
@@ -1339,7 +1395,7 @@ let setup_toolchain () =
     search_path :=
       !dirs @
       [
-       Filename.dirname (get_output1 (!gcc ^ " -print-libgcc-file-name"));
+       Filename.dirname (get_output1 "%s -print-libgcc-file-name" !gcc);
        read_gnatls ();
       ];
     default_libs :=
@@ -1453,25 +1509,14 @@ let main () =
   parse_cmdline ();
   setup_toolchain ();
 
-  use_cygpath :=
-    begin
-      match !toolchain, !cygpath_arg with
-      | _, `Yes -> true
-      | _, `No -> false
-      | (`GNAT|`GNAT64|`MINGW|`MINGW64|`CYGWIN64), `None ->
-          begin match Sys.os_type with
-          | "Unix" | "Cygwin" ->
-              Sys.command "cygpath -S 2>/dev/null >/dev/null" = 0
-          | "Win32" ->
-              Sys.command "cygpath -S 2>NUL >NUL" = 0
-          | _ -> assert false
-          end
-      | (`MSVC|`MSVC64|`LIGHTLD), `None -> false
-    end;
-
-
   if !verbose >= 2 then (
-    Printf.printf "** Use cygpath: %b\n" !use_cygpath;
+    let use_cygpath =
+      match !use_cygpath with
+      | `Yes -> "true"
+      | `No -> "false"
+      | `Try -> "maybe"
+    in
+    Printf.printf "** Use cygpath: %s\n" use_cygpath;
     Printf.printf "** Search path:\n";
     List.iter print_endline !search_path;
     if !use_default_libs then begin
@@ -1487,7 +1532,12 @@ let main () =
       build_dll !exe_mode !output_file files !exts
         (String.concat " " (List.map Filename.quote (List.rev !extra_args)))
   | `PATCH ->
-      patch_output !output_file
+      let output_file =
+        if !use_cygpath <> `No then
+          Option.value ~default:!output_file (cygpath1 !output_file)
+        else
+          !output_file in
+      patch_output output_file
 
 let () =
   try main ()
