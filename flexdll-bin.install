@@ -1,0 +1,20 @@
+libexec: [
+  "flexlink.exe"
+]
+lib: [
+  "default.manifest"
+  "default_amd64.manifest"
+  "flexdll.h"
+  "?flexdll_mingw.o"
+  "?flexdll_initer_mingw.o"
+  "?flexdll_mingw64.o"
+  "?flexdll_initer_mingw64.o"
+  "?flexdll_msvc.obj"
+  "?flexdll_initer_msvc.obj"
+  "?flexdll_msvc64.obj"
+  "?flexdll_initer_msvc64.obj"
+  "?flexdll_cygwin.o"
+  "?flexdll_initer_cygwin.o"
+  "?flexdll_cygwin64.o"
+  "?flexdll_initer_cygwin64.o"
+]

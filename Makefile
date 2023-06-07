@@ -5,7 +5,9 @@
 ##
 
 
-VERSION = 0.42
+VERSION = \
+  $(eval VERSION := $$(shell sed -ne 's/^version: *"\(.*\)"/\1/p' flexdll.opam))$(VERSION)
+
 all: flexlink.exe support
 
 OCAML_CONFIG_FILE=$(shell cygpath -ad "$(shell ocamlopt -where 2>/dev/null)/Makefile.config" 2>/dev/null)
@@ -159,11 +161,25 @@ flexlink.exe: $(OBJS) $(RES)
 	rm -f flexlink.exe
 	$(RES_PREFIX) $(OCAMLOPT) -o flexlink.exe $(LINKFLAGS) $(OBJS)
 
-version.res: version.rc
-	$(RES_PREFIX) rc version.rc
+COMMA = ,
+FULL_VERSION = $(wordlist 1, 4, $(subst ., ,$(VERSION)) 0 0 0)
+FLEXDLL_VERSION = $(subst $(SPACE),$(COMMA),$(FULL_VERSION))
+FLEXDLL_VERSION_STR = $(subst $(SPACE),.,$(FULL_VERSION))
 
-version_res.o: version.rc
-	$(TOOLPREF)windres version.rc version_res.o
+RC_FLAGS = \
+  /d FLEXDLL_VERSION=$(FLEXDLL_VERSION) \
+  /d FLEXDLL_VERSION_STR="$(FLEXDLL_VERSION_STR)"
+
+# cf. https://sourceware.org/bugzilla/show_bug.cgi?id=27843
+WINDRES_FLAGS = \
+  -D FLEXDLL_VERSION=$(FLEXDLL_VERSION) \
+  -D FLEXDLL_VERSION_STR=\\\"$(FLEXDLL_VERSION_STR)\\\"
+
+version.res: version.rc flexdll.opam
+	$(RES_PREFIX) rc /nologo $(RC_FLAGS) $<
+
+version_res.o: version.rc flexdll.opam
+	$(TOOLPREF)windres $(WINDRES_FLAGS) $< $@
 
 flexdll_msvc.obj: flexdll.h flexdll.c
 	$(MSVC_PREFIX) $(MSVCC) /DMSVC -c /Fo"flexdll_msvc.obj" flexdll.c
@@ -238,7 +254,7 @@ package_src:
 	rm -Rf flexdll-$(VERSION)
 	mkdir flexdll-$(VERSION)
 	mkdir flexdll-$(VERSION)/test
-	cp -a $(filter-out version.ml,$(OBJS:Compat.ml=Compat.ml.in)) Makefile msvs-detect $(COMMON_FILES) version.rc flexdll-$(VERSION)/
+	cp -a $(filter-out version.ml,$(OBJS:Compat.ml=Compat.ml.in)) Makefile msvs-detect $(COMMON_FILES) version.rc flexdll.install flexdll.opam flexdll-$(VERSION)/
 	cp -aR test/Makefile test/*.c flexdll-$(VERSION)/test/
 	tar czf $(PACKAGE) flexdll-$(VERSION)
 	rm -Rf flexdll-$(VERSION)
@@ -254,13 +270,14 @@ upload_src: package_src upload
 # Binary package
 
 PACKAGE_BIN = flexdll-bin-$(VERSION)$(PACKAGE_BIN_SUFFIX).zip
+FLEXLINK_BIN = flexlink-bin-$(VERSION)$(PACKAGE_BIN_SUFFIX).zip
 INSTALLER = flexdll-$(VERSION)$(PACKAGE_BIN_SUFFIX)-setup.exe
 
 package_bin:
 	$(MAKE) clean all
-	rm -f $(PACKAGE_BIN)
-	zip $(PACKAGE_BIN) $(COMMON_FILES) \
-	    flexlink.exe flexdll_*.obj flexdll_*.o flexdll.c flexdll_initer.c
+	rm -f $(PACKAGE_BIN) $(FLEXLINK_BIN)
+	zip $(PACKAGE_BIN) $(COMMON_FILES) flexlink.exe flexdll_*.obj flexdll_*.o
+	zip $(FLEXLINK_BIN) $(COMMON_FILES) flexlink.exe Makefile flexdll-bin.install flexdll-bin.opam
 
 do_upload_bin:
 	rsync $(PACKAGE_BIN) $(URL)

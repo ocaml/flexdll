@@ -1,0 +1,19 @@
+bin: [
+  "flexlink.exe"
+]
+lib_root: [
+  "default.manifest" {"ocaml/default.manifest"}
+  "default_amd64.manifest" {"ocaml/default_amd64.manifest"}
+  "?flexdll_mingw.o" {"ocaml/flexdll_mingw.o"}
+  "?flexdll_initer_mingw.o" {"ocaml/flexdll_initer_mingw.o"}
+  "?flexdll_mingw64.o" {"ocaml/flexdll_mingw64.o"}
+  "?flexdll_initer_mingw64.o" {"ocaml/flexdll_initer_mingw64.o"}
+  "?flexdll_msvc.obj" {"ocaml/flexdll_msvc.obj"}
+  "?flexdll_initer_msvc.obj" {"ocaml/flexdll_initer_msvc.obj"}
+  "?flexdll_msvc64.obj" {"ocaml/flexdll_msvc64.obj"}
+  "?flexdll_initer_msvc64.obj" {"ocaml/flexdll_initer_msvc64.obj"}
+  "?flexdll_cygwin.o" {"ocaml/flexdll_cygwin.o"}
+  "?flexdll_initer_cygwin.o" {"ocaml/flexdll_initer_cygwin.o"}
+  "?flexdll_cygwin64.o" {"ocaml/flexdll_cygwin64.o"}
+  "?flexdll_initer_cygwin64.o" {"ocaml/flexdll_initer_cygwin64.o"}
+]
