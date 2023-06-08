@@ -5,7 +5,7 @@
 ##
 
 
-VERSION = 0.42
+VERSION = 0.43
 all: flexlink.exe support
 
 OCAML_CONFIG_FILE=$(shell cygpath -ad "$(shell ocamlopt -where 2>/dev/null)/Makefile.config" 2>/dev/null)

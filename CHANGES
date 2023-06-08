@@ -1,4 +1,4 @@
-Next version
+Version 0.43
 - GPR#108: Add -lgcc_s to Cygwin's link libraries, upstreaming a patch from the
   Cygwin flexdll package (David Allsopp)
 - GPR#112: Put error global variables into thread-local storage (Samuel Hym, Nicolás Ojeda Bär)
