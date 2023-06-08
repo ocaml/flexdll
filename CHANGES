@@ -4,7 +4,7 @@ Version 0.43
 - GPR#112: Put error global variables into thread-local storage (Samuel Hym, Nicolás Ojeda Bär)
 - GPR#114: Support for /alternatename directive. Fixes GPR#113 (Jonah Beckford)
 - GPR#116: Remove Cygwin32 (David Allsopp)
-- GPR#117: Fix handling of object names of length > 16 in archive files. Fixes GPR#110 (Nicolás Ojeda Bär)
+- GPR#117: Fix handling of object names of length > 16 in archive files. Fixes GPR#101 (Nicolás Ojeda Bär)
 - GPR#118: Defer the detection of cygpath to the first time it's actually
   required, reducing the overall number of calls. Further, detect whether
   mingw-w64 gcc's library path requires cygpath, which further reduces the
