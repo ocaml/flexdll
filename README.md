@@ -4,14 +4,12 @@
 
 ## Introduction
 
-Under Windows, DLL ([Dynamically-Linked
-Libraries][DLL]) are
-generally used to improve code modularity and sharing. A DLL can be
-loaded automatically when the program is loaded (if it requires the
-DLL). The program can also explicitly request Windows to load a DLL at
-any moment during runtime, using the
-[`LoadLibrary`][LoadLibrary]
-function from the Win32 API.
+Under Windows, DLL ([Dynamically-Linked Libraries][DLL]) are generally
+used to improve code modularity and sharing. A DLL can be loaded
+automatically when the program is loaded (if it requires the DLL).
+The program can also explicitly request Windows to load a DLL at any
+moment during runtime, using the [`LoadLibrary`][LoadLibrary] function
+from the Win32 API.
 
 This naturally suggests to use DLLs as a plugin mechanism. For instance,
 a web server could load extensions modules stored in DLLs at runtime.
@@ -24,19 +22,18 @@ very problem solved by FlexDLL:
 in previously loaded DLLs.**
 
 Some usual solutions exist, but they are not very flexible. A notable
-exception is the [edll][] library (its
-homepage also describes the usual solutions), which follows a rather
-drastic approach; indeed, edll implements a new dynamic linker which can
-directly load object files (without creating a Windows DLL).
+exception is the [edll][] library (its homepage also describes the usual
+solutions), which follows a rather drastic approach; indeed, edll
+implements a new dynamic linker which can directly load object files
+(without creating a Windows DLL).
 
 FlexDLL is another solution to the same problem. Contrary to edll, it
 relies on the native static and dynamic linkers. Also, it works both
 with the Microsoft environment (MS linker, Visual Studio compilers) and
 with Cygwin (GNU linker and compilers, in Cygwin or MinGW mode).
-Actually, FlexDLL implements mostly the usual
-[`dlopen`][dlopen]
-POSIX API, without trying to be fully conformant though (e.g. it does
-not respect the official priority ordering for symbol resolution). This
+Actually, FlexDLL implements mostly the usual [`dlopen`][dlopen] POSIX
+API, without trying to be fully conformant though (e.g. it does not
+respect the official priority ordering for symbol resolution).  This
 should make it easy to port applications developed for Unix.
 
 [DLL]: https://en.wikipedia.org/wiki/Dynamic-link_library
@@ -47,15 +44,15 @@ should make it easy to port applications developed for Unix.
 ## About
 
 FlexDLL is distributed under the terms of a zlib/libpng open source
-[license](LICENSE). The copyright holder is the Institut
-National de Recherche en Informatique et en Automatique (INRIA). The
-project was started when I (= Alain Frisch) was working at INRIA. I'm
-now working for [LexiFi][], which is kind enough to
-let me continue my work on FlexDLL. My office mate at INRIA,
-Jean-Baptiste Tristan, coined the name FlexDLL.
+[license](LICENSE). The copyright holder is the Institut National de
+Recherche en Informatique et en Automatique (INRIA). The project was
+started when I (= Alain Frisch) was working at INRIA. I'm now working
+for [LexiFi][], which is kind enough to let me continue my work on
+FlexDLL. My office mate at INRIA, Jean-Baptiste Tristan, coined the name
+FlexDLL.
 
-The runtime support library is written in C. The `flexlink` wrapper
-is implemented in the wonderful [OCaml][] language.
+The runtime support library is written in C. The `flexlink` wrapper is
+implemented in the wonderful [OCaml][] language.
 
 [LexiFi]: https://www.lexifi.com
 [OCaml]: https://ocaml.org/
@@ -88,13 +85,13 @@ resulting directory (e.g. `C:\Program Files\flexdll` or
 directory by hand and unzip the .zip file in it.
 
 **Compiling from sources:** To compile the code from sources, you'll
-need a working installation of OCaml, GNU Make, and a C
-toolchain (compiler + linker) either the one from Microsoft (any version
-of Visual Studio should work), Cygwin, or MinGW. It is probably a good
-idea to use a native version of ocamlopt (not the Cygwin port) to
-compile flexlink. By default, the `Makefile` will compile support
-objects for the supported toolchains; you can choose a subset with the
-`CHAINS` variable, e.g.: `make CHAINS="mingw msvc"`.
+need a working installation of OCaml, GNU Make, and a C toolchain
+(compiler + linker) either the one from Microsoft (any version of Visual
+Studio should work), Cygwin, or MinGW. It is probably a good idea to use
+a native version of ocamlopt (not the Cygwin port) to compile flexlink.
+By default, the `Makefile` will compile support objects for the
+supported toolchains; you can choose a subset with the `CHAINS`
+variable, e.g.: `make CHAINS="mingw msvc"`.
 
 
 ## Overview
@@ -103,8 +100,8 @@ FlexDLL has two components: a wrapper around the static linker, and a
 tiny runtime library to be linked with the main application. The wrapper
 must be called in place of the normal linker when you want to produce a
 DLL or to link the main application. The runtime library relies
-internally on the native `LoadLibrary` API to implement a
-dlopen-like interface.
+internally on the native `LoadLibrary` API to implement a dlopen-like
+interface.
 
 Let's see a simple example of a plugin. Here is the code for the main
 program (file `dump.c`):
@@ -137,12 +134,12 @@ int main(int argc, char **argv)
 ```
 
 This application opens in turn all the DLLs given on its command line,
-using the FlexDLL function `flexdll_dlopen`. For each DLL, the
-program looks for a symbol named `torun` (which is supposed to refer
-to a function) and if the symbol is available in the DLL, the function
-is called. The program also provides a very simple API to its plugin:
-the `api` function. The `FLEX_RTLD_GLOBAL` flag makes all the
-symbols exported by each DLL available for the DLL to be loaded later.
+using the FlexDLL function `flexdll_dlopen`. For each DLL, the program
+looks for a symbol named `torun` (which is supposed to refer to a
+function) and if the symbol is available in the DLL, the function is
+called. The program also provides a very simple API to its plugin: the
+`api` function. The `FLEX_RTLD_GLOBAL` flag makes all the symbols
+exported by each DLL available for the DLL to be loaded later.
 
 This main program can be compiled and linked like the commands below
 (the `[...]` refers to the directory where FlexDLL is installed).
@@ -175,10 +172,9 @@ void dump_x() { printf("x=%i\n", x); }
 void torun() { api("plug1.torun();"); }
 ```
 
-Note that the plugin uses the `api` symbol from the main application
-(it would be cleaner to introduce it with an `extern` declaration).
-You can compile and link this plugin (into a DLL) with the following
-commands:
+Note that the plugin uses the `api` symbol from the main application (it
+would be cleaner to introduce it with an `extern` declaration). You can
+compile and link this plugin (into a DLL) with the following commands:
 
 ```sh
 # MSVC
@@ -228,8 +224,8 @@ x=3
 x=100
 ```
 
-Simple, isn't it? No `declspec` declaration, no import library to
-deal with, …
+Simple, isn't it? No `declspec` declaration, no import library to deal
+with, …
 
 
 ## How it works
@@ -239,20 +235,20 @@ the linker how some addresses in their code or data sections have to be
 patched, using the value of some global symbols. When the static linker
 is invoked to produce a DLL from a set of object files, it assumes that
 all the relocations can be performed: all the symbols which are used in
-relocations must be defined in some the objects linked together. FlexDLL
-drops this constraint following a very simple idea: when a relocation
-refers to a symbol which is not available, the relocation is turned into
-a piece of data that will be passed to the runtime support library.
+relocations must be defined in some the objects linked together.
+FlexDLL drops this constraint following a very simple idea: when a
+relocation refers to a symbol which is not available, the relocation is
+turned into a piece of data that will be passed to the runtime support
+library.
 
 In the example above, the `plug1.obj` object refers to a symbol
 `api`. When this object is turned into a DLL, FlexDLL produce a new
-temporary object file derived from `plug1.obj` without the
-relocation that mention `api`. Instead, it adds an “import
-table”, which is just a piece of data that tells the FlexDLL support
-library which address has to be patched with the value of a symbol
-called `api` to be found somewhere else. You can see the list of
-such imported symbols by adding the `-show-imports` option to the
-`flexlink` command line:
+temporary object file derived from `plug1.obj` without the relocation
+that mention `api`. Instead, it adds an “import table”, which is just a
+piece of data that tells the FlexDLL support library which address has
+to be patched with the value of a symbol called `api` to be found
+somewhere else. You can see the list of such imported symbols by adding
+the `-show-imports` option to the `flexlink` command line:
 
 ```console
 $ ../flexlink -chain msvc -o plug1.dll plug1.obj -show-imports
@@ -260,9 +256,9 @@ $ ../flexlink -chain msvc -o plug1.dll plug1.obj -show-imports
 _api
 ```
 
-When the `flexdll_dlopen` function opens this DLL, it will look for
-an internal symbol that points to the import table, resolve the symbols
-and patch the code and data segments accordingly. The FlexDLL runtime
+When the `flexdll_dlopen` function opens this DLL, it will look for an
+internal symbol that points to the import table, resolve the symbols and
+patch the code and data segments accordingly. The FlexDLL runtime
 library must thus maintain a set of symbols together with their concrete
 value (address). In particular, it knows about the global symbols
 defined in the main program. Indeed, when you link the main program with
@@ -288,8 +284,8 @@ only about symbols that comes from the main program, but also about
 symbols exported by the DLL it loads. This is needed to implement the
 `flexdll_dlsym` function, but also to deal with import tables that
 mentions symbols defined in previously loaded DLLs (for which the
-`FLEXDLL_RTLD_GLOBAL` was used). So the wrapper does not only
-produce an import table for DLLs, but also an export table:
+`FLEXDLL_RTLD_GLOBAL` was used). So the wrapper does not only produce an
+import table for DLLs, but also an export table:
 
 ```console
 $ ../flexlink -chain msvc -o plug1.dll plug1.obj -show-imports -show-exports
@@ -315,21 +311,21 @@ mentions a number of object and library files. In a first pass, the
 wrapper computed which objects embedded in those libraries will be used.
 To do that, it looks at which symbols are used, and where they are
 defined. Then the wrapper consider that all the global (external)
-symbols are exported. Note that the `/export` or
-` __declspec(dllexport)` directives are not used: all the symbols
-are exported. (In a future version, FlexDLL will allow to control more
-precisely which symbols are exported). All the object files (given
-explicitly, or embedded in a library) that need to import symbols must
-be rewritten. The `flexlink` wrapper will produce new temporary object
-files for them. If you want to understand better how FlexDLL works, you
-can use the `-v` and `-save-temps` command options to tell the
-wrapper to show you the linker command line and to keep those temporary
-files alive (by default, there are removed automatically).
+symbols are exported. Note that the `/export` or `__declspec(dllexport)`
+directives are not used: all the symbols are exported. (In a future
+version, FlexDLL will allow to control more precisely which symbols are
+exported). All the object files (given explicitly, or embedded in a
+library) that need to import symbols must be rewritten. The `flexlink`
+wrapper will produce new temporary object files for them. If you want to
+understand better how FlexDLL works, you can use the `-v` and
+`-save-temps` command options to tell the wrapper to show you the linker
+command line and to keep those temporary files alive (by default, there
+are removed automatically).
 
 Some object files can mention default libraries (they correspond to the
 `/defaultlib` linker flag, which is often embedded in the object
-`.drectve` section). FlexDLL will parse those libraries, but only to
-see which symbols they define. Those symbols are not considered as being
+`.drectve` section). FlexDLL will parse those libraries, but only to see
+which symbols they define. Those symbols are not considered as being
 imported by the DLL, but they won't be exported either. A typical case
 of default libraries are import libraries that behave as interfaces to
 (normal, non-FlexDLL) DLLs.
@@ -350,9 +346,9 @@ Internally, this declaration has the same effect as declaring:
 extern int *_imp__mysymbol;
 ```
 
-and using `&x` instead of `x` everywhere in the current unit. In
-other words, even if your code seems to access `x` directly, each
-access actually goes through an extra indirection.
+and using `&x` instead of `x` everywhere in the current unit. In other
+words, even if your code seems to access `x` directly, each access
+actually goes through an extra indirection.
 
 FlexDLL knows about this convention. When a object refers to a symbol of
 the form `_imp__XXX` which is not available in the objects that will
@@ -364,16 +360,16 @@ equivalent of the following declaration:
 void *_imp__XXX = &XXX;
 ```
 
-If the symbol `XXX` itself is not available, this will in turn
-produce an entry for `XXX` in the import table. All these new
-declarations are put in the same object file that contain the export
-table, which is global for the DLL to be produced. So, if all the
-external symbols in a given object files are accessed through this
-convention, the object file needs not be patched at all.
+If the symbol `XXX` itself is not available, this will in turn produce
+an entry for `XXX` in the import table. All these new declarations are
+put in the same object file that contain the export table, which is
+global for the DLL to be produced. So, if all the external symbols in a
+given object files are accessed through this convention, the object file
+needs not be patched at all.
 
-Note that you can define and use the `_imp__XXX` symbols by hand,
-you don't have to use the `__declspec(dllimport)` notation (this is
-useful if you use a compiler that doesn't support this notation).
+Note that you can define and use the `_imp__XXX` symbols by hand, you
+don't have to use the `__declspec(dllimport)` notation (this is useful
+if you use a compiler that doesn't support this notation).
 
 Anyway, there is no compelling reason for adopting this style. A very
 small advantage might be that there will be fewer relocations at runtime
@@ -394,10 +390,9 @@ Usually, the real entry point is provided by the C runtime library:
 initialization for the C runtime library, invoke the code that has to be
 run automatically at load time (e.g for C++: constructors of static
 objects, or right-hand sides of non-constant initializers for global
-variables), and then call the function
-[`DllMain`][DllMain],
-which by default does nothing but can be overridden by the program to
-perform custom initialization of the DLL.
+variables), and then call the function [`DllMain`][DllMain], which by
+default does nothing but can be overridden by the program to perform
+custom initialization of the DLL.
 
 FlexDLL must take control before any custom code (static constructors,
 `DllMain`) so as to perform relocations (in case this code refers to
@@ -405,13 +400,12 @@ symbols found in the main program or previously loaded DLLs). As a
 consequence, FlexDLL defines its own entry point, which first asks the
 main program to perform relocations and then calls the regular entry
 point of the C runtime library. This behavior is implemented in the
-`flexdll_initer.c` file and the corresponding object file (whose
-name depends on the toolchain) is automatically included by
-`flexlink`.
+`flexdll_initer.c` file and the corresponding object file (whose name
+depends on the toolchain) is automatically included by `flexlink`.
 
 It is possible to completely disable the DLL entry point with the
-`-noentry` option passed to `flexlink`. In this case, FlexDLL
-will perform relocations after the DLL has been opened.
+`-noentry` option passed to `flexlink`. In this case, FlexDLL will
+perform relocations after the DLL has been opened.
 
 [DllMain]: https://learn.microsoft.com/en-us/windows/win32/dlls/dllmain
 
@@ -441,59 +435,58 @@ counterparts. Here is a short explanation of their semantics.
 
 The most important function is `flexdll_dlopen`. The first argument
 gives the filename of a DLL to be opened. This DLL must have been
-produced by the `flexlink` wrapper. The function resolves the
-symbols mentioned in the DLL's import table and performs the
-relocations. The second argument is a mode, made of flags that can be
-or'ed together. The flag `FLEXDLL_RTLD_GLOBAL` means that the
-symbols exported by the opened DLL can be used to resolve relocations
-for DLLs to be opened later on. The flag `FLEXDLL_RTLD_NOEXEC` opens
-the DLL is a special mode, disabling the automatic loaded of
-dependencies and the FlexDLL resolution pass. This is useful if you want
-to open a DLL only to check whether it defines some symbol.
+produced by the `flexlink` wrapper. The function resolves the symbols
+mentioned in the DLL's import table and performs the relocations.
+The second argument is a mode, made of flags that can be or'ed together.
+The flag `FLEXDLL_RTLD_GLOBAL` means that the symbols exported by the
+opened DLL can be used to resolve relocations for DLLs to be opened
+later on. The flag `FLEXDLL_RTLD_NOEXEC` opens the DLL is a special
+mode, disabling the automatic loaded of dependencies and the FlexDLL
+resolution pass. This is useful if you want to open a DLL only to check
+whether it defines some symbol.
 
-The `flexdll_dlopen` function returns a pointer to an opaque handle
-that can be used as an argument to the other API functions. If the
-filename is `NULL`, the function returns a special handle which
-refers to the global unit: it includes all the static symbols, plus the
-symbols from the DLLs opened with the `FLEXDLL_RTLD_GLOBAL` flag. A
-given DLL will be opened only once, even if you call the function
-several times on the same file. The `FLEXDLL_RTLD_GLOBAL` flag is
-sticky: if one of the calls mentions it, it will stay forever, even if
-the corresponding handle is then passed to `dlclose` (this is
-because the same handle is actually returned for all the calls). If an
-error occurs during the call to `flexdll_dlopen`, the functions
-returns `NULL` and the error message can be retrieved using
-`flexdll_dlerror`.
+The `flexdll_dlopen` function returns a pointer to an opaque handle that
+can be used as an argument to the other API functions. If the filename
+is `NULL`, the function returns a special handle which refers to the
+global unit: it includes all the static symbols, plus the symbols from
+the DLLs opened with the `FLEXDLL_RTLD_GLOBAL` flag. A given DLL will be
+opened only once, even if you call the function several times on the
+same file. The `FLEXDLL_RTLD_GLOBAL` flag is sticky: if one of the calls
+mentions it, it will stay forever, even if the corresponding handle is
+then passed to `dlclose` (this is because the same handle is actually
+returned for all the calls). If an error occurs during the call to
+`flexdll_dlopen`, the functions returns `NULL` and the error message can
+be retrieved using `flexdll_dlerror`.
 
 The function `flexdll_wdlopen` is a wide-character version of
-`flexdll_dlopen`.  The filename argument to `flexdll_wdlopen` is a
+`flexdll_dlopen`. The filename argument to `flexdll_wdlopen` is a
 wide-character string. `flexdll_wdlopen` and `flexdll_dlopen` behave
 identically otherwise.
 
-The second most important function is `flexdll_dlsym` which looks
-for a symbol whose name is the second argument. The first argument can
-be either a regular handle returned by `flexdll_dlopen` (the symbol
-is searched only in the corresponding DLL), the special handle for the
+The second most important function is `flexdll_dlsym` which looks for a
+symbol whose name is the second argument. The first argument can be
+either a regular handle returned by `flexdll_dlopen` (the symbol is
+searched only in the corresponding DLL), the special handle for the
 global unit as return by a call to `flexdll_dlopen(NULL,...)` (the
 symbol is searched amongst the static symbols plus the ones in the DLL
-opened with the flag `FLEXDLL_RTLD_GLOBAL`), or `NULL` (the
-symbol is searched only amongst the static symbols). If the symbol
-cannot be found, the function returns `NULL`.
+opened with the flag `FLEXDLL_RTLD_GLOBAL`), or `NULL` (the symbol is
+searched only amongst the static symbols). If the symbol cannot be
+found, the function returns `NULL`.
 
 The same symbol name can be defined several times. The policy used to
 choose amongst the various definitions is not specified. This applies
 both to the automatic resolution that happens when you open a DLL and to
 the explicit resolution performed by `dlsym`.
 
-The function `flexdll_dlclose` must be used with caution. It
-decrements the reference counter to a given handle and release the DLL
-from memory when the counter reaches 0. After that time, symbols defined
-in this DLL are no longer used for resolution. You most probably don't
-want to close a DLL if you still hold pointers to some of its symbols.
+The function `flexdll_dlclose` must be used with caution. It decrements
+the reference counter to a given handle and release the DLL from memory
+when the counter reaches 0. After that time, symbols defined in this DLL
+are no longer used for resolution. You most probably don't want to close
+a DLL if you still hold pointers to some of its symbols.
 
-The two functions `flexdll_dump_exports` and
-`flexdll_dump_relocations` are used to display (to the standard
-output) the internal tables associated to a given DLL handle.
+The two functions `flexdll_dump_exports` and `flexdll_dump_relocations`
+are used to display (to the standard output) the internal tables
+associated to a given DLL handle.
 
 
 ## Command line for the flexlink wrapper
@@ -550,12 +543,12 @@ library files (.a/.lib), or C files (.c). C files will be compiled using
 the toolchain's C compiler and the resulting object will be used for the
 actual linking.
 
-The argument for the `-l`, `-I` and `-L` options does not
-need to be separated by whitespace from the option (i.e. `-LXXX`
-is equivalent to `-L XXX`).
+The argument for the `-l`, `-I` and `-L` options does not need to be
+separated by whitespace from the option (i.e. `-LXXX` is equivalent to
+`-L XXX`).
 
-There is a single set of search directories for all kinds of files. The
-`-I` and `-L` options are synonyms.
+There is a single set of search directories for all kinds of files.
+The `-I` and `-L` options are synonyms.
 
 As usual, object files included in libraries are linked in only if one
 of the symbol they export is needed.
@@ -564,31 +557,30 @@ The `-export` option explicitly exports a symbol. If this symbols is
 found in a library, it will force the corresponding object file to be
 included.
 
-The `-defaultlib` option is used to tell `flexlink` that some
-object (usually, a library) does not need any relocation (that is, all
-the symbols it refers to are defined in one of the objects being linked)
-and that we don't want to re-export the symbols exported by this object.
+The `-defaultlib` option is used to tell `flexlink` that some object
+(usually, a library) does not need any relocation (that is, all the
+symbols it refers to are defined in one of the objects being linked) and
+that we don't want to re-export the symbols exported by this object.
 This is usually used for system libraries.
 
-The `-cygpath` and `-nocygpath` options control whether
-`flexlink` uses the `cygpath` command or not (default is: no
-under MSVC, yes under Cygwin/MinGW if cygpath can be found in
-the PATH). When it uses `cygpath`, `flexlink` tries to resolve
-file names directly and otherwise calls `cygpath -m` (to produce
-Windows paths from Cygwin paths) if `cygpath` is available in the
-path.
+The `-cygpath` and `-nocygpath` options control whether `flexlink` uses
+the `cygpath` command or not (default is: no under MSVC, yes under
+Cygwin/MinGW if cygpath can be found in the PATH). When it uses
+`cygpath`, `flexlink` tries to resolve file names directly and otherwise
+calls `cygpath -m` (to produce Windows paths from Cygwin paths) if
+`cygpath` is available in the path.
 
-The `-maindll` option is used to build a DLL that behaves as the
-main program from the point of view of FlexDLL. It cannot have
-unresolved symbols.
+The `-maindll` option is used to build a DLL that behaves as the main
+program from the point of view of FlexDLL. It cannot have unresolved
+symbols.
 
 By default, `flexlink` looks for FlexDLL's object files in the same
-directory as `flexlink.exe` itself. It is possible to specify
-another directory with the `FLEXDIR` environment variable.
+directory as `flexlink.exe` itself. It is possible to specify another
+directory with the `FLEXDIR` environment variable.
 
-Extra arguments can be passed to `flexlink.exe` through the
-environment variable `FLEXLINKFLAGS`. The arguments coming from this
-variable are parsed before those coming from the command line.
+Extra arguments can be passed to `flexlink.exe` through the environment
+variable `FLEXLINKFLAGS`. The arguments coming from this variable are
+parsed before those coming from the command line.
 
 
 ## Performance
@@ -625,11 +617,11 @@ Please let me know if you use FlexDLL!
 ### Dynamic loading for OCaml
 
 The initial motivation for FlexDLL was to add dynamic linking of native
-code to Windows ports of [OCaml][] (Cygwin, MinGW,
-MSVC). A side-effect was to simplify the dynamic loading of C libraries
-(e.g. for the toplevel) and to make it work under the Cygwin port, to
-simplify Makefiles of libraries (now shared between Unix and Windows
-ports), and to create a native toplevel.
+code to Windows ports of [OCaml][] (Cygwin, MinGW, MSVC). A side-effect
+was to simplify the dynamic loading of C libraries (e.g. for the
+toplevel) and to make it work under the Cygwin port, to simplify
+Makefiles of libraries (now shared between Unix and Windows ports), and
+to create a native toplevel.
 
 
 ## Links
