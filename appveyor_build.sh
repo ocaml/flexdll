@@ -33,6 +33,7 @@ function configure_ocaml {
                     --disable-unix-lib \
                     --disable-bigarray-lib \
                     $GRAPHICS_DISABLE \
+                    $OCAMLTEST_DISABLE \
                     --disable-debug-runtime
     else
       # "Classic" configuration
@@ -93,6 +94,7 @@ esac
 MAKEOCAML=make
 CONFIG_DIR=config
 GRAPHICS_DISABLE=
+OCAMLTEST_DISABLE=--disable-ocamltest
 HEADER_DIR=
 FLEXDLL_BOOTSTRAP_WORKS=1
 
@@ -105,9 +107,13 @@ case $OCAML_RELEASE in
   406|407)
     HEADER_DIR=byterun/caml;;
   408)
+    OCAMLTEST_DISABLE=''
     GRAPHICS_DISABLE=--disable-graph-lib
     FLEXDLL_BOOTSTRAP_WORKS=0;;
-  409|410|411|412)
+  409|410)
+    OCAMLTEST_DISABLE=''
+    FLEXDLL_BOOTSTRAP_WORKS=0;;
+  411|412)
     FLEXDLL_BOOTSTRAP_WORKS=0;;
 esac
 
