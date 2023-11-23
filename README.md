@@ -1,16 +1,16 @@
 # FlexDLL: an implementation of a dlopen-like API for Windows
 
-[![Build status](https://ci.appveyor.com/api/projects/status/5plx0da26cv03lgd?svg=true)](https://ci.appveyor.com/project/alainfrisch/flexdll)
+[![Build status](https://ci.appveyor.com/api/projects/status/github/ocaml/flexdll?svg=true)](https://ci.appveyor.com/project/dra27/flexdll-7sptc)
 
 ## Introduction
 
 Under Windows, DLL ([Dynamically-Linked
-Libraries](http://en.wikipedia.org/wiki/Dynamic-link_library)) are
+Libraries][DLL]) are
 generally used to improve code modularity and sharing. A DLL can be
 loaded automatically when the program is loaded (if it requires the
 DLL). The program can also explicitly request Windows to load a DLL at
 any moment during runtime, using the
-[`LoadLibrary`](https://msdn.microsoft.com/en-us/library/windows/desktop/ms684175(v=vs.85).aspx)
+[`LoadLibrary`][LoadLibrary]
 function from the Win32 API.
 
 This naturally suggests to use DLLs as a plugin mechanism. For instance,
@@ -24,7 +24,7 @@ very problem solved by FlexDLL:
 in previously loaded DLLs.**
 
 Some usual solutions exist, but they are not very flexible. A notable
-exception is the [edll](http://edll.sourceforge.net/) library (its
+exception is the [edll][] library (its
 homepage also describes the usual solutions), which follows a rather
 drastic approach; indeed, edll implements a new dynamic linker which can
 directly load object files (without creating a Windows DLL).
@@ -34,11 +34,15 @@ relies on the native static and dynamic linkers. Also, it works both
 with the Microsoft environment (MS linker, Visual Studio compilers) and
 with Cygwin (GNU linker and compilers, in Cygwin or MinGW mode).
 Actually, FlexDLL implements mostly the usual
-[`dlopen`](http://www.opengroup.org/onlinepubs/009695399/functions/dlopen.html)
+[`dlopen`][dlopen]
 POSIX API, without trying to be fully conformant though (e.g. it does
 not respect the official priority ordering for symbol resolution). This
 should make it easy to port applications developed for Unix.
 
+[DLL]: https://en.wikipedia.org/wiki/Dynamic-link_library
+[LoadLibrary]: https://learn.microsoft.com/en-us/windows/win32/api/libloaderapi/nf-libloaderapi-loadlibraryw
+[edll]: https://edll.sourceforge.net/
+[dlopen]: https://pubs.opengroup.org/onlinepubs/9699919799/functions/dlopen.html
 
 ## About
 
@@ -46,13 +50,15 @@ FlexDLL is distributed under the terms of a zlib/libpng open source
 [license](LICENSE). The copyright holder is the Institut
 National de Recherche en Informatique et en Automatique (INRIA). The
 project was started when I (= Alain Frisch) was working at INRIA. I'm
-now working for [LexiFi](http://www.lexifi.com), which is kind enough to
+now working for [LexiFi][], which is kind enough to
 let me continue my work on FlexDLL. My office mate at INRIA,
 Jean-Baptiste Tristan, coined the name FlexDLL.
 
 The runtime support library is written in C. The `flexlink` wrapper
-is implemented in the wonderful [OCaml](http://ocaml.org)
-language.
+is implemented in the wonderful [OCaml][] language.
+
+[LexiFi]: https://www.lexifi.com
+[OCaml]: https://ocaml.org/
 
 ## Supported toolchains
 
@@ -72,8 +78,8 @@ LD: an internal linker to produce .dll (only).
 
 ## Download
 
-- [Source and binary releases](https://github.com/alainfrisch/flexdll/releases).
-- [Development version](https://github.com/alainfrisch/flexdll).
+- [Source and binary releases](https://github.com/ocaml/flexdll/releases).
+- [Development version](https://github.com/ocaml/flexdll).
 - [Changelog](CHANGES).
 
 **Installation instructions:** Simply run the installer and add the
@@ -389,7 +395,7 @@ initialization for the C runtime library, invoke the code that has to be
 run automatically at load time (e.g for C++: constructors of static
 objects, or right-hand sides of non-constant initializers for global
 variables), and then call the function
-[`DllMain`](http://msdn2.microsoft.com/en-us/library/ms682583.aspx),
+[`DllMain`][DllMain],
 which by default does nothing but can be overridden by the program to
 perform custom initialization of the DLL.
 
@@ -407,6 +413,7 @@ It is possible to completely disable the DLL entry point with the
 `-noentry` option passed to `flexlink`. In this case, FlexDLL
 will perform relocations after the DLL has been opened.
 
+[DllMain]: https://learn.microsoft.com/en-us/windows/win32/dlls/dllmain
 
 ## The API
 
@@ -618,7 +625,7 @@ Please let me know if you use FlexDLL!
 ### Dynamic loading for OCaml
 
 The initial motivation for FlexDLL was to add dynamic linking of native
-code to Windows ports of [OCaml](http://ocaml.org) (Cygwin, MinGW,
+code to Windows ports of [OCaml][] (Cygwin, MinGW,
 MSVC). A side-effect was to simplify the dynamic loading of C libraries
 (e.g. for the toplevel) and to make it work under the Cygwin port, to
 simplify Makefiles of libraries (now shared between Unix and Windows
@@ -627,7 +634,7 @@ ports), and to create a native toplevel.
 
 ## Links
 
-- [Microsoft Portable Executable and Common Object File Format Specification](http://www.microsoft.com/whdc/system/platform/firmware/PECOFF.mspx).
-- [Enhanced Dynamic Linking Library for MinGW under MS-Windows (edll)](http://edll.sourceforge.net/).
-- [dlopen (POSIX)](http://www.opengroup.org/onlinepubs/009695399/functions/dlopen.html).
-- [DllMain](http://msdn2.microsoft.com/en-us/library/ms682583.aspx).
+- [Microsoft Portable Executable and Common Object File Format Specification](https://learn.microsoft.com/en-us/windows/win32/debug/pe-format).
+- [Enhanced Dynamic Linking Library for MinGW under MS-Windows (edll)][edll].
+- [dlopen (POSIX)][dlopen].
+- [DllMain][DllMain].
