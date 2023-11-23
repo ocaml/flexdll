@@ -10,6 +10,7 @@ environment:
     CYG_CACHE: C:/cygwin64/var/cache/setup
     OCAML_PORT: msvc64
     ARTEFACTS: no
+    FLEXDLL_VERSION: 0.43
   matrix:
     - OCAMLBRANCH: 3.11
     - OCAMLBRANCH: 3.12
@@ -36,6 +37,8 @@ environment:
       SKIP_OCAML_TEST: no
     - OCAMLBRANCH: 5.0
       OCAML_PORT: mingw64
+    - OCAMLBRANCH: 5.1
+      OCAML_PORT: mingw64
       SKIP_OCAML_TEST: no
     - OCAMLBRANCH: trunk
       OCAML_PORT: mingw64
@@ -56,8 +59,8 @@ install:
   - '%CYG_ROOT%\bin\bash -lc "zip --version" > nul || "%CYG_ROOT%\setup-x86_64.exe" --quiet-mode --no-shortcuts --no-startmenu --no-desktop --only-site --root "%CYG_ROOT%" --site "%CYG_MIRROR%" --local-package-dir "%CYG_CACHE%" --upgrade-also > nul'
   - '%CYG_ROOT%\bin\bash -lc "cygcheck -dc cygwin"'
   - call "C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\bin\amd64\vcvars64.bat"
-  - appveyor DownloadFile "https://github.com/alainfrisch/flexdll/archive/0.37.tar.gz" -FileName "flexdll.tar.gz"
-  - appveyor DownloadFile "https://github.com/alainfrisch/flexdll/releases/download/0.37/flexdll-bin-0.37.zip" -FileName "flexdll.zip"
+  - appveyor DownloadFile "https://github.com/ocaml/flexdll/archive/%FLEXDLL_VERSION%.tar.gz" -FileName "flexdll.tar.gz"
+  - appveyor DownloadFile "https://github.com/ocaml/flexdll/releases/download/%FLEXDLL_VERSION%/flexdll-bin-%FLEXDLL_VERSION%.zip" -FileName "flexdll.zip"
   - appveyor DownloadFile "https://raw.githubusercontent.com/ocaml/ocaml/trunk/tools/msvs-promote-path" -FileName "msvs-promote-path"
 
 build_script:
