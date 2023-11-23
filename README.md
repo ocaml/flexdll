@@ -244,7 +244,7 @@ library.
 In the example above, the `plug1.obj` object refers to a symbol
 `api`. When this object is turned into a DLL, FlexDLL produce a new
 temporary object file derived from `plug1.obj` without the relocation
-that mention `api`. Instead, it adds an “import table”, which is just a
+that mentions `api`. Instead, it adds an “import table”, which is just a
 piece of data that tells the FlexDLL support library which address has
 to be patched with the value of a symbol called `api` to be found
 somewhere else. You can see the list of such imported symbols by adding
@@ -260,7 +260,7 @@ When the `flexdll_dlopen` function opens this DLL, it will look for an
 internal symbol that points to the import table, resolve the symbols and
 patch the code and data segments accordingly. The FlexDLL runtime
 library must thus maintain a set of symbols together with their concrete
-value (address). In particular, it knows about the global symbols
+values (addresses). In particular, it knows about the global symbols
 defined in the main program. Indeed, when you link the main program with
 `flexlink -exe`, the wrapper produces a small fresh object file that
 contains a symbol table, mapping symbol names to their addresses.
@@ -283,8 +283,8 @@ FlexDLL itself) appear in the global symbol table. FlexDLL knows not
 only about symbols that comes from the main program, but also about
 symbols exported by the DLL it loads. This is needed to implement the
 `flexdll_dlsym` function, but also to deal with import tables that
-mentions symbols defined in previously loaded DLLs (for which the
-`FLEXDLL_RTLD_GLOBAL` was used). So the wrapper does not only produce an
+mention symbols defined in previously loaded DLLs (for which the
+`FLEXDLL_RTLD_GLOBAL` was used). So the wrapper produces not only an
 import table for DLLs, but also an export table:
 
 ```console
@@ -305,12 +305,12 @@ _x
 _torun
 ```
 
-How does FlexDLL determine which symbols as imported or exported? It
+How does FlexDLL determine which symbols are imported or exported? It
 uses an algorithm similar to the linker itself. The command line
 mentions a number of object and library files. In a first pass, the
 wrapper computed which objects embedded in those libraries will be used.
 To do that, it looks at which symbols are used, and where they are
-defined. Then the wrapper consider that all the global (external)
+defined. Then the wrapper considers that all the global (external)
 symbols are exported. Note that the `/export` or `__declspec(dllexport)`
 directives are not used: all the symbols are exported. (In a future
 version, FlexDLL will allow to control more precisely which symbols are
@@ -319,7 +319,7 @@ library) that need to import symbols must be rewritten. The `flexlink`
 wrapper will produce new temporary object files for them. If you want to
 understand better how FlexDLL works, you can use the `-v` and
 `-save-temps` command options to tell the wrapper to show you the linker
-command line and to keep those temporary files alive (by default, there
+command line and to preserve those temporary files alive (by default, they
 are removed automatically).
 
 Some object files can mention default libraries (they correspond to the
@@ -365,7 +365,7 @@ an entry for `XXX` in the import table. All these new declarations are
 put in the same object file that contain the export table, which is
 global for the DLL to be produced. So, if all the external symbols in a
 given object files are accessed through this convention, the object file
-needs not be patched at all.
+need not be patched at all.
 
 Note that you can define and use the `_imp__XXX` symbols by hand, you
 don't have to use the `__declspec(dllimport)` notation (this is useful
@@ -400,7 +400,7 @@ symbols found in the main program or previously loaded DLLs). As a
 consequence, FlexDLL defines its own entry point, which first asks the
 main program to perform relocations and then calls the regular entry
 point of the C runtime library. This behavior is implemented in the
-`flexdll_initer.c` file and the corresponding object file (whose name
+`flexdll_initer.c` file, and the corresponding object file (whose name
 depends on the toolchain) is automatically included by `flexlink`.
 
 It is possible to completely disable the DLL entry point with the
@@ -441,7 +441,7 @@ The second argument is a mode, made of flags that can be or'ed together.
 The flag `FLEXDLL_RTLD_GLOBAL` means that the symbols exported by the
 opened DLL can be used to resolve relocations for DLLs to be opened
 later on. The flag `FLEXDLL_RTLD_NOEXEC` opens the DLL is a special
-mode, disabling the automatic loaded of dependencies and the FlexDLL
+mode, disabling the automatic loading of dependencies and the FlexDLL
 resolution pass. This is useful if you want to open a DLL only to check
 whether it defines some symbol.
 
@@ -479,14 +479,14 @@ both to the automatic resolution that happens when you open a DLL and to
 the explicit resolution performed by `dlsym`.
 
 The function `flexdll_dlclose` must be used with caution. It decrements
-the reference counter to a given handle and release the DLL from memory
+the reference counter for the given handle and releases the DLL from memory
 when the counter reaches 0. After that time, symbols defined in this DLL
 are no longer used for resolution. You most probably don't want to close
 a DLL if you still hold pointers to some of its symbols.
 
 The two functions `flexdll_dump_exports` and `flexdll_dump_relocations`
 are used to display (to the standard output) the internal tables
-associated to a given DLL handle.
+associated with a given DLL handle.
 
 
 ## Command line for the flexlink wrapper
@@ -558,7 +558,7 @@ found in a library, it will force the corresponding object file to be
 included.
 
 The `-defaultlib` option is used to tell `flexlink` that some object
-(usually, a library) does not need any relocation (that is, all the
+(usually, a library) does not need any relocations (that is, all the
 symbols it refers to are defined in one of the objects being linked) and
 that we don't want to re-export the symbols exported by this object.
 This is usually used for system libraries.
