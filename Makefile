@@ -223,7 +223,7 @@ distclean: clean
 
 clean:
 	rm -f *.obj *.o *.lib *.a *.exe *.opt *.cmx *.dll *.exp *.cmi *.cmo *~ version.res version.ml COMPILER-* Compat.ml
-	cd test && $(MAKE) clean
+	$(MAKE) -C test clean
 
 
 ## Packaging
