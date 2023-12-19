@@ -692,7 +692,7 @@ module Coff = struct
       | _ -> raise Exit
     and aux1 i0 i = if i = l then (String.sub s i0 (i - i0), [])::[]
     else match s.[i] with
-      | 'a'..'z' | 'A'..'Z' -> aux1 i0 (i+1)
+      | 'a'..'z' | 'A'..'Z' | '-' -> aux1 i0 (i+1)
       | ' ' -> (String.sub s i0 (i - i0), []) :: aux0 (i+1)
       | ':' -> aux2 (String.sub s i0 (i - i0)) [] (i+1)
       | _   -> raise Exit
