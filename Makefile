@@ -60,6 +60,7 @@ MSVC_FLAGS=/nologo /MD -D_CRT_SECURE_NO_DEPRECATE /GS-
 
 ifeq ($(MSVC_DETECT),0)
 # Assume that the environment is correctly set for a single Microsoft C Compiler; don't attempt to guess anything
+MSVCC_ROOT=
 MSVC_PREFIX=
 MSVC64_PREFIX=
 MSVCC=cl.exe $(MSVC_FLAGS)
