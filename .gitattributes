@@ -2,3 +2,4 @@
 
 msvs-detect text eol=lf
 checkenv text eol=lf
+Compat.cmd text eol=crlf
