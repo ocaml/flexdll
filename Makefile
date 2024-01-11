@@ -26,14 +26,16 @@ COMPAT_VERSION:=$(subst ., ,$(OCAML_VERSION))
 COMPAT_VERSION:=$(subst $(SPACE),,$(firstword $(COMPAT_VERSION))$(foreach i,$(wordlist 2,$(words $(COMPAT_VERSION)),$(COMPAT_VERSION)),$(if $(filter 0 1 2 3 4 5 6 7 8 9,$(i)),0,)$(i)))
 endif
 
+GCC_FLAGS = -Wall
+
 MINGW_PREFIX = i686-w64-mingw32-
-MINCC = $(MINGW_PREFIX)gcc
+MINCC = $(MINGW_PREFIX)gcc $(GCC_FLAGS)
 
 MINGW64_PREFIX = x86_64-w64-mingw32-
-MIN64CC = $(MINGW64_PREFIX)gcc
+MIN64CC = $(MINGW64_PREFIX)gcc $(GCC_FLAGS)
 
 CYGWIN64_PREFIX = x86_64-pc-cygwin-
-CYG64CC = $(CYGWIN64_PREFIX)gcc
+CYG64CC = $(CYGWIN64_PREFIX)gcc $(GCC_FLAGS)
 
 version.ml: Makefile flexdll.opam
 	echo "let version = \"$(VERSION)\"" > version.ml
@@ -60,7 +62,7 @@ endif
 Makefile.winsdk: msvs-detect
 	bash ./msvs-detect --output=make > $@
 
-MSVC_FLAGS=/nologo /MD -D_CRT_SECURE_NO_DEPRECATE /GS-
+MSVC_FLAGS = /nologo /MD -D_CRT_SECURE_NO_DEPRECATE /GS- /W3
 
 ifeq ($(MSVC_DETECT),0)
 # Assume that the environment is correctly set for a single Microsoft C Compiler; don't attempt to guess anything
