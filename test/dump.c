@@ -20,7 +20,6 @@ void api2(char *msg){ printf("API2: %s\n", msg); }
 
 int main(int argc, char **argv)
 {
-  void *sym;
   void *handle;
   int i;
   torun *torun;
