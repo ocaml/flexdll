@@ -93,6 +93,11 @@ MSVCC64 = cl.exe $(MSVC_FLAGS)
 endif
 endif
 
+ifneq "$(filter True true,$(CI))" ""
+GCC_FLAGS += -Werror -fdiagnostics-color=always
+MSVC_FLAGS += /WX
+endif
+
 show_root:
 ifeq ($(MSVCC_ROOT),)
 	@echo "$(MSVS_PATH)"
