@@ -322,7 +322,7 @@ static void relocate(resolver f, void *data, reloctbl *tbl, err_t *err) {
         err->code = 3;
         goto restore;
       }
-      *((UINT32*) ptr->addr) = s;
+      *((UINT32*) ptr->addr) = (UINT32) s;
       break;
     case RELOC_REL32_4:
       s -= (INT_PTR)(ptr -> addr) + 8;
@@ -332,7 +332,7 @@ static void relocate(resolver f, void *data, reloctbl *tbl, err_t *err) {
         err->code = 3;
         goto restore;
       }
-      *((UINT32*) ptr->addr) = s;
+      *((UINT32*) ptr->addr) = (UINT32) s;
       break;
     case RELOC_REL32_1:
       s -= (INT_PTR)(ptr -> addr) + 5;
@@ -342,7 +342,7 @@ static void relocate(resolver f, void *data, reloctbl *tbl, err_t *err) {
         err->code = 3;
         goto restore;
       }
-      *((UINT32*) ptr->addr) = s;
+      *((UINT32*) ptr->addr) = (UINT32) s;
       break;
     case RELOC_REL32_2:
       s -= (INT_PTR)(ptr -> addr) + 6;
@@ -352,7 +352,7 @@ static void relocate(resolver f, void *data, reloctbl *tbl, err_t *err) {
         err->code = 3;
         goto restore;
       }
-      *((UINT32*) ptr->addr) = s;
+      *((UINT32*) ptr->addr) = (UINT32) s;
       break;
     default:
       fprintf(stderr, "flexdll: unknown relocation kind");
