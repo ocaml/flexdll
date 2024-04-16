@@ -507,8 +507,7 @@ again:
     }
   } else {
     if (WaitForSingleObject(units_mutex, INFINITE) == WAIT_FAILED) {
-      /* XXX Some kind of error here?? */
-      /* error = ?? */
+      if (!err->code) err->code = 1;
       return NULL;
     }
   }
@@ -581,8 +580,12 @@ void flexdll_dlclose(void *u) {
 
 void *flexdll_dlsym(void *u, const char *name) {
   void *res;
+  err_t * err;
+  err = get_tls_error(TLS_ERROR_NOP);
+  if(err == NULL) return NULL;
+
   if (WaitForSingleObject(units_mutex, INFINITE) == WAIT_FAILED) {
-    /* XXX Proper error code */
+    if (!err->code) err->code = 1;
     return NULL;
   }
   if (u == &main_unit) res = find_symbol_global(NULL,name);
