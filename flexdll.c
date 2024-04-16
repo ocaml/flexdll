@@ -67,7 +67,7 @@ static volatile HANDLE units_mutex = INVALID_HANDLE_VALUE;
  * - TLS_ERROR_RESET will reset what is stored in the structure, so this is
  *   intended for initialisation entry points (flexdll_dlopen, flexdll_relocate)
  * - TLS_ERROR_NOP will keep the current content of the structure, for all other
- *   entry points (flexdll_dlerror, ll_dlerror)
+ *   entry points (flexdll_dlerror, ll_dlerror, flexdll_dlsym)
  *
  * The other exported entrypoints do not need to access the error storage.
  */
