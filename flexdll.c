@@ -501,6 +501,10 @@ void *flexdll_wdlopen(const wchar_t *file, int mode) {
 again:
   if (units_mutex == INVALID_HANDLE_VALUE) {
     HANDLE hMutex = CreateMutex(NULL, TRUE, NULL);
+    if (hMutex == NULL) {
+      if (!err->code) err->code = 1;
+      return NULL;
+    }
     if (InterlockedCompareExchangePointer(&units_mutex, hMutex, INVALID_HANDLE_VALUE) != INVALID_HANDLE_VALUE) {
       CloseHandle(hMutex);
       goto again;
