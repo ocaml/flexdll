@@ -582,7 +582,7 @@ void *flexdll_dlsym(void *u, const char *name) {
   void *res;
   err_t * err;
   err = get_tls_error(TLS_ERROR_NOP);
-  if(err == NULL) return NULL;
+  if (err == NULL) return NULL;
 
   if (WaitForSingleObject(units_mutex, INFINITE) == WAIT_FAILED) {
     if (!err->code) err->code = 1;
