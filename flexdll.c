@@ -47,7 +47,7 @@ typedef struct dlunit {
 } dlunit;
 typedef void *resolver(void*, const char*);
 
-static volatile HANDLE units_mutex = INVALID_HANDLE_VALUE;
+static HANDLE units_mutex = INVALID_HANDLE_VALUE;
 
 /* Error reporting */
 /* The latest error must be kept in some variable so that flexdll_dlerror can
