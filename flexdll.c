@@ -509,11 +509,9 @@ again:
       CloseHandle(hMutex);
       goto again;
     }
-  } else {
-    if (WaitForSingleObject(units_mutex, INFINITE) == WAIT_FAILED) {
+  } else if (WaitForSingleObject(units_mutex, INFINITE) == WAIT_FAILED) {
       if (!err->code) err->code = 1;
       return NULL;
-    }
   }
 
   handle = ll_dlopen(file, exec);
