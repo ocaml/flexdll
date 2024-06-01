@@ -1509,7 +1509,7 @@ let main () =
   parse_cmdline ();
 
   begin match !toolchain with
-  | `MSVC | `MSVC64 | `MINGW | `MINGW64 when !use_cygpath = `Try -> use_cygpath := `No
+  | `MSVC | `MSVC64 when !use_cygpath = `Try -> use_cygpath := `No
   | _ -> ()
   end;
 
