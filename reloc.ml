@@ -1507,6 +1507,12 @@ let all_files () =
 
 let main () =
   parse_cmdline ();
+
+  begin match !toolchain with
+  | `MSVC | `MSVC64 | `MINGW | `MINGW64 when !use_cygpath = `Try -> use_cygpath := `No
+  | _ -> ()
+  end;
+
   setup_toolchain ();
 
   if !verbose >= 2 then (
