@@ -47,6 +47,8 @@ typedef struct dlunit {
 } dlunit;
 typedef void *resolver(void*, const char*);
 
+static HANDLE units_mutex = INVALID_HANDLE_VALUE;
+
 /* Error reporting */
 /* The latest error must be kept in some variable so that flexdll_dlerror can
  * report it but this causes data races (and possible segmentation faults) in
@@ -65,7 +67,7 @@ typedef void *resolver(void*, const char*);
  * - TLS_ERROR_RESET will reset what is stored in the structure, so this is
  *   intended for initialisation entry points (flexdll_dlopen, flexdll_relocate)
  * - TLS_ERROR_NOP will keep the current content of the structure, for all other
- *   entry points (flexdll_dlerror, ll_dlerror)
+ *   entry points (flexdll_dlerror, ll_dlerror, flexdll_dlsym)
  *
  * The other exported entrypoints do not need to access the error storage.
  */
@@ -496,8 +498,24 @@ void *flexdll_wdlopen(const wchar_t *file, int mode) {
 #endif /* __STDC_SECURE_LIB__ >= 200411L*/
 #endif /* CYGWIN */
 
+again:
+  if (units_mutex == INVALID_HANDLE_VALUE) {
+    HANDLE hMutex = CreateMutex(NULL, TRUE, NULL);
+    if (hMutex == NULL) {
+      if (!err->code) err->code = 1;
+      return NULL;
+    }
+    if (InterlockedCompareExchangePointer(&units_mutex, hMutex, INVALID_HANDLE_VALUE) != INVALID_HANDLE_VALUE) {
+      CloseHandle(hMutex);
+      goto again;
+    }
+  } else if (WaitForSingleObject(units_mutex, INFINITE) == WAIT_FAILED) {
+      if (!err->code) err->code = 1;
+      return NULL;
+  }
+
   handle = ll_dlopen(file, exec);
-  if (!handle) { if (!err->code) err->code = 1; return NULL; }
+  if (!handle) { if (!err->code) err->code = 1; ReleaseMutex(units_mutex); return NULL; }
 
   unit = units;
   while ((NULL != unit) && (unit->handle != handle)) unit = unit->next;
@@ -516,8 +534,10 @@ void *flexdll_wdlopen(const wchar_t *file, int mode) {
     /* Relocation has already been done if the flexdll's DLL entry point
        is used */
     flexdll_relocate(ll_dlsym(handle, "reloctbl"));
-    if (err->code) { flexdll_dlclose(unit); return NULL; }
+    if (err->code) { flexdll_dlclose(unit); ReleaseMutex(units_mutex); return NULL; }
   }
+
+  ReleaseMutex(units_mutex);
 
   return unit;
 }
@@ -561,9 +581,20 @@ void flexdll_dlclose(void *u) {
 
 
 void *flexdll_dlsym(void *u, const char *name) {
-  if (u == &main_unit) return find_symbol_global(NULL,name);
-  else if (NULL == u) return find_symbol(&static_symtable,name);
-  else return find_symbol(((dlunit*)u)->symtbl,name);
+  void *res;
+  err_t * err;
+  err = get_tls_error(TLS_ERROR_NOP);
+  if (err == NULL) return NULL;
+
+  if (WaitForSingleObject(units_mutex, INFINITE) == WAIT_FAILED) {
+    if (!err->code) err->code = 1;
+    return NULL;
+  }
+  if (u == &main_unit) res = find_symbol_global(NULL,name);
+  else if (NULL == u) res = find_symbol(&static_symtable,name);
+  else res = find_symbol(((dlunit*)u)->symtbl,name);
+  ReleaseMutex(units_mutex);
+  return res;
 }
 
 char *flexdll_dlerror() {
