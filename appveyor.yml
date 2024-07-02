@@ -11,6 +11,7 @@ environment:
     OCAML_PORT: msvc64
     ARTEFACTS: no
     FLEXDLL_VERSION: 0.43
+    FLEXDLL_WARN_ERROR: true
   matrix:
     - OCAMLBRANCH: 3.11
     - OCAMLBRANCH: 3.12
