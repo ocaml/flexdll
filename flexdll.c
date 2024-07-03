@@ -246,8 +246,8 @@ static void dump_master_reloctbl(reloctbl **ptr) {
 /* Avoid the use of snprintf */
 static void cannot_resolve_msg(char *name, err_t *err) {
   static char msg[] = "Cannot resolve ";
-  static int l = sizeof(msg) - 1;
-  int n = strlen(name);
+  static size_t l = sizeof(msg) - 1;
+  size_t n = strlen(name);
   memcpy(err->message,msg,l);
   memcpy(err->message+l,name,min(n,sizeof(err->message) - l - 1));
   err->message[l+n] = 0;
@@ -255,7 +255,6 @@ static void cannot_resolve_msg(char *name, err_t *err) {
 
 static void relocate(resolver f, void *data, reloctbl *tbl, err_t *err) {
   reloc_entry *ptr;
-  nonwr *wr;
   INT_PTR s;
   DWORD prev_protect;
   static long int page_size = 0;
@@ -325,7 +324,7 @@ static void relocate(resolver f, void *data, reloctbl *tbl, err_t *err) {
         err->code = 3;
         goto restore;
       }
-      *((UINT32*) ptr->addr) = s;
+      *((UINT32*) ptr->addr) = (INT32) s;
       break;
     case RELOC_REL32_4:
       s -= (INT_PTR)(ptr -> addr) + 8;
@@ -335,7 +334,7 @@ static void relocate(resolver f, void *data, reloctbl *tbl, err_t *err) {
         err->code = 3;
         goto restore;
       }
-      *((UINT32*) ptr->addr) = s;
+      *((UINT32*) ptr->addr) = (INT32) s;
       break;
     case RELOC_REL32_1:
       s -= (INT_PTR)(ptr -> addr) + 5;
@@ -345,7 +344,7 @@ static void relocate(resolver f, void *data, reloctbl *tbl, err_t *err) {
         err->code = 3;
         goto restore;
       }
-      *((UINT32*) ptr->addr) = s;
+      *((UINT32*) ptr->addr) = (INT32) s;
       break;
     case RELOC_REL32_2:
       s -= (INT_PTR)(ptr -> addr) + 6;
@@ -355,7 +354,7 @@ static void relocate(resolver f, void *data, reloctbl *tbl, err_t *err) {
         err->code = 3;
         goto restore;
       }
-      *((UINT32*) ptr->addr) = s;
+      *((UINT32*) ptr->addr) = (INT32) s;
       break;
     default:
       fprintf(stderr, "flexdll: unknown relocation kind");
@@ -381,13 +380,13 @@ static void relocate_master(resolver f, void *data, reloctbl **ptr, err_t *err) 
 
 static void dump_symtbl(symtbl *tbl)
 {
-  int i;
+  unsigned i;
 
   if (!tbl) { printf("No symbol table\n"); return; }
   printf("Dynamic symbol at %p (size = %u)\n", tbl, (unsigned int) tbl->size); fflush(stdout);
 
   for (i = 0; i < tbl->size; i++) {
-    printf("[%i] ", i); fflush(stdout);
+    printf("[%u] ", i); fflush(stdout);
     printf(" %p: ", tbl->entries[i].addr); fflush(stdout);
     printf("%s\n", tbl->entries[i].name);
     fflush(stdout);
@@ -436,6 +435,7 @@ static void unlink_unit(dlunit *unit) {
 static void *find_symbol_global(void *data, const char *name) {
   void *sym;
   dlunit *unit;
+  (void)data; /* data is unused */
 
   if (!name) return NULL;
   sym = find_symbol(&static_symtable, name);
@@ -597,7 +597,7 @@ void *flexdll_dlsym(void *u, const char *name) {
   return res;
 }
 
-char *flexdll_dlerror() {
+char *flexdll_dlerror(void) {
   err_t * err;
   err = get_tls_error(TLS_ERROR_NOP);
   if(err == NULL) return TLS_ACCESS_ERRMSG;
