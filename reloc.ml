@@ -433,6 +433,10 @@ let add_reloc_table obj obj_name p =
         | `x64, 0x01 (* IMAGE_REL_AMD64_ADDR64 *) ->
             0x0002 (* absolute, native size (32/64) *)
 
+        | `x86, 0x07 (* IMAGE_REL_I386_DIR32NB *)
+        | `x64, 0x03 (* IMAGE_REL_AMD64_ADDR32NB *) ->
+            0x0007 (* 32nb *)
+
         | `x64, 0x04 (* IMAGE_REL_AMD64_REL32 *)
         | `x86, 0x14 (* IMAGE_REL_I386_REL32 *) when not !no_rel_relocs ->
             0x0001 (* rel32 *)
@@ -440,6 +444,7 @@ let add_reloc_table obj obj_name p =
         | `x64, 0x05 when not !no_rel_relocs -> 0x0004 (* rel32_1 *)
         | `x64, 0x08 when not !no_rel_relocs-> 0x0003 (* rel32_4 *)
         | `x64, 0x06 when not !no_rel_relocs-> 0x0005 (* rel32_2 *)
+        | `x64, 0x09 when not !no_rel_relocs-> 0x0006 (* rel32_5 *)
 
         | (`x86 | `x64), (0x0a (* IMAGE_REL_{I386|AMD64}_SECTION *) |
                           0x0b (* IMAGE_REL_{I386|AMD64}_SECREL*) ) ->
