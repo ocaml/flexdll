@@ -30,6 +30,8 @@ Version 0.44
   as querying the compilers for their library search paths. Support parsing
   clang output.
   (Antonin Décimo, review by David Allsopp)
+- GPR#146: For mingw-w64, select crt2u.o instead of crt2.o if -link -municode
+  is specified (David Allsopp)
 
 Version 0.43
 - GPR#108: Add -lgcc_s to Cygwin's link libraries, upstreaming a patch from the
