@@ -907,7 +907,6 @@ let build_dll link_exe output_file files exts extra_args =
 
   let imports obj =
     let n = needed imported defined resolve_alias resolve_alternate obj in
-    imported_from_implib := StrSet.union !imported_from_implib (StrSet.inter n from_imports);
     let undefs = StrSet.diff n defined in
     StrSet.filter
       (fun s ->
@@ -915,7 +914,7 @@ let build_dll link_exe output_file files exts extra_args =
          | Some _ -> false
          | None -> s <> "environ"  (* special hack for Cygwin64 *)
       )
-      undefs
+      undefs, StrSet.inter n from_imports
   in
 
   (* Second step: transitive closure, starting from given objects *)
@@ -963,7 +962,7 @@ let build_dll link_exe output_file files exts extra_args =
   in
 
   let dll_exports = ref StrSet.empty in
-  let rec link_obj fn obj =
+  let record_exports obj =
     List.iter
       (fun sym ->
          if Symbol.is_defin sym && exportable sym.sym_name
@@ -972,7 +971,9 @@ let build_dll link_exe output_file files exts extra_args =
       obj.symbols;
 
     dll_exports := List.fold_left (fun accu x -> StrSet.add x accu)
-        !dll_exports (collect_dllexports obj);
+        !dll_exports (collect_dllexports obj)
+  in
+  let rec link_obj fn obj =
     StrSet.iter
       (fun s ->
         if StrSet.mem s !exported then ()
@@ -990,15 +991,20 @@ let build_dll link_exe output_file files exts extra_args =
 
   and link_libobj (libname,objname,obj) =
     if Hashtbl.mem libobjects (libname,objname) then ()
-    else (Hashtbl.replace libobjects (libname,objname) (obj,imports obj);
+    else (let imports, from_imports = imports obj in
+          Hashtbl.replace libobjects (libname,objname) (obj,imports);
+          imported_from_implib := StrSet.union !imported_from_implib from_imports;
+          record_exports obj;
           link_obj (Printf.sprintf "%s(%s)" libname objname) obj)
   in
 
   let redirect = Hashtbl.create 16 in
   List.iter
     (fun (fn, obj) ->
+       let imps, from_imports = imports obj in
+       imported_from_implib := StrSet.union !imported_from_implib from_imports;
+       record_exports obj;
        link_obj fn obj;
-       let imps = imports obj in
        if StrSet.is_empty imps then ()
        else Hashtbl.replace redirect fn (close_obj fn imps obj);
     ) objs;
