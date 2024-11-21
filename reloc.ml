@@ -725,7 +725,7 @@ let needed imported defined resolve_alias resolve_alternate obj =
     StrSet.empty
     obj.symbols
 
-let build_dll link_exe output_file files exts extra_args =
+let build_dll link_exe output_file files exts extra_args_string =
   let main_pgm = link_exe <> `DLL in
 
   (* fully resolve filenames, eliminate duplicates *)
@@ -1007,6 +1007,53 @@ let build_dll link_exe output_file files exts extra_args =
           link_obj (Printf.sprintf "%s(%s)" libname objname) obj)
   in
 
+  let entrypoint =
+    if not main_pgm then
+      None
+    else
+      match !toolchain with
+      | `CYGWIN64 ->
+          Some "main"
+      | `MINGW | `MINGW64 -> begin
+          let entry_point s =
+            String.length s > 7 && String.sub s 0 7 = "-Wl,-e,"
+          in
+          try
+            let s = List.find entry_point !extra_args in
+            Some (String.sub s 7 (String.length s - 7))
+          with Not_found ->
+            Some "mainCRTStartup"
+        end
+      | `MSVC | `MSVC64 -> begin
+          let entry_point s =
+            String.length s > 7 && String.lowercase_ascii (String.sub s 0 7) = "/entry:"
+          in
+          try
+            let s = List.find entry_point !extra_args in
+            Some (String.sub s 7 (String.length s - 7))
+          with Not_found ->
+            if !subsystem = "windows" then
+              Some "WinMainCRTStartup"
+            else
+              Some "mainCRTStartup"
+        end
+      | `LIGHTLD | `GNAT | `GNAT64 ->
+          None
+  in
+  let () =
+    match entrypoint with
+    | None -> ()
+    | Some entrypoint ->
+        try
+          let (libname, objname, _) as o = defined_in entrypoint in
+          if !explain then
+            Printf.printf "%s(%s) because of entrypoint %s\n%!" libname objname
+                                                                entrypoint;
+          link_libobj o
+        with Not_found ->
+          if !explain then
+            Printf.printf "Entrypoint %s not found\n%!" entrypoint
+  in
   let redirect = Hashtbl.create 16 in
   List.iter
     (fun (fn, obj) ->
@@ -1142,24 +1189,24 @@ let build_dll link_exe output_file files exts extra_args =
            being an empty file. *)
         let c = open_out implib in output_string c "x"; close_out c;
         let _impexp = add_temp (Filename.chop_suffix implib ".lib" ^ ".exp") in
-        let extra_args =
-          if !custom_crt then "/nodefaultlib:LIBCMT /nodefaultlib:MSVCRT " ^ extra_args
-          else "msvcrt.lib " ^ extra_args
+        let extra_args_string =
+          if !custom_crt then "/nodefaultlib:LIBCMT /nodefaultlib:MSVCRT " ^ extra_args_string
+          else "msvcrt.lib " ^ extra_args_string
         in
 
-        let extra_args =
-          if !machine = `x64 then (Printf.sprintf "/base:%s " !base_addr) ^ extra_args else extra_args
+        let extra_args_string =
+          if !machine = `x64 then (Printf.sprintf "/base:%s " !base_addr) ^ extra_args_string else extra_args_string
         in
 
-        let extra_args =
+        let extra_args_string =
           (* FlexDLL doesn't process .voltbl sections correctly, so don't allow the linker
              to process them. *)
           let command =
             if Sys.win32 then link ^ " /nologo /? | findstr EMITVOLATILEMETADATA > NUL"
             else link ^ " /nologo '/?' | grep -iq emitvolatilemetadata >/dev/null" in
           if Sys.command command = 0 then
-            "/EMITVOLATILEMETADATA:NO " ^ extra_args
-          else extra_args
+            "/EMITVOLATILEMETADATA:NO " ^ extra_args_string
+          else extra_args_string
         in
 
         (* Flexdll requires that all images (main programs and all the DLLs) are
@@ -1187,7 +1234,7 @@ let build_dll link_exe output_file files exts extra_args =
           (Filename.quote output_file)
           !subsystem
           files descr
-          extra_args
+          extra_args_string
     | `CYGWIN64 ->
         let def_file =
           if main_pgm then ""
@@ -1209,7 +1256,7 @@ let build_dll link_exe output_file files exts extra_args =
           descr
           files
           def_file
-          extra_args
+          extra_args_string
     | `MINGW | `MINGW64 | `GNAT | `GNAT64 ->
         let def_file =
           if main_pgm then ""
@@ -1233,7 +1280,7 @@ let build_dll link_exe output_file files exts extra_args =
           files
           def_file
           (if !implib then "-Wl,--out-implib=" ^ Filename.quote (Filename.chop_extension output_file ^ ".a") else "")
-          extra_args
+          extra_args_string
     | `LIGHTLD ->
         no_merge_manifest := true;
         let ld = Option.value !Cmdline.use_linker ~default:"ld" in
@@ -1246,7 +1293,7 @@ let build_dll link_exe output_file files exts extra_args =
           descr
           files
           (if !implib then "--out-implib " ^ Filename.quote (Filename.chop_extension output_file ^ ".a") else "")
-          extra_args
+          extra_args_string
   in
   debug ~dry_mode 1 "+ %s" cmd;
   if not !dry_mode then begin
