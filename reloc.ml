@@ -767,7 +767,7 @@ let build_dll link_exe output_file files exts extra_args =
   in
   (* Collect all the available symbols, including those defined
      in default libraries *)
-  let defined, from_imports, resolve_alias, resolve_alternate =
+  let defined, from_imports, resolve_alias, resolve_alternate, collected =
     let aliases = Hashtbl.create 16 in
     let alternates = Hashtbl.create 16 in
     let defined = ref StrSet.empty in
@@ -836,14 +836,16 @@ let build_dll link_exe output_file files exts extra_args =
 
     and collect_file fn =
       if not (Hashtbl.mem collected (String.lowercase_ascii fn)) then begin
-        Hashtbl.replace collected (String.lowercase_ascii fn) ();
         debug 2 "** open: %s" fn;
         collect_defined fn (Lib.read fn)
       end
 
     and collect_defined fn = function
-      | `Obj obj -> collect_defined_obj obj
+      | `Obj obj ->
+          Hashtbl.replace collected (String.lowercase_ascii fn) [fn, obj];
+          collect_defined_obj obj
       | `Lib (objs,imports) ->
+          Hashtbl.replace collected (String.lowercase_ascii fn) objs;
           List.iter (fun (_, obj) -> collect_defined_obj obj) objs;
           List.iter
             (fun (s,_) ->
@@ -854,12 +856,7 @@ let build_dll link_exe output_file files exts extra_args =
             )
             imports
     in
-    List.iter
-      (fun (fn,x) ->
-         Hashtbl.replace collected (String.lowercase_ascii fn) ();
-         collect_defined fn x
-      )
-      files;
+    List.iter (fun (fn,x) -> collect_defined fn x) files;
     if !use_default_libs then List.iter (fun fn -> collect_file (find_file fn)) !default_libs;
     List.iter (fun fn -> collect_file (find_file fn)) exts;
 
@@ -869,13 +866,13 @@ let build_dll link_exe output_file files exts extra_args =
     if !machine = `x64 then add_def "__ImageBase"
     else add_def "___ImageBase";
 
-    !defined, !from_imports, (Hashtbl.find aliases), (Hashtbl.find alternates)
+    !defined, !from_imports, (Hashtbl.find aliases), (Hashtbl.find alternates), collected
   in
 
   (* Determine which objects from the given libraries should be linked
      in. First step: find the mapping (symbol -> object) for these
      objects. *)
-  let defined_in =
+  let defined_in, default_libs =
     let defined_in = Hashtbl.create 16 in
     let def_in_obj fn (objname, obj) =
       List.iter
@@ -893,13 +890,21 @@ let build_dll link_exe output_file files exts extra_args =
         )
         obj.symbols
     in
-    List.iter
-      (fun (fn,objs) ->
-         if !explain then Printf.printf "Scanning lib %s\n%!" fn;
-         List.iter (def_in_obj fn) objs
-      )
-      libs;
-    Hashtbl.find defined_in
+    let scan (fn,objs) =
+      if !explain then Printf.printf "Scanning lib %s\n%!" fn;
+      List.iter (def_in_obj fn) objs
+    in
+    let default_libs =
+      List.fold_right
+        (fun fn acc ->
+           let fn = find_file fn in
+           scan (fn, Hashtbl.find collected (String.lowercase_ascii fn));
+           StrSet.add fn acc)
+        (if !use_default_libs then !default_libs else [])
+        StrSet.empty
+    in
+    List.iter scan libs;
+    Hashtbl.find defined_in, default_libs
   in
 
   let imported_from_implib = ref StrSet.empty in
@@ -990,20 +995,27 @@ let build_dll link_exe output_file files exts extra_args =
       (needed imported defined resolve_alias resolve_alternate obj)
 
   and link_libobj (libname,objname,obj) =
+    let default = StrSet.mem libname default_libs in
     if Hashtbl.mem libobjects (libname,objname) then ()
     else (let imports, from_imports = imports obj in
+          let imports = if default then StrSet.empty else imports in
           Hashtbl.replace libobjects (libname,objname) (obj,imports);
-          imported_from_implib := StrSet.union !imported_from_implib from_imports;
-          record_exports obj;
+          if not default then begin
+            imported_from_implib := StrSet.union !imported_from_implib from_imports;
+            record_exports obj
+          end;
           link_obj (Printf.sprintf "%s(%s)" libname objname) obj)
   in
 
   let redirect = Hashtbl.create 16 in
   List.iter
     (fun (fn, obj) ->
+       let default = StrSet.mem fn default_libs in
        let imps, from_imports = imports obj in
-       imported_from_implib := StrSet.union !imported_from_implib from_imports;
-       record_exports obj;
+       if not default then begin
+         imported_from_implib := StrSet.union !imported_from_implib from_imports;
+         record_exports obj
+       end;
        link_obj fn obj;
        if StrSet.is_empty imps then ()
        else Hashtbl.replace redirect fn (close_obj fn imps obj);
