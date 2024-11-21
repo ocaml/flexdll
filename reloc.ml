@@ -1423,8 +1423,14 @@ let setup_toolchain () =
       with Not_found -> ()
     in
     default_libs := "-lmingw32" :: "-lgcc" :: !default_libs;
-    if !exe_mode = `EXE then default_libs := "crt2.o" :: !default_libs
-    else default_libs := "dllcrt2.o" :: !default_libs
+    if not (List.mem "-nostartfiles" !extra_args) then begin
+      if !exe_mode = `EXE then
+        if List.mem "-municode" !extra_args then
+          default_libs := "crt2u.o" :: !default_libs
+        else
+          default_libs := "crt2.o" :: !default_libs
+      else default_libs := "dllcrt2.o" :: !default_libs
+    end
   in
   match !toolchain with
   | _ when !builtin_linker ->
