@@ -20,6 +20,7 @@ Next version
 - GPR#156: Allow choosing an alternative linker and manifest tool at runtime
   with -use-linker=<cmd> and -use-mt=<cmd>.
   (Antonin Décimo, review by David Allsopp)
+- GPR#133, GPR#147: Allow default libraries to be marked as optional (David Allsopp, report by Romain Beauxis)
 
 Version 0.43
 - GPR#108: Add -lgcc_s to Cygwin's link libraries, upstreaming a patch from the
