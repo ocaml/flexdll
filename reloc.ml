@@ -427,7 +427,11 @@ let add_reloc_table obj obj_name p =
   let syms = ref [] in
   let reloc secsym min max rel =
     if p rel.symbol then (
-      (* kind *)
+      (* kind = f(machine,rtype)
+         - a RELOC_ constant in flexdll.c
+
+         rtype
+         - https://learn.microsoft.com/en-us/windows/win32/debug/pe-format#x64-processors *)
       let kind = match !machine, rel.rtype with
         | `x86, 0x06 (* IMAGE_REL_I386_DIR32 *)
         | `x64, 0x01 (* IMAGE_REL_AMD64_ADDR64 *) ->
@@ -441,10 +445,16 @@ let add_reloc_table obj obj_name p =
         | `x86, 0x14 (* IMAGE_REL_I386_REL32 *) when not !no_rel_relocs ->
             0x0001 (* rel32 *)
 
-        | `x64, 0x05 when not !no_rel_relocs -> 0x0004 (* rel32_1 *)
-        | `x64, 0x08 when not !no_rel_relocs-> 0x0003 (* rel32_4 *)
-        | `x64, 0x06 when not !no_rel_relocs-> 0x0005 (* rel32_2 *)
-        | `x64, 0x09 when not !no_rel_relocs-> 0x0006 (* rel32_5 *)
+        | `x64, 0x05 (* IMAGE_REL_AMD64_REL32_1 *) when not !no_rel_relocs->
+            0x0004 (* rel32_1 *)
+        | `x64, 0x06 (* IMAGE_REL_AMD64_REL32_2 *) when not !no_rel_relocs->
+            0x0005 (* rel32_2 *)
+        | `x64, 0x07 (* IMAGE_REL_AMD64_REL32_3 *) when not !no_rel_relocs->
+            0x0008 (* rel32_3 *)
+        | `x64, 0x08 (* IMAGE_REL_AMD64_REL32_4 *) when not !no_rel_relocs->
+            0x0003 (* rel32_4 *)
+        | `x64, 0x09 (* IMAGE_REL_AMD64_REL32_5 *) when not !no_rel_relocs->
+            0x0006 (* rel32_5 *)
 
         | (`x86 | `x64), (0x0a (* IMAGE_REL_{I386|AMD64}_SECTION *) |
                           0x0b (* IMAGE_REL_{I386|AMD64}_SECREL*) ) ->

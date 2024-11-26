@@ -26,11 +26,15 @@
 typedef long intnat;
 typedef unsigned long uintnat;
 
+/* RELOC_ constants except RELOC_DONE have ordinal values based on when
+   they were introduced to the code base. These ordinal values are
+   persisted in .obj files so do not re-use any existing ordinals. */
 #define RELOC_REL32     0x0001
 #define RELOC_ABS       0x0002
-#define RELOC_REL32_4   0x0003
 #define RELOC_REL32_1   0x0004
 #define RELOC_REL32_2   0x0005
+#define RELOC_REL32_3   0x0008
+#define RELOC_REL32_4   0x0003
 #define RELOC_REL32_5   0x0006
 #define RELOC_32NB      0x0007
 #define RELOC_DONE      0x0100
@@ -328,16 +332,6 @@ static void relocate(resolver f, void *data, reloctbl *tbl, err_t *err) {
       }
       *((UINT32*) ptr->addr) = (INT32) s;
       break;
-    case RELOC_REL32_4:
-      s -= (INT_PTR)(ptr -> addr) + 8;
-      s += *((INT32*) ptr -> addr);
-      if (s != (INT32) s) {
-        sprintf(err->message, "flexdll error: cannot relocate RELOC_REL32_4, target is too far: %p  %p",(void *)((UINT_PTR) s), (void *) ((UINT_PTR)(INT32) s));
-        err->code = 3;
-        goto restore;
-      }
-      *((UINT32*) ptr->addr) = (INT32) s;
-      break;
     case RELOC_REL32_1:
       s -= (INT_PTR)(ptr -> addr) + 5;
       s += *((INT32*) ptr -> addr);
@@ -353,6 +347,26 @@ static void relocate(resolver f, void *data, reloctbl *tbl, err_t *err) {
       s += *((INT32*) ptr -> addr);
       if (s != (INT32) s) {
         sprintf(err->message, "flexdll error: cannot relocate RELOC_REL32_2, target is too far: %p  %p",(void *)((UINT_PTR) s), (void *) ((UINT_PTR)(INT32) s));
+        err->code = 3;
+        goto restore;
+      }
+      *((UINT32*) ptr->addr) = (INT32) s;
+      break;
+    case RELOC_REL32_3:
+      s -= (INT_PTR)(ptr -> addr) + 7;
+      s += *((INT32*) ptr -> addr);
+      if (s != (INT32) s) {
+        sprintf(err->message, "flexdll error: cannot relocate RELOC_REL32_3, target is too far: %p  %p",(void *)((UINT_PTR) s), (void *) ((UINT_PTR)(INT32) s));
+        err->code = 3;
+        goto restore;
+      }
+      *((UINT32*) ptr->addr) = (INT32) s;
+      break;
+    case RELOC_REL32_4:
+      s -= (INT_PTR)(ptr -> addr) + 8;
+      s += *((INT32*) ptr -> addr);
+      if (s != (INT32) s) {
+        sprintf(err->message, "flexdll error: cannot relocate RELOC_REL32_4, target is too far: %p  %p",(void *)((UINT_PTR) s), (void *) ((UINT_PTR)(INT32) s));
         err->code = 3;
         goto restore;
       }
