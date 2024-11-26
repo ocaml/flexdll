@@ -371,11 +371,43 @@ Note that you can define and use the `_imp__XXX` symbols by hand, you
 don't have to use the `__declspec(dllimport)` notation (this is useful
 if you use a compiler that doesn't support this notation).
 
-Anyway, there is no compelling reason for adopting this style. A very
-small advantage might be that there will be fewer relocations at runtime
-and that more code pages can be shared amongst several instances of the
-same DLL used by different processes.
+There *are* compelling reasons to adopt this style.
 
+A very small advantage might be that there will be fewer relocations at
+runtime and that more code pages can be shared amongst several instances
+of the same DLL used by different processes.
+
+A big advantage on IA-64 systems is to avoid relocation errors like:
+
+```text
+Fatal error: cannot load shared library plug1
+Reason: flexdll error: cannot relocate XXX
+  RELOC_REL32, target is too far: FFFFFFFF2EDEC956  000000002EDEC956
+```
+
+Without `__declspec(dllimport)` your symbol (ex. `extern XXX`) generates
+the following pseudo-assembly:
+
+```asm
+CALL XXX ; this is a 32-bit relative address
+```
+
+These 32-bit relative addresses are restricted to 2GiB jumps, and there is
+no guarantee that your main programs and all its DLLs will reside in the same
+2GiB block of virtual memory. The more DLLs you have, and the bigger they
+are, the more likely you will encounter a `RELOC_REL32` error.
+
+flexdll will verify every 32-bit relative address `CALL` during
+`flexdll_dlopen` to ensure they are within 2GiB.
+However, the indirection introduced by `__declspec(dllimport) extern` makes
+the pseudo-assembly instead:
+
+```asm
+void *_imp__XXX = &XXX;
+CALL [_imp__XXX] ; this is a 64-bit indirect address
+```
+
+which works well with flexdll.
 
 ## Advanced topic: static constructors and the entry point
 
