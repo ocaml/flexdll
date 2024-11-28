@@ -377,7 +377,7 @@ A very small advantage might be that there will be fewer relocations at
 runtime and that more code pages can be shared amongst several instances
 of the same DLL used by different processes.
 
-A big advantage on IA-64 systems is to avoid relocation errors like:
+A big advantage on x86_64 systems is to avoid relocation errors like:
 
 ```text
 Fatal error: cannot load shared library plug1
