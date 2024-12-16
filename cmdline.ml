@@ -89,6 +89,9 @@ let specs = [
   "-base", Arg.String (fun s -> base_addr := s),
   " Specify base address (Win64 only)";
 
+  "-pthread", Arg.Unit (fun () -> extra_args := "-pthread" :: !extra_args),
+  " Pass -pthread to the linker";
+
   "-I", Arg.String (fun dir -> dirs := dir :: !dirs),
   "<dir> Add a directory where to search for files";
 
