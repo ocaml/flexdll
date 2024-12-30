@@ -410,7 +410,7 @@ module StrSet = Set.Make(String)
    by their name). It also lists segments that are normally write-protected
    and that must be de-protected to enable the patching process. *)
 
-let add_reloc_table obj obj_name p =
+let add_reloc_table obj obj_name p trampolines =
   let sname = Symbol.gen_sym () in (* symbol pointing to the reloc table *)
   let sect = Section.create ".reltbl" 0xc0300040l in
   let data = Buffer.create 1024 in
@@ -432,33 +432,33 @@ let add_reloc_table obj obj_name p =
 
          rtype
          - https://learn.microsoft.com/en-us/windows/win32/debug/pe-format#x64-processors *)
-      let kind = match !machine, rel.rtype with
+      let kind, may_trampoline = match !machine, rel.rtype with
         | `x86, 0x06 (* IMAGE_REL_I386_DIR32 *)
         | `x64, 0x01 (* IMAGE_REL_AMD64_ADDR64 *) ->
-            0x0002 (* absolute, native size (32/64) *)
+            0x0002, false (* absolute, native size (32/64) *)
 
         | `x86, 0x07 (* IMAGE_REL_I386_DIR32NB *)
         | `x64, 0x03 (* IMAGE_REL_AMD64_ADDR32NB *) ->
-            0x0007 (* 32nb *)
+            0x0007, true (* 32nb *)
 
         | `x64, 0x04 (* IMAGE_REL_AMD64_REL32 *)
         | `x86, 0x14 (* IMAGE_REL_I386_REL32 *) when not !no_rel_relocs ->
-            0x0001 (* rel32 *)
+            0x0001, true (* rel32 *)
 
         | `x64, 0x05 (* IMAGE_REL_AMD64_REL32_1 *) when not !no_rel_relocs->
-            0x0004 (* rel32_1 *)
+            0x0004, true (* rel32_1 *)
         | `x64, 0x06 (* IMAGE_REL_AMD64_REL32_2 *) when not !no_rel_relocs->
-            0x0005 (* rel32_2 *)
+            0x0005, true (* rel32_2 *)
         | `x64, 0x07 (* IMAGE_REL_AMD64_REL32_3 *) when not !no_rel_relocs->
-            0x0008 (* rel32_3 *)
+            0x0008, true (* rel32_3 *)
         | `x64, 0x08 (* IMAGE_REL_AMD64_REL32_4 *) when not !no_rel_relocs->
-            0x0003 (* rel32_4 *)
+            0x0003, true (* rel32_4 *)
         | `x64, 0x09 (* IMAGE_REL_AMD64_REL32_5 *) when not !no_rel_relocs->
-            0x0006 (* rel32_5 *)
+            0x0006, true (* rel32_5 *)
 
         | (`x86 | `x64), (0x0a (* IMAGE_REL_{I386|AMD64}_SECTION *) |
                           0x0b (* IMAGE_REL_{I386|AMD64}_SECREL*) ) ->
-            0x0100 (* debug relocs: ignore *)
+            0x0100, false (* debug relocs: ignore *)
 
         | _, k ->
             let msg =
@@ -469,6 +469,7 @@ let add_reloc_table obj obj_name p =
 (*            Printf.eprintf "%s\n%!" msg;
             0x0001 *)
       in
+      if may_trampoline then trampolines := StrSet.add rel.symbol.sym_name !trampolines;
       int_to_buf data kind;
 
       (* name *)
@@ -605,6 +606,12 @@ let add_master_reloc_table obj names symname =
   sect.data <- `String (Buffer.to_bytes data);
   obj.sections <- sect :: obj.sections
 
+let add_master_jmp_table obj names symname =
+  let trampolines = StrSet.cardinal names in
+  let sect = Section.create ".mjmptbl" 0xe0500020l in
+  obj.symbols <- (Symbol.export symname sect 0l) :: obj.symbols;
+  sect.data <- `Uninit (trampolines * 16);
+  obj.sections <- sect :: obj.sections
 
 
 let collect_dllexports obj =
@@ -851,7 +858,7 @@ let build_dll link_exe output_file files exts extra_args =
     List.iter (fun fn -> collect_file (find_file fn)) exts;
 
     if main_pgm then add_def (usym "static_symtable")
-    else add_def (usym "reloctbl");
+    else (add_def (usym "reloctbl"); if !machine = `x64 then add_def (usym "jmptbl"));
 
     if !machine = `x64 then add_def "__ImageBase"
     else add_def "___ImageBase";
@@ -909,6 +916,7 @@ let build_dll link_exe output_file files exts extra_args =
 
   let libobjects = Hashtbl.create 16 in
   let reloctbls = ref [] in
+  let trampolines = ref StrSet.empty in
   let exported = ref StrSet.empty in
 
   List.iter (fun s -> exported := StrSet.add (usym s) !exported) !defexports;
@@ -929,7 +937,7 @@ let build_dll link_exe output_file files exts extra_args =
       Printf.printf "** Imported symbols for %s:\n%!" name;
       StrSet.iter print_endline imps
     );
-    let sym = add_reloc_table obj name (fun s -> StrSet.mem s.sym_name imps) in
+    let sym = add_reloc_table obj name (fun s -> StrSet.mem s.sym_name imps) trampolines in
     reloctbls := sym :: !reloctbls
   in
 
@@ -1035,7 +1043,11 @@ let build_dll link_exe output_file files exts extra_args =
 
   add_export_table obj (if !noexport then [] else StrSet.elements !exported)
     (usym (if main_pgm then "static_symtable" else "symtbl"));
-  if not main_pgm then add_master_reloc_table obj !reloctbls (usym "reloctbl");
+  if not main_pgm then begin
+    add_master_reloc_table obj !reloctbls (usym "reloctbl");
+    if !machine = `x64 then
+      add_master_jmp_table obj !trampolines (usym "jmptbl");
+  end;
 
   if !errors then
     exit 2;
@@ -1116,7 +1128,9 @@ let build_dll link_exe output_file files exts extra_args =
         in
 
         let extra_args =
-          if !machine = `x64 then (Printf.sprintf "/base:%s " !base_addr) ^ extra_args else extra_args
+          match !machine, !base_addr with
+          | `x64, Some base_addr -> Printf.sprintf "/base:%s %s" base_addr extra_args
+          | _ -> extra_args
         in
 
         let extra_args =
@@ -1134,10 +1148,11 @@ let build_dll link_exe output_file files exts extra_args =
            with the Windows 7 SDK in 64-bit mode. *)
 
         Printf.sprintf
-          "link /nologo %s%s%s%s%s /implib:%s /out:%s /subsystem:%s %s %s %s"
+          "link /nologo %s%s%s%s%s%s /implib:%s /out:%s /subsystem:%s %s %s %s"
           (if !verbose >= 2 then "/verbose " else "")
           (if link_exe = `EXE then "" else "/dll ")
           (if main_pgm then "" else "/export:symtbl /export:reloctbl ")
+          (if main_pgm || !machine = `x86 then "" else "/export:jmptbl ")
           (if main_pgm then "" else if !noentry then "/noentry " else
           let s =
             match !machine with
@@ -1158,8 +1173,15 @@ let build_dll link_exe output_file files exts extra_args =
           else
             let def_file, oc = open_temp_file "flexlink" ".def" in
             Printf.fprintf oc "EXPORTS\n  reloctbl\n  symtbl\n";
+            if !machine = `x64 then
+              Printf.fprintf oc "  jmptbl\n";
             close_out oc;
             Filename.quote def_file
+        in
+        let extra_args =
+          match !machine, !base_addr with
+          | `x64, Some base_addr -> Printf.sprintf "-Xlinker --image-base -Xlinker %s %s" base_addr extra_args
+          | _ -> extra_args
         in
         Printf.sprintf
           "%s %s%s -L. %s %s -o %s %s %s %s %s"
@@ -1179,8 +1201,15 @@ let build_dll link_exe output_file files exts extra_args =
           else
             let def_file, oc = open_temp_file "flexlink" ".def" in
             Printf.fprintf oc "EXPORTS\n  reloctbl\n  symtbl\n";
+            if !machine = `x64 then
+              Printf.fprintf oc "  jmptbl\n";
             close_out oc;
             Filename.quote def_file
+        in
+        let extra_args =
+          match !machine, !base_addr with
+          | `x64, Some base_addr -> Printf.sprintf "-Xlinker --image-base -Xlinker %s %s" base_addr extra_args
+          | _ -> extra_args
         in
         Printf.sprintf
           "%s -m%s %s%s -L. %s %s -o %s %s %s %s %s %s"
