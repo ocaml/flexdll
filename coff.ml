@@ -1044,10 +1044,11 @@ module Stacksize = struct
       else filename
     in
     let ic = open_in_bin filename in
-    let hdr_offset = int16 (read ic 0x3c 2) 0 in
+    (* Read e_lfanew from the IMAGE_DOS_HEADER (see winnt.h) *)
+    let hdr_offset = int32_ (read ic 0x3c 4) 0 in
     let pe_signature = read_str ic hdr_offset 4 in
     assert(pe_signature = "PE\000\000");
-    let coff_hdr = read ic 0 20 in
+    let coff_hdr = read ic (hdr_offset + 4) 20 in
     let opthdr_size = int16 coff_hdr 16 in
     let opthdr = read ic (hdr_offset + 24) opthdr_size in
     let machine =
@@ -1057,7 +1058,6 @@ module Stacksize = struct
       | magic -> Printf.ksprintf failwith "Cannot determine image target (magic = %x)." magic
     in
     let reserve_offset = hdr_offset + 24 + 72 in
-(*    Printf.printf "current stack reserve %ld\n%!" (int32 opthdr 72); *)
     close_in ic;
 
     let oc = open_out_gen [Open_wronly; Open_binary] 0x777 filename in
