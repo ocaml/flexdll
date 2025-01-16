@@ -3,6 +3,10 @@ Next version
 - GPR#136: Fix parallel access crashes and misbehavior (David Allsopp, Jan Midtgaard, Antonin Décimo)
 - GPR#140: Fixes #29. Support relocation kind 0003 (IMAGE_REL_AMD64_ADDR32NB) and
   IMAGE_REL_I386_DIR32NB. Extend relative types to IMAGE_REL_AMD64_REL32_5. (Jonah Beckford)
+- GPR#150: Fix stack reserve incorrectly reading from the start of the PE
+  executable instead of the COFF file header. Fix reading the file address of
+  new exe header.
+  (Antonin Décimo, review by David Allsopp and Nicolás Ojeda Bär)
 
 Version 0.43
 - GPR#108: Add -lgcc_s to Cygwin's link libraries, upstreaming a patch from the
