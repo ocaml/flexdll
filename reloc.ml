@@ -183,29 +183,22 @@ let build_diversion lst =
         Bytes.to_string s ^ "\r\n"
       ) (List.filter (fun f -> f <> "") lst)
   in
-  let utf16, lst =
-    try true, List.map toutf16 lst
-    with Not_utf8 -> false, lst
+  let lst =
+    match !toolchain with
+    | `MINGW | `MINGW64 | `GNAT | `GNAT64 | `CYGWIN64 -> lst
+    | `MSVC | `MSVC64 | `LIGHTLD ->
+      (* UTF-16 response files required *)
+      try
+        let lst = List.map toutf16 lst in
+        output_string oc "\xFF\xFE"; (* LE BOM *)
+        lst
+      with Not_utf8 -> lst
   in
-  if utf16 then output_string oc "\xFF\xFE"; (* LE BOM *)
   List.iter (fun s -> output_string oc s) lst;
   close_out oc;
   "@" ^ responsefile
 
-type cmdline = {
-    may_use_response_file: bool;
-  }
-
-let new_cmdline () =
-  let rf = match !toolchain with
-  | `MSVC | `MSVC64 | `LIGHTLD -> true
-  | `MINGW | `MINGW64 | `GNAT | `GNAT64 | `CYGWIN64 -> false
-  in
-  {
-   may_use_response_file = rf;
-  }
-
-let run_command cmdline cmd =
+let run_command cmd =
   let pipe_to_null = (!toolchain = `MSVC || !toolchain = `MSVC64) in
   let silencer = if pipe_to_null then " >NUL 2>NUL" else ""
   in
@@ -238,11 +231,11 @@ let run_command cmdline cmd =
       failwith "Error during linking\n"
     end
 
-let quote_files cmdline lst =
+let quote_files lst =
   let s =
     String.concat " "
       (List.map (fun f -> if f = "" then f else Filename.quote f) lst) in
-  if String.length s >= 1024 && cmdline.may_use_response_file then Filename.quote (build_diversion lst)
+  if String.length s >= 1024 then Filename.quote (build_diversion lst)
   else s
 
 
@@ -1074,8 +1067,7 @@ let build_dll link_exe output_file files exts extra_args =
       )
     @ exts in
 
-  let cmdline = new_cmdline () in
-  let files = quote_files cmdline files in
+  let files = quote_files files in
   let descr = Filename.quote descr in
 
   begin
@@ -1212,7 +1204,7 @@ let build_dll link_exe output_file files exts extra_args =
   if not !dry_mode then begin
     let manifest_file = output_file ^ ".manifest" in
     safe_remove manifest_file;
-    run_command cmdline cmd;
+    run_command cmd;
 
     if (not !no_merge_manifest) && !merge_manifest && (not !real_manifest || Sys.file_exists manifest_file)
     then begin
