@@ -16,6 +16,7 @@ Next version
   Fix FlexDLL cross-build on macOS and BSD.
   (Antonin Décimo, review by Nicolás Ojeda Bär)
 - GPR#151: Use response files with all toolchains (Puneeth Chaganti, review by David Allsopp and Antonin Décimo)
+- GPR#152: Use a file to pass arguments to cygpath (Puneeth Chaganti, review by David Allsopp and Antonin Décimo)
 
 Version 0.43
 - GPR#108: Add -lgcc_s to Cygwin's link libraries, upstreaming a patch from the

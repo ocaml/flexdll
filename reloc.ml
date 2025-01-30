@@ -244,7 +244,17 @@ let quote_files lst =
 let cygpath l cont =
   let accept_error = (!use_cygpath = `Try && l <> []) in
   let l =
-    let args = String.concat " " (List.map Filename.quote l) in
+    let s = "-- " ^ String.concat " " (List.map Filename.quote l) in
+    let args =
+      if not Sys.cygwin && String.length s >= 1024 then begin
+        (* cygpath loads the file in "text" mode, so CRLF endings are fine *)
+        let (fn, oc) = open_temp_file "cygpathargs" "" in
+        List.iter (fun x -> output_string oc x; output_char oc '\n') l;
+        close_out oc;
+        "--file " ^ Filename.quote fn
+      end else
+        s
+    in
     get_output ~accept_error "cygpath -m %s" args
   in
   if accept_error && l = [] then begin
