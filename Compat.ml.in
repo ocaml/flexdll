@@ -101,6 +101,7 @@
 408:module Option = struct
 408:  let some v = Some v
 408:  let value o ~default = match o with Some v -> v | None -> default
+408:  let fold ~none ~some = function Some v -> some v | None -> none
 408:end
 
 407:module Stdlib = Pervasives
