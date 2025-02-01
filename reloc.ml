@@ -1237,7 +1237,9 @@ let build_dll link_exe output_file files exts extra_args =
           Filename.concat flexdir default_manifest
       in
       let mcmd =
-        Printf.sprintf "mt -nologo -outputresource:%s -manifest %s"
+        let mt = Option.value !Cmdline.use_mt ~default:"mt" in
+        Printf.sprintf "%s -nologo -outputresource:%s -manifest %s"
+          mt
           (Filename.quote (if link_exe = `EXE then output_file
                            else output_file ^ ";#2"))
           (Filename.quote fn)
