@@ -69,8 +69,8 @@ ifeq ($(MSVC_DETECT),0)
 MSVCC_ROOT=
 MSVC_PREFIX=
 MSVC64_PREFIX=
-MSVCC=cl.exe $(MSVC_FLAGS)
-MSVCC64=cl.exe $(MSVC_FLAGS)
+MSVCC = cl.exe
+MSVCC64 = cl.exe
 else
 ifeq ($(MSVS_PATH),)
 # Otherwise, assume the 32-bit version of VS 2008 or Win7 SDK is in the path.
@@ -85,15 +85,15 @@ MSVC_PREFIX=LIB="$(MSVC_LIB)" INCLUDE="$(MSVC_INCLUDE)"
 MSVC64_LIB = $(MSVC_LIB1)/Lib/amd64;$(MSVC_LIB2)/Lib/x64
 MSVC64_PREFIX=LIB="$(MSVC64_LIB)" INCLUDE="$(MSVC_INCLUDE)"
 
-MSVCC = $(MSVCC_ROOT)/cl.exe $(MSVC_FLAGS)
-MSVCC64 = $(MSVCC_ROOT)/amd64/cl.exe $(MSVC_FLAGS)
+MSVCC = $(MSVCC_ROOT)/cl.exe
+MSVCC64 = $(MSVCC_ROOT)/amd64/cl.exe
 else
 MSVCC_ROOT:=
 MSVC_PREFIX=PATH="$(MSVS_PATH)$(PATH)" LIB="$(MSVS_LIB)$(LIB)" INCLUDE="$(MSVS_INC)$(INCLUDE)"
 MSVC64_PREFIX=PATH="$(MSVS64_PATH)$(PATH)" LIB="$(MSVS64_LIB)$(LIB)" INCLUDE="$(MSVS64_INC)$(INCLUDE)"
 
-MSVCC = cl.exe $(MSVC_FLAGS)
-MSVCC64 = cl.exe $(MSVC_FLAGS)
+MSVCC = cl.exe
+MSVCC64 = cl.exe
 endif
 endif
 
@@ -200,10 +200,10 @@ version_res.o: version.rc flexdll.opam
 	$(TOOLPREF)windres $(WINDRES_FLAGS) -i $< -o $@
 
 flexdll_msvc.obj: flexdll.c flexdll.h
-	$(MSVC_PREFIX) $(MSVCC) /DMSVC -c /Fo"$@" $<
+	$(MSVC_PREFIX) $(MSVCC) $(MSVC_FLAGS) /DMSVC -c /Fo"$@" $<
 
 flexdll_msvc64.obj: flexdll.c flexdll.h
-	$(MSVC64_PREFIX) $(MSVCC64) /DMSVC /DMSVC64 -c /Fo"$@" $<
+	$(MSVC64_PREFIX) $(MSVCC64) $(MSVC_FLAGS) /DMSVC /DMSVC64 -c /Fo"$@" $<
 
 flexdll_cygwin64.o: flexdll.c flexdll.h
 	$(CYG64CC) -DCYGWIN -c -o $@ $<
@@ -218,10 +218,10 @@ flexdll_mingw64.o: flexdll.c flexdll.h
 	$(MIN64CC) -DMINGW -c -o $@ $<
 
 flexdll_initer_msvc.obj: flexdll_initer.c
-	$(MSVC_PREFIX) $(MSVCC) -c /Fo"$@" $<
+	$(MSVC_PREFIX) $(MSVCC) $(MSVC_FLAGS) -c /Fo"$@" $<
 
 flexdll_initer_msvc64.obj: flexdll_initer.c
-	$(MSVC64_PREFIX) $(MSVCC64) -c /Fo"$@" $<
+	$(MSVC64_PREFIX) $(MSVCC64) $(MSVC_FLAGS) -c /Fo"$@" $<
 
 flexdll_initer_cygwin64.o: flexdll_initer.c
 	$(CYG64CC) -c -o $@ $<
@@ -237,7 +237,7 @@ flexdll_initer_mingw64.o: flexdll_initer.c
 
 
 demo_msvc: flexlink.exe flexdll_msvc.obj flexdll_initer_msvc.obj
-	$(MSVC_PREFIX) $(MAKE) -C test clean demo CHAIN=msvc CC="$(MSVCC)" PLUG2_CFLAGS="/bigobj" O=obj
+	$(MSVC_PREFIX) $(MAKE) -C test clean demo CHAIN=msvc CC="$(MSVCC) $(MSVC_FLAGS)" PLUG2_CFLAGS="/bigobj" O=obj
 
 demo_cygwin64: flexlink.exe flexdll_cygwin64.o flexdll_initer_cygwin64.o
 	$(MAKE) -C test clean demo CHAIN=cygwin64 CC="$(CYG64CC)" O=o RUN="PATH=\"/cygdrive/c/cygwin64/bin:$(PATH)\""
@@ -249,7 +249,7 @@ demo_mingw64: flexlink.exe flexdll_mingw64.o flexdll_initer_mingw64.o
 	$(MAKE) -C test clean demo CHAIN=mingw64 CC="$(MIN64CC)" O=o
 
 demo_msvc64:  flexlink.exe flexdll_msvc64.obj flexdll_initer_msvc64.obj
-	$(MSVC64_PREFIX) $(MAKE) -C test clean demo CHAIN=msvc64 CC="$(MSVCC64)" PLUG2_CFLAGS="/bigobj" O=obj
+	$(MSVC64_PREFIX) $(MAKE) -C test clean demo CHAIN=msvc64 CC="$(MSVCC64) $(MSVC_FLAGS)" PLUG2_CFLAGS="/bigobj" O=obj
 
 distclean: clean
 	rm -f Makefile.winsdk
