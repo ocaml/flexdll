@@ -120,6 +120,7 @@ OCAMLOPT = ocamlopt -g
 #LINKFLAGS = unix.cmxa
 
 ifeq ($(TOOLCHAIN), msvc)
+RC = rc
 RES=version.res
 ifeq ($(ARCH), i386)
 RES_PREFIX=$(MSVC_PREFIX)
@@ -127,6 +128,7 @@ else
 RES_PREFIX=$(MSVC64_PREFIX)
 endif
 else
+RC = $(TOOLPREF)windres
 RES=version_res.o
 RES_PREFIX=
 endif
@@ -194,10 +196,10 @@ WINDRES_FLAGS = \
   -D FLEXDLL_FULL_VERSION=\\\"$(FLEXDLL_FULL_VERSION)\\\"
 
 version.res: version.rc flexdll.opam
-	$(RES_PREFIX) rc /nologo $(RC_FLAGS) $<
+	$(RES_PREFIX) $(RC) /nologo $(RC_FLAGS) $<
 
 version_res.o: version.rc flexdll.opam
-	$(TOOLPREF)windres $(WINDRES_FLAGS) -i $< -o $@
+	$(RC) $(WINDRES_FLAGS) -i $< -o $@
 
 flexdll_msvc.obj: flexdll.c flexdll.h
 	$(MSVC_PREFIX) $(MSVCC) $(MSVC_FLAGS) /DMSVC -c /Fo"$@" $<
