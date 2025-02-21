@@ -99,7 +99,7 @@ endif
 
 FLEXDLL_WARN_ERROR ?=
 ifeq ($(FLEXDLL_WARN_ERROR),true)
-GCC_FLAGS += -Werror -fdiagnostics-color=always
+GCC_FLAGS += -Wextra -std=c99 -Werror -fdiagnostics-color=always
 MSVC_FLAGS += /WX
 endif
 

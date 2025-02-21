@@ -13,7 +13,7 @@
 #include <stdio.h>
 #include "flexdll.h"
 
-typedef void torun();
+typedef void torun(void);
 
 void api1(char *msg){ printf("API1: %s\n", msg); }
 void api2(char *msg){ printf("API2: %s\n", msg); }

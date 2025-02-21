@@ -2,7 +2,7 @@
 
 extern int x;
 
-void torun() {
+void torun(void) {
   api1("plug2.torun();");
   api2("plug2.torun();");
   /*

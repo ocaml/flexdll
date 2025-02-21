@@ -18,15 +18,13 @@
 #include <stdio.h>
 #include <windows.h>
 
-typedef int func(void*);
-
 extern int reloctbl;
 
-static int flexdll_init() {
-  func *sym = 0;
+static int flexdll_init(void) {
+  int (*sym)(void *) = 0;
   char *s = getenv("FLEXDLL_RELOCATE");
   if (!s) { fprintf(stderr, "Cannot find FLEXDLL_RELOCATE\n"); return FALSE; }
-  sscanf(s,"%p",&sym);
+  sscanf(s,"%p",(void **) &sym);
   /* sym = 0 means "loaded not for execution" */
   if (!sym || sym(&reloctbl)) return TRUE;
   return FALSE;
