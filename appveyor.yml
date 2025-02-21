@@ -40,6 +40,10 @@ environment:
       OCAML_PORT: mingw64
     - OCAMLBRANCH: 5.1
       OCAML_PORT: mingw64
+    - OCAMLBRANCH: 5.2
+      OCAML_PORT: mingw64
+    - OCAMLBRANCH: 5.3
+      OCAML_PORT: mingw64
       SKIP_OCAML_TEST: no
     - OCAMLBRANCH: trunk
       OCAML_PORT: mingw64
