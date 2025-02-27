@@ -235,7 +235,7 @@ let quote_files lst =
   let s =
     String.concat " "
       (List.map (fun f -> if f = "" then f else Filename.quote f) lst) in
-  if String.length s >= 1024 then Filename.quote (build_diversion lst)
+  if not Sys.unix && String.length s >= 1024 then Filename.quote (build_diversion lst)
   else s
 
 
