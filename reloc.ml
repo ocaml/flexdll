@@ -1351,7 +1351,12 @@ let setup_toolchain () =
       match input with
       | entry :: input ->
           if String.length entry > 9 && String.sub entry 0 9 = "install: " then
-            get_lib_search_dirs (String.sub entry 9 (String.length entry - 9)) libraries input
+            let install = String.sub entry 9 (String.length entry - 9) in
+            (* Ensure install does not end with a separator (or
+               [Sys.is_directory] will fail) *)
+            let install = Filename.concat install Filename.current_dir_name
+                          |> Filename.dirname in
+            get_lib_search_dirs (Some install) libraries input
           else begin try
             match split entry '=' with
             | "libraries: ", paths -> get_lib_search_dirs install paths input
@@ -1360,18 +1365,9 @@ let setup_toolchain () =
             get_lib_search_dirs install libraries input
           end
       | [] ->
-          let install =
-            if install <> "" then
-              (* Ensure install does not end with a separator (or
-                 Sys.is_directory will fail) *)
-              Filename.concat install Filename.current_dir_name
-              |> Filename.dirname
-            else
-              ""
-          in
           let separator, run_through_cygpath =
             if Sys.win32 then
-              if dir_exists_no_cygpath install then
+              if Option.fold ~none:true ~some:dir_exists_no_cygpath install then
                 ';', false
               else
                 ':', (!use_cygpath <> `No)
@@ -1385,7 +1381,8 @@ let setup_toolchain () =
             libraries
     in
     let lib_search_dirs =
-      get_lib_search_dirs "" "" (get_output "%s -print-search-dirs" (cc !toolchain))
+      get_lib_search_dirs None "" (get_output "%s -print-search-dirs" (cc !toolchain))
+      |> List.filter (( <> ) "")
       |> List.map normalize_path
       |> remove_duplicate_paths
     in
