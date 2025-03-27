@@ -24,7 +24,15 @@ let debug ?(dry_mode = {contents=false}) min_level fmt =
 let search_path = ref []
 let default_libs = ref []
 
-let gcc = ref "gcc"
+let cc = function
+  | `MSVC -> Version.msvc
+  | `MSVC64 -> Version.msvc64
+  | `CYGWIN64 -> Version.cygwin64
+  | `MINGW -> Version.mingw
+  | `MINGW64 -> Version.mingw64
+  | `GNAT | `GNAT64 -> Version.gnat
+  | `LIGHTLD -> failwith "No C compiler configured for this toolchain."
+
 let objdump = ref "objdump"
 
 let is_crt_lib = function
@@ -1173,7 +1181,7 @@ let build_dll link_exe output_file files exts extra_args =
         in
         Printf.sprintf
           "%s %s%s%s -L. %s %s -o %s %s %s %s %s"
-          !gcc
+          (cc !toolchain)
           (Option.fold ~none:"" ~some:(fun ld -> "-fuse-ld=" ^ ld ^ " ") !Cmdline.use_linker)
           (if link_exe = `EXE then "" else "-shared ")
           (if main_pgm then "" else if !noentry then "-Wl,-e0 " else if !machine = `x86 then "-Wl,-e_FlexDLLiniter@12 " else "-Wl,-eFlexDLLiniter ")
@@ -1195,7 +1203,7 @@ let build_dll link_exe output_file files exts extra_args =
         in
         Printf.sprintf
           "%s -m%s %s%s%s -L. %s %s -o %s %s %s %s %s %s"
-          !gcc
+          (cc !toolchain)
           !subsystem
           (Option.fold ~none:"" ~some:(fun ld -> "-fuse-ld=" ^ ld ^ " ") !Cmdline.use_linker)
           (if link_exe = `EXE then "" else "-shared ")
@@ -1338,7 +1346,6 @@ let remove_duplicate_paths paths =
 
 let setup_toolchain () =
   let mingw_libs pre =
-    gcc := pre ^ "gcc";
     objdump := pre ^ "objdump";
     let rec get_lib_search_dirs install libraries input =
       match input with
@@ -1378,13 +1385,13 @@ let setup_toolchain () =
             libraries
     in
     let lib_search_dirs =
-      get_lib_search_dirs "" "" (get_output "%s -print-search-dirs" !gcc)
+      get_lib_search_dirs "" "" (get_output "%s -print-search-dirs" (cc !toolchain))
       |> List.map normalize_path
       |> remove_duplicate_paths
     in
     search_path := !dirs @ lib_search_dirs;
     if !verbose >= 1 then begin
-      print_endline "lib search dirs:";
+      Printf.printf "lib search dirs (%s):\n" (cc !toolchain);
       List.iter (Printf.printf "  %s\n") lib_search_dirs;
       flush stdout
     end;
@@ -1410,14 +1417,13 @@ let setup_toolchain () =
       add_flexdll_obj := false;
       noentry := true
   | `CYGWIN64 ->
-      gcc := "gcc";
       objdump := "objdump";
       search_path :=
         !dirs @
           [
            "/lib";
            "/lib/w32api";
-           Filename.dirname (get_output1 ~use_bash:true "gcc -print-libgcc-file-name");
+           Filename.dirname (get_output1 ~use_bash:true "%s -print-libgcc-file-name" (cc !toolchain));
           ];
       default_libs := ["-lkernel32"; "-luser32"; "-ladvapi32";
                        "-lshell32"; "-lcygwin"; "-lgcc_s"; "-lgcc"]
@@ -1436,7 +1442,7 @@ let setup_toolchain () =
     search_path :=
       !dirs @
       [
-       Filename.dirname (get_output1 "%s -print-libgcc-file-name" !gcc);
+       Filename.dirname (get_output1 "%s -print-libgcc-file-name" (cc !toolchain));
        read_gnatls ();
       ];
     default_libs :=
@@ -1475,21 +1481,23 @@ let compile_if_needed file =
     let cmd = match !toolchain with
       | `MSVC | `MSVC64 ->
           Printf.sprintf
-            "cl /c /MD /nologo /Fo%s %s %s%s"
+            "%s /c /MD /nologo /Fo%s %s %s%s"
+            (cc !toolchain)
             (Filename.quote tmp_obj)
             (mk_dirs_opt "/I")
             file
             pipe
       | `CYGWIN64 ->
           Printf.sprintf
-            "gcc -c -o %s %s %s"
+            "%s -c -o %s %s %s"
+            (cc !toolchain)
             (Filename.quote tmp_obj)
             (mk_dirs_opt "-I")
             file
       | `MINGW | `MINGW64 | `GNAT | `GNAT64 ->
           Printf.sprintf
             "%s -c -o %s %s %s"
-            !gcc
+            (cc !toolchain)
             (Filename.quote tmp_obj)
             (mk_dirs_opt "-I")
             (Filename.quote file)
