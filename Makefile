@@ -241,19 +241,19 @@ flexdll_initer_mingw64.o: flexdll_initer.c
 
 
 demo_msvc: flexlink.exe flexdll_msvc.obj flexdll_initer_msvc.obj
-	$(MSVC_PREFIX) $(MAKE) -C test clean demo CHAIN=msvc CC="$(MSVCC) $(MSVC_FLAGS)" PLUG2_CFLAGS="/bigobj" O=obj
+	$(MSVC_PREFIX) $(MAKE) -C test clean demo CHAIN=msvc CC="$(MSVCC)" CFLAGS="$(MSVC_FLAGS)" PLUG2_CFLAGS="/bigobj" O=obj
 
 demo_cygwin64: flexlink.exe flexdll_cygwin64.o flexdll_initer_cygwin64.o
-	$(MAKE) -C test clean demo CHAIN=cygwin64 CC="$(CYG64CC) $(GCC_FLAGS)" O=o RUN="PATH=\"/cygdrive/c/cygwin64/bin:$(PATH)\""
+	$(MAKE) -C test clean demo CHAIN=cygwin64 CC="$(CYG64CC)" CFLAGS="$(GCC_FLAGS)" O=o RUN="PATH=\"/cygdrive/c/cygwin64/bin:$(PATH)\""
 
 demo_mingw: flexlink.exe flexdll_mingw.o flexdll_initer_mingw.o
-	$(MAKE) -C test clean demo CHAIN=mingw CC="$(MINCC) $(GCC_FLAGS)" O=o
+	$(MAKE) -C test clean demo CHAIN=mingw CC="$(MINCC)" CFLAGS="$(GCC_FLAGS)" O=o
 
 demo_mingw64: flexlink.exe flexdll_mingw64.o flexdll_initer_mingw64.o
-	$(MAKE) -C test clean demo CHAIN=mingw64 CC="$(MIN64CC) $(GCC_FLAGS)" O=o
+	$(MAKE) -C test clean demo CHAIN=mingw64 CC="$(MIN64CC)" CFLAGS="$(GCC_FLAGS)" O=o
 
 demo_msvc64:  flexlink.exe flexdll_msvc64.obj flexdll_initer_msvc64.obj
-	$(MSVC64_PREFIX) $(MAKE) -C test clean demo CHAIN=msvc64 CC="$(MSVCC64) $(MSVC_FLAGS)" PLUG2_CFLAGS="/bigobj" O=obj
+	$(MSVC64_PREFIX) $(MAKE) -C test clean demo CHAIN=msvc64 CC="$(MSVCC64)" CFLAGS="$(MSVC_FLAGS)" PLUG2_CFLAGS="/bigobj" O=obj
 
 distclean: clean
 	rm -f Makefile.winsdk
