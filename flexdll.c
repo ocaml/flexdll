@@ -9,6 +9,10 @@
 
 /* Runtime support library */
 
+#ifdef CYGWIN
+#define _POSIX_C_SOURCE 200112L
+#include <stdlib.h> /* for setenv */
+#endif
 #include <stdio.h>
 #include <string.h>
 #include <windows.h>
@@ -157,6 +161,7 @@ static err_t *get_tls_error(int op) {
 #include <dlfcn.h>
 
 static void *ll_dlopen(const char *libname, int for_execution) {
+  (void)for_execution; /* for_execution is currently unused */
   return dlopen(libname, RTLD_NOW | RTLD_GLOBAL);
   /* Could use RTLD_LAZY if for_execution == 0, but needs testing */
 }
@@ -228,7 +233,7 @@ static void dump_reloctbl(reloctbl *tbl) {
   nonwr *wr;
 
   if (!tbl) { printf("No relocation table\n"); return; }
-  printf("Dynamic relocation table found at %p\n", tbl);
+  printf("Dynamic relocation table found at %p\n", (void *) tbl);
 
   for (wr = tbl->nonwr; wr->last != 0; wr++)
     printf(" Non-writable relocation in zone %p -> %p\n",
@@ -418,7 +423,7 @@ static void dump_symtbl(symtbl *tbl)
   unsigned i;
 
   if (!tbl) { printf("No symbol table\n"); return; }
-  printf("Dynamic symbol at %p (size = %u)\n", tbl, (unsigned int) tbl->size); fflush(stdout);
+  printf("Dynamic symbol at %p (size = %u)\n", (void *) tbl, (unsigned int) tbl->size); fflush(stdout);
 
   for (i = 0; i < tbl->size; i++) {
     printf("[%u] ", i); fflush(stdout);
