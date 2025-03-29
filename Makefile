@@ -29,13 +29,13 @@ endif
 GCC_FLAGS = -Wall
 
 MINGW_PREFIX = i686-w64-mingw32-
-MINCC = $(MINGW_PREFIX)gcc $(GCC_FLAGS)
+MINCC = $(MINGW_PREFIX)gcc
 
 MINGW64_PREFIX = x86_64-w64-mingw32-
-MIN64CC = $(MINGW64_PREFIX)gcc $(GCC_FLAGS)
+MIN64CC = $(MINGW64_PREFIX)gcc
 
 CYGWIN64_PREFIX = x86_64-pc-cygwin-
-CYG64CC = $(CYGWIN64_PREFIX)gcc $(GCC_FLAGS)
+CYG64CC = $(CYGWIN64_PREFIX)gcc
 
 version.ml: Makefile flexdll.opam
 	echo "let version = \"$(VERSION)\"" > version.ml
@@ -69,8 +69,8 @@ ifeq ($(MSVC_DETECT),0)
 MSVCC_ROOT=
 MSVC_PREFIX=
 MSVC64_PREFIX=
-MSVCC=cl.exe $(MSVC_FLAGS)
-MSVCC64=cl.exe $(MSVC_FLAGS)
+MSVCC = cl.exe
+MSVCC64 = cl.exe
 else
 ifeq ($(MSVS_PATH),)
 # Otherwise, assume the 32-bit version of VS 2008 or Win7 SDK is in the path.
@@ -85,15 +85,15 @@ MSVC_PREFIX=LIB="$(MSVC_LIB)" INCLUDE="$(MSVC_INCLUDE)"
 MSVC64_LIB = $(MSVC_LIB1)/Lib/amd64;$(MSVC_LIB2)/Lib/x64
 MSVC64_PREFIX=LIB="$(MSVC64_LIB)" INCLUDE="$(MSVC_INCLUDE)"
 
-MSVCC = $(MSVCC_ROOT)/cl.exe $(MSVC_FLAGS)
-MSVCC64 = $(MSVCC_ROOT)/amd64/cl.exe $(MSVC_FLAGS)
+MSVCC = $(MSVCC_ROOT)/cl.exe
+MSVCC64 = $(MSVCC_ROOT)/amd64/cl.exe
 else
 MSVCC_ROOT:=
 MSVC_PREFIX=PATH="$(MSVS_PATH)$(PATH)" LIB="$(MSVS_LIB)$(LIB)" INCLUDE="$(MSVS_INC)$(INCLUDE)"
 MSVC64_PREFIX=PATH="$(MSVS64_PATH)$(PATH)" LIB="$(MSVS64_LIB)$(LIB)" INCLUDE="$(MSVS64_INC)$(INCLUDE)"
 
-MSVCC = cl.exe $(MSVC_FLAGS)
-MSVCC64 = cl.exe $(MSVC_FLAGS)
+MSVCC = cl.exe
+MSVCC64 = cl.exe
 endif
 endif
 
@@ -120,6 +120,7 @@ OCAMLOPT = ocamlopt -g
 #LINKFLAGS = unix.cmxa
 
 ifeq ($(TOOLCHAIN), msvc)
+RC = rc
 RES=version.res
 ifeq ($(ARCH), i386)
 RES_PREFIX=$(MSVC_PREFIX)
@@ -127,6 +128,7 @@ else
 RES_PREFIX=$(MSVC64_PREFIX)
 endif
 else
+RC = $(TOOLPREF)windres
 RES=version_res.o
 RES_PREFIX=
 endif
@@ -160,12 +162,14 @@ COMPAT_LEVEL := \
   $(strip $(if $(call test_ver,40100),401) \
           $(if $(call test_ver,40200),402) \
           $(if $(call test_ver,40300),403) \
+          $(if $(call test_ver,40400),404) \
           $(if $(call test_ver,40500),405) \
           $(if $(call test_ver,40600),406) \
-          $(if $(call test_ver,40700),407))
+          $(if $(call test_ver,40700),407) \
+          $(if $(call test_ver,40800),408))
 
 Compat.ml: Compat.ml.in COMPILER-$(COMPAT_VERSION)
-	sed -e '$(if $(COMPAT_LEVEL),/^$(subst $(SPACE),:\|^,$(COMPAT_LEVEL)):/d;)s/^[0-9]*://' $< > $@
+	sed -E -e '$(if $(COMPAT_LEVEL),/^$(subst $(SPACE),:|^,$(COMPAT_LEVEL)):/d;)s/^[0-9]*://' $< > $@
 
 flexlink.exe: $(OBJS) $(RES)
 	@echo Building flexlink.exe with TOOLCHAIN=$(TOOLCHAIN) for OCaml $(OCAML_VERSION)
@@ -186,7 +190,7 @@ FLEXDLL_VS_VERSION_INFO = $(subst .,$(COMMA),$(FLEXDLL_FULL_VERSION))
 
 RC_FLAGS = \
   /d FLEXDLL_VS_VERSION_INFO=$(FLEXDLL_VS_VERSION_INFO) \
-  /d FLEXDLL_FULL_VERSION="$(FLEXDLL_FULL_VERSION)"
+  /d FLEXDLL_FULL_VERSION=\"$(FLEXDLL_FULL_VERSION)\"
 
 # cf. https://sourceware.org/bugzilla/show_bug.cgi?id=27843
 WINDRES_FLAGS = \
@@ -194,62 +198,62 @@ WINDRES_FLAGS = \
   -D FLEXDLL_FULL_VERSION=\\\"$(FLEXDLL_FULL_VERSION)\\\"
 
 version.res: version.rc flexdll.opam
-	$(RES_PREFIX) rc /nologo $(RC_FLAGS) $<
+	$(RES_PREFIX) $(RC) /nologo $(RC_FLAGS) $<
 
 version_res.o: version.rc flexdll.opam
-	$(TOOLPREF)windres $(WINDRES_FLAGS) -i $< -o $@
+	$(RC) $(WINDRES_FLAGS) -i $< -o $@
 
 flexdll_msvc.obj: flexdll.c flexdll.h
-	$(MSVC_PREFIX) $(MSVCC) /DMSVC -c /Fo"$@" $<
+	$(MSVC_PREFIX) $(MSVCC) $(MSVC_FLAGS) /DMSVC -c /Fo"$@" $<
 
 flexdll_msvc64.obj: flexdll.c flexdll.h
-	$(MSVC64_PREFIX) $(MSVCC64) /DMSVC /DMSVC64 -c /Fo"$@" $<
+	$(MSVC64_PREFIX) $(MSVCC64) $(MSVC_FLAGS) /DMSVC /DMSVC64 -c /Fo"$@" $<
 
 flexdll_cygwin64.o: flexdll.c flexdll.h
-	$(CYG64CC) -DCYGWIN -c -o $@ $<
+	$(CYG64CC) $(GCC_FLAGS) -DCYGWIN -c -o $@ $<
 
 flexdll_mingw.o: flexdll.c flexdll.h
-	$(MINCC) -DMINGW -c -o $@ $<
+	$(MINCC) $(GCC_FLAGS) -DMINGW -c -o $@ $<
 
 flexdll_gnat.o: flexdll.c flexdll.h
 	gcc -c -o $@ $<
 
 flexdll_mingw64.o: flexdll.c flexdll.h
-	$(MIN64CC) -DMINGW -c -o $@ $<
+	$(MIN64CC) $(GCC_FLAGS) -DMINGW -c -o $@ $<
 
 flexdll_initer_msvc.obj: flexdll_initer.c
-	$(MSVC_PREFIX) $(MSVCC) -c /Fo"$@" $<
+	$(MSVC_PREFIX) $(MSVCC) $(MSVC_FLAGS) -c /Fo"$@" $<
 
 flexdll_initer_msvc64.obj: flexdll_initer.c
-	$(MSVC64_PREFIX) $(MSVCC64) -c /Fo"$@" $<
+	$(MSVC64_PREFIX) $(MSVCC64) $(MSVC_FLAGS) -c /Fo"$@" $<
 
 flexdll_initer_cygwin64.o: flexdll_initer.c
-	$(CYG64CC) -c -o $@ $<
+	$(CYG64CC) $(GCC_FLAGS) -c -o $@ $<
 
 flexdll_initer_mingw.o: flexdll_initer.c
-	$(MINCC) -c -o $@ $<
+	$(MINCC) $(GCC_FLAGS) -c -o $@ $<
 
 flexdll_initer_gnat.o: flexdll_initer.c
 	gcc -c -o $@ $<
 
 flexdll_initer_mingw64.o: flexdll_initer.c
-	$(MIN64CC) -c -o $@ $<
+	$(MIN64CC) $(GCC_FLAGS) -c -o $@ $<
 
 
 demo_msvc: flexlink.exe flexdll_msvc.obj flexdll_initer_msvc.obj
-	$(MSVC_PREFIX) $(MAKE) -C test clean demo CHAIN=msvc CC="$(MSVCC)" PLUG2_CFLAGS="/bigobj" O=obj
+	$(MSVC_PREFIX) $(MAKE) -C test clean demo CHAIN=msvc CC="$(MSVCC)" CFLAGS="$(MSVC_FLAGS)" PLUG2_CFLAGS="/bigobj" O=obj
 
 demo_cygwin64: flexlink.exe flexdll_cygwin64.o flexdll_initer_cygwin64.o
-	$(MAKE) -C test clean demo CHAIN=cygwin64 CC="$(CYG64CC)" O=o RUN="PATH=\"/cygdrive/c/cygwin64/bin:$(PATH)\""
+	$(MAKE) -C test clean demo CHAIN=cygwin64 CC="$(CYG64CC)" CFLAGS="$(GCC_FLAGS)" O=o RUN="PATH=\"/cygdrive/c/cygwin64/bin:$(PATH)\""
 
 demo_mingw: flexlink.exe flexdll_mingw.o flexdll_initer_mingw.o
-	$(MAKE) -C test clean demo CHAIN=mingw CC="$(MINCC)" O=o
+	$(MAKE) -C test clean demo CHAIN=mingw CC="$(MINCC)" CFLAGS="$(GCC_FLAGS)" O=o
 
 demo_mingw64: flexlink.exe flexdll_mingw64.o flexdll_initer_mingw64.o
-	$(MAKE) -C test clean demo CHAIN=mingw64 CC="$(MIN64CC)" O=o
+	$(MAKE) -C test clean demo CHAIN=mingw64 CC="$(MIN64CC)" CFLAGS="$(GCC_FLAGS)" O=o
 
 demo_msvc64:  flexlink.exe flexdll_msvc64.obj flexdll_initer_msvc64.obj
-	$(MSVC64_PREFIX) $(MAKE) -C test clean demo CHAIN=msvc64 CC="$(MSVCC64)" PLUG2_CFLAGS="/bigobj" O=obj
+	$(MSVC64_PREFIX) $(MAKE) -C test clean demo CHAIN=msvc64 CC="$(MSVCC64)" CFLAGS="$(MSVC_FLAGS)" PLUG2_CFLAGS="/bigobj" O=obj
 
 distclean: clean
 	rm -f Makefile.winsdk

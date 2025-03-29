@@ -7,6 +7,14 @@ Next version
   executable instead of the COFF file header. Fix reading the file address of
   new exe header.
   (Antonin Décimo, review by David Allsopp and Nicolás Ojeda Bär)
+- GPR#153: Pass MSVC and MSVC64 variables to Make when building FlexDLL to allow
+  choosing an alternative cl.exe-like compiler. Pass RC to choose an alternative
+  resource compiler (like rc.exe or windres). Pass MINCC, MIN64CC, CYG64CC to
+  choose (respectively) an alternative MinGW-w64 (32 bits), MinGW-w64 (64 bits),
+  Cygwin (64 bits) compiler. Their triplet prefix can be overridden with
+  (respectively) MINCC_PREFIX, MIN64CC_PREFIX, CYG64_PREFIX.
+  Fix FlexDLL cross-build on macOS and BSD.
+  (Antonin Décimo, review by Nicolás Ojeda Bär)
 
 Version 0.43
 - GPR#108: Add -lgcc_s to Cygwin's link libraries, upstreaming a patch from the
