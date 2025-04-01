@@ -21,6 +21,8 @@ let subsystem = ref "console"
 let explain = ref false
 let builtin_linker = ref false
 let toolchain : [ `MSVC | `MSVC64 | `MINGW | `MINGW64 | `GNAT | `GNAT64 | `CYGWIN64 | `LIGHTLD ] ref = ref `MSVC
+let use_linker = ref None
+let use_mt = ref None
 let save_temps = ref false
 let show_exports = ref false
 let show_imports = ref false
@@ -115,6 +117,12 @@ let specs = [
                           | "ld" -> `LIGHTLD
 			  | _ -> assert false)),
   " Choose which linker to use";
+
+  "-use-linker", Arg.String (fun s -> use_linker := Some s),
+  "<cmd> Choose an alternative linker to use";
+
+  "-use-mt", Arg.String (fun s -> use_mt := Some s),
+  "<cmd> Choose an alternative manifest tool to use";
 
   "-x64", Arg.Unit (fun () -> machine := `x64; underscore := false; toolchain := `MSVC64),
   " (Deprecated)";

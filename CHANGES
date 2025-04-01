@@ -17,6 +17,9 @@ Next version
   (Antonin Décimo, review by Nicolás Ojeda Bär)
 - GPR#151: Use response files with all toolchains (Puneeth Chaganti, review by David Allsopp and Antonin Décimo)
 - GPR#152: Use a file to pass arguments to cygpath (Puneeth Chaganti, review by David Allsopp and Antonin Décimo)
+- GPR#156: Allow choosing an alternative linker and manifest tool at runtime
+  with -use-linker=<cmd> and -use-mt=<cmd>.
+  (Antonin Décimo, review by David Allsopp)
 
 Version 0.43
 - GPR#108: Add -lgcc_s to Cygwin's link libraries, upstreaming a patch from the
