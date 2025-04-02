@@ -317,7 +317,7 @@ let rec map_until_found f = function
       | r ->
           r
 
-let find_file =
+let find_file_exn =
   let memo = Hashtbl.create 16 in
   fun fn ->
     let k = String.lowercase_ascii fn in
@@ -339,16 +339,18 @@ let find_file =
             else
               ["lib" ^ base], standard_suffixes
           else [fn], standard_suffixes in
-        let r =
-          match map_until_found (find_file suffixes) fns with
-          | Some fn -> fn
-          | None ->
-              failwith (Printf.sprintf "Cannot find file %S" fn)
-        in
-        Hashtbl.add memo k r;
-        Hashtbl.add memo (k ^ ".lib") r;
-        r
+        match map_until_found (find_file suffixes) fns with
+        | Some fn ->
+            Hashtbl.add memo k fn;
+            Hashtbl.add memo (k ^ ".lib") fn;
+            fn
+        | None ->
+            raise Not_found
 
+let find_file fn =
+  try find_file_exn fn
+  with Not_found ->
+    failwith (Printf.sprintf "Cannot find file %S" fn)
 
 (*******************************)
 
@@ -1385,8 +1387,18 @@ let setup_toolchain () =
       flush stdout
     end;
     default_libs :=
-      ["-lmingw32"; "-lgcc"; "-lgcc_eh"; "-lmoldname"; "-lmingwex"; "-lmsvcrt";
-       "-luser32"; "-lkernel32"; "-ladvapi32"; "-lshell32" ];
+      [ "-lmoldname"; "-lmingwex"; "-lmsvcrt"; "-luser32"; "-lkernel32";
+        "-ladvapi32"; "-lshell32" ];
+    (* -lgcc_eh isn't guaranteed to be available (e.g. if using a static
+       compiler - cf. ocaml/ocaml#12996. Parsing GCC's specs is a bit too much
+       work, so instead treat -lgcc_eh as optional *)
+    let () =
+      try
+        let _ = find_file_exn "-lgcc_eh" in
+        default_libs := "-lgcc_eh" :: !default_libs
+      with Not_found -> ()
+    in
+    default_libs := "-lmingw32" :: "-lgcc" :: !default_libs;
     if !exe_mode = `EXE then default_libs := "crt2.o" :: !default_libs
     else default_libs := "dllcrt2.o" :: !default_libs
   in
