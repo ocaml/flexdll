@@ -138,6 +138,7 @@
 401:
 401:  let win32 = (Sys.os_type = "Win32")
 401:  let cygwin = (Sys.os_type = "Cygwin")
+401:  let unix = (Sys.os_type = "Unix")
 401:end
 
 402:type bytes = string

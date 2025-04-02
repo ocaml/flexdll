@@ -204,7 +204,7 @@ let run_command cmd =
   in
   (* note: for Cygwin, using bash allow to follow symlinks to find
      gcc... *)
-  if !toolchain = `CYGWIN64 ||
+  if Sys.unix || !toolchain = `CYGWIN64 ||
      String.length cmd + String.length silencer > max_command_length
   then begin
     (* Dump the command in a text file and apply bash to it. *)
@@ -235,7 +235,7 @@ let quote_files lst =
   let s =
     String.concat " "
       (List.map (fun f -> if f = "" then f else Filename.quote f) lst) in
-  if String.length s >= 1024 then Filename.quote (build_diversion lst)
+  if not Sys.unix && String.length s >= 1024 then Filename.quote (build_diversion lst)
   else s
 
 
@@ -1128,7 +1128,9 @@ let build_dll link_exe output_file files exts extra_args =
         let extra_args =
           (* FlexDLL doesn't process .voltbl sections correctly, so don't allow the linker
              to process them. *)
-          let command = link ^ " | findstr EMITVOLATILEMETADATA > NUL" in
+          let command =
+            if Sys.win32 then link ^ " /nologo /? | findstr EMITVOLATILEMETADATA > NUL"
+            else link ^ " /nologo '/?' | grep -iq emitvolatilemetadata >/dev/null" in
           if Sys.command command = 0 then
             "/EMITVOLATILEMETADATA:NO " ^ extra_args
           else extra_args
