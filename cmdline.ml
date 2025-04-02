@@ -63,7 +63,7 @@ let footer =
   if it is defined.
 * Extra argument can be passed in the environment variable FLEXLINKFLAGS.
 
-Homepage: http://alain.frisch.fr/flexdll.html"
+Homepage: https://github.com/ocaml/flexdll"
 
 let specs = [
 
@@ -213,7 +213,7 @@ let specs = [
   "<option> Next argument is passed verbatim to the linker";
 
   "-g", Arg.Unit (fun () -> ()),
-  " (ignored)";
+  " (Ignored)";
 
   "-D", Arg.String (fun _ -> ()),
   "<symbol> (Ignored)";
