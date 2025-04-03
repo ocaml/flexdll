@@ -39,7 +39,7 @@ should make it easy to port applications developed for Unix.
 [DLL]: https://en.wikipedia.org/wiki/Dynamic-link_library
 [LoadLibrary]: https://learn.microsoft.com/en-us/windows/win32/api/libloaderapi/nf-libloaderapi-loadlibraryw
 [edll]: https://edll.sourceforge.net/
-[dlopen]: https://pubs.opengroup.org/onlinepubs/9699919799/functions/dlopen.html
+[dlopen]: https://pubs.opengroup.org/onlinepubs/9799919799/functions/dlopen.html
 
 ## About
 
@@ -110,7 +110,7 @@ program (file `dump.c`):
 #include <stdlib.h>
 #include "flexdll.h"
 
-typedef void torun();
+typedef void torun(void);
 
 void api(char *msg){ printf("API: %s\n", msg); }
 
@@ -168,8 +168,8 @@ Now we can provide a first plugin (file `plug1.c`):
 
 ```c
 int x = 3;
-void dump_x() { printf("x=%i\n", x); }
-void torun() { api("plug1.torun();"); }
+void dump_x(void) { printf("x=%i\n", x); }
+void torun(void) { api("plug1.torun();"); }
 ```
 
 Note that the plugin uses the `api` symbol from the main application (it
@@ -203,7 +203,7 @@ symbols (a function and a global variable) defined in the first plugin:
 ```c
 extern int x;
 
-void torun() {
+void torun(void) {
   api("plug2.torun();");
 
   dump_x();
@@ -525,7 +525,7 @@ associated with a given DLL handle.
 
 ```
 Usage:
-  flexlink -o <result.dll> file1.obj file2.obj ... -- <extra linker arguments>
+  flexlink -o <result.dll/exe> file1.obj file2.obj ... -- <extra linker arguments>
 
   -o                  Choose the name of the output file
   -exe                Link the main program as an exe file
@@ -533,11 +533,17 @@ Usage:
   -noflexdllobj       Do not add the Flexdll runtime object (for exe)
   -noentry            Do not use the Flexdll entry point (for dll)
   -noexport           Do not export any symbol
+  -norelrelocs        Ensure that no relative relocation is generated
+  -base               Specify base address (Win64 only)
+  -pthread            Pass -pthread to the linker
   -I <dir>            Add a directory where to search for files
   -L <dir>            Add a directory where to search for files
   -l <lib>            Library file
-  -chain {msvc|msvc64|cygwin64|mingw|mingw64|ld}
+  -chain {msvc|msvc64|cygwin64|mingw|mingw64|gnat|gnat64|ld}
                       Choose which linker to use
+  -use-linker <cmd>   Choose an alternative linker to use
+  -use-mt <cmd>       Choose an alternative manifest tool to use
+  -x64                (Deprecated)
   -defaultlib <obj>   External object (no export, no import)
   -save-temps         Do not delete intermediate files
   -implib             Do not delete the generated import library
@@ -547,7 +553,8 @@ Usage:
   -show-imports       Show imported symbols
   -dry                Show the linker command line, do not actually run it
   -dump               Only dump the content of object files
-  -nocygpath          Do not use cygpath (default for msvc)
+  -patch              Only patch the target image (to be used with -stack)
+  -nocygpath          Do not use cygpath (default for msvc, mingw)
   -cygpath            Use cygpath (default for cygwin)
   -no-merge-manifest  Do not merge the manifest (takes precedence over -merge-manifest)
   -merge-manifest     Merge manifest to the dll or exe (if generated)
@@ -562,10 +569,14 @@ Usage:
   -explain            Explain why library objects are linked
   -subsystem <id>     Set the subsystem (default: console)
   -custom-crt         Use a custom CRT
+  -stack <int>        Set the stack reserve in the resulting image
   -link <option>      Next argument is passed verbatim to the linker
+  -g                  (Ignored)
   -D <symbol>         (Ignored)
   -U <symbol>         (Ignored)
   --                  Following arguments are passed verbatim to the linker
+  -version            Print linker version and FlexDLL directory and exit
+  -vnum               Print linker version number and exit
   -help               Display this list of options
   --help              Display this list of options
 ```
@@ -660,5 +671,5 @@ to create a native toplevel.
 
 - [Microsoft Portable Executable and Common Object File Format Specification](https://learn.microsoft.com/en-us/windows/win32/debug/pe-format).
 - [Enhanced Dynamic Linking Library for MinGW under MS-Windows (edll)][edll].
-- [dlopen (POSIX)][dlopen].
-- [DllMain][DllMain].
+- [`dlopen` (POSIX)][dlopen].
+- [`DllMain`][DllMain].
