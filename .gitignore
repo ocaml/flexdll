@@ -12,6 +12,7 @@ flexlink.opt
 test/dump.exe
 version.res
 version.ml
+build_config.ml
 Makefile.winsdk
 COMPILER-*
 Compat.ml

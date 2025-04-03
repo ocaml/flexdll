@@ -23,6 +23,10 @@ Next version
 - GPR#133, GPR#147: Allow default libraries to be marked as optional (David Allsopp, report by Romain Beauxis)
 - GPR#157: Improve flexlink support on Unix (for cross-compiling contexts).
   (Antonin Décimo, review by David Allsopp)
+- GPR#158: Reuse the compilers used during the build for later operations, such
+  as querying the compilers for their library search paths. Support parsing
+  clang output.
+  (Antonin Décimo, review by ???)
 
 Version 0.43
 - GPR#108: Add -lgcc_s to Cygwin's link libraries, upstreaming a patch from the

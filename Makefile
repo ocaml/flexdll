@@ -38,9 +38,7 @@ CYGWIN64_PREFIX = x86_64-pc-cygwin-
 CYG64CC = $(CYGWIN64_PREFIX)gcc
 
 version.ml: Makefile flexdll.opam
-	echo "let version = \"$(VERSION)\"" > version.ml
-	echo "let mingw_prefix = \"$(MINGW_PREFIX)\"" >> version.ml
-	echo "let mingw64_prefix = \"$(MINGW64_PREFIX)\"" >> version.ml
+	echo 'let version = "$(VERSION)"' > $@
 
 # Supported tool-chains
 
@@ -149,7 +147,8 @@ build_cygwin64: flexdll_cygwin64.o flexdll_initer_cygwin64.o
 build_mingw: flexdll_mingw.o flexdll_initer_mingw.o
 build_mingw64: flexdll_mingw64.o flexdll_initer_mingw64.o
 
-OBJS = version.ml Compat.ml coff.ml cmdline.ml create_dll.ml reloc.ml
+OBJS = version.ml Compat.ml coff.ml cmdline.ml create_dll.ml build_config.ml \
+       reloc.ml
 
 COMPILER-$(COMPAT_VERSION):
 	rm -f COMPILER-*
@@ -166,7 +165,9 @@ COMPAT_LEVEL := \
           $(if $(call test_ver,40500),405) \
           $(if $(call test_ver,40600),406) \
           $(if $(call test_ver,40700),407) \
-          $(if $(call test_ver,40800),408))
+          $(if $(call test_ver,40800),408) \
+          $(if $(call test_ver,40900),409) \
+          $(if $(call test_ver,41000),410))
 
 Compat.ml: Compat.ml.in COMPILER-$(COMPAT_VERSION)
 	sed -E -e '$(if $(COMPAT_LEVEL),/^$(subst $(SPACE),:|^,$(COMPAT_LEVEL)):/d;)s/^[0-9]*://' $< > $@
@@ -239,6 +240,15 @@ flexdll_initer_gnat.o: flexdll_initer.c
 flexdll_initer_mingw64.o: flexdll_initer.c
 	$(MIN64CC) $(GCC_FLAGS) -c -o $@ $<
 
+build_config.ml: Makefile
+	echo 'let mingw_prefix = "$(MINGW_PREFIX)"' > $@
+	echo 'let mingw64_prefix = "$(MINGW64_PREFIX)"' >> $@
+	echo 'let msvc = "$(subst ",\",$(subst \,\\,$(MSVCC)))"' >> $@
+	echo 'let msvc64 = "$(subst ",\",$(subst \,\\,$(MSVCC64)))"' >> $@
+	echo 'let cygwin64 = "$(subst ",\",$(subst \,\\,$(CYG64CC)))"' >> $@
+	echo 'let mingw = "$(subst ",\",$(subst \,\\,$(MINCC)))"' >> $@
+	echo 'let mingw64 = "$(subst ",\",$(subst \,\\,$(MIN64CC)))"' >> $@
+	echo 'let gnat = "gcc"' >> $@
 
 demo_msvc: flexlink.exe flexdll_msvc.obj flexdll_initer_msvc.obj
 	$(MSVC_PREFIX) $(MAKE) -C test clean demo CHAIN=msvc CC="$(MSVCC)" CFLAGS="$(MSVC_FLAGS)" PLUG2_CFLAGS="/bigobj" O=obj
