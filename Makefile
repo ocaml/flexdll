@@ -38,9 +38,15 @@ CYGWIN64_PREFIX = x86_64-pc-cygwin-
 CYG64CC = $(CYGWIN64_PREFIX)gcc
 
 version.ml: Makefile flexdll.opam
-	echo "let version = \"$(VERSION)\"" > version.ml
-	echo "let mingw_prefix = \"$(MINGW_PREFIX)\"" >> version.ml
-	echo "let mingw64_prefix = \"$(MINGW64_PREFIX)\"" >> version.ml
+	echo 'let version = "$(VERSION)"' > $@
+	echo 'let mingw_prefix = "$(MINGW_PREFIX)"' >> $@
+	echo 'let mingw64_prefix = "$(MINGW64_PREFIX)"' >> $@
+	echo 'let msvc = "$(notdir $(MSVCC))"' >> $@
+	echo 'let msvc64 = "$(notdir $(MSVCC64))"' >> $@
+	echo 'let cygwin64 = "$(notdir $(CYG64CC))"' >> $@
+	echo 'let mingw = "$(notdir $(MINCC))"' >> $@
+	echo 'let mingw64 = "$(notdir $(MIN64CC))"' >> $@
+	echo 'let gnat = "gcc"' >> $@
 
 # Supported tool-chains
 
