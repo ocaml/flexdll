@@ -1,4 +1,4 @@
-Next version
+Version 0.44
 - GPR#127: Recognise hyphens in option names in the COFF .drectve section.
   Fixes #126 (Reza Barazesh)
 - GPR#136: Fix parallel access crashes and misbehavior

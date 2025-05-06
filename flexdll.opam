@@ -1,5 +1,5 @@
 opam-version: "2.0"
-version: "0.43"
+version: "0.44"
 authors: "Alain Frisch"
 maintainer: "David Allsopp <david@tarides.com>"
 bug-reports: "https://github.com/ocaml/flexdll/issues"
