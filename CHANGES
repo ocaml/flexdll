@@ -1,26 +1,29 @@
 Next version
-- GPR#127: Recognise hyphens in option names in the COFF .drectve section. Fixes #126 (Reza Barazesh)
-- GPR#136: Fix parallel access crashes and misbehavior (David Allsopp, Jan Midtgaard, Antonin Décimo)
-- GPR#140: Fixes #29. Support relocation kind 0003 (IMAGE_REL_AMD64_ADDR32NB) and
-  IMAGE_REL_I386_DIR32NB. Extend relative types to IMAGE_REL_AMD64_REL32_5. (Jonah Beckford)
+- GPR#127: Recognise hyphens in option names in the COFF .drectve section.
+  Fixes #126 (Reza Barazesh)
+- GPR#136: Fix parallel access crashes and misbehavior
+  (David Allsopp, Jan Midtgaard, Antonin Décimo)
+- GPR#141: Support relocation kind 0003 (IMAGE_REL_AMD64_ADDR32NB) and
+  IMAGE_REL_I386_DIR32NB. Extend relative types to IMAGE_REL_AMD64_REL32_5.
+  Fixes GPR#29 (Jonah Beckford)
+- GPR#148: Pass-through -pthread to the linker (Romain Beauxis)
 - GPR#150: Fix stack reserve incorrectly reading from the start of the PE
   executable instead of the COFF file header. Fix reading the file address of
   new exe header.
   (Antonin Décimo, review by David Allsopp and Nicolás Ojeda Bär)
-- GPR#153: Pass MSVC and MSVC64 variables to Make when building FlexDLL to allow
-  choosing an alternative cl.exe-like compiler. Pass RC to choose an alternative
-  resource compiler (like rc.exe or windres). Pass MINCC, MIN64CC, CYG64CC to
-  choose (respectively) an alternative MinGW-w64 (32 bits), MinGW-w64 (64 bits),
-  Cygwin (64 bits) compiler. Their triplet prefix can be overridden with
-  (respectively) MINCC_PREFIX, MIN64CC_PREFIX, CYG64_PREFIX.
-  Fix FlexDLL cross-build on macOS and BSD.
+- GPR#153: Allow the names of the compiler binaries to be overridden without
+  losing the flags which go with them to assist use of alternate compilers and
+  for cross-compilation. Fix FlexDLL cross-build on macOS and BSD.
   (Antonin Décimo, review by Nicolás Ojeda Bär)
-- GPR#151: Use response files with all toolchains (Puneeth Chaganti, review by David Allsopp and Antonin Décimo)
-- GPR#152: Use a file to pass arguments to cygpath (Puneeth Chaganti, review by David Allsopp and Antonin Décimo)
+- GPR#151: Use response files with all toolchains
+  (Puneeth Chaganti, review by David Allsopp and Antonin Décimo)
+- GPR#152: Use a response file to pass arguments to cygpath
+  (Puneeth Chaganti, review by David Allsopp and Antonin Décimo)
 - GPR#156: Allow choosing an alternative linker and manifest tool at runtime
   with -use-linker=<cmd> and -use-mt=<cmd>.
   (Antonin Décimo, review by David Allsopp)
-- GPR#133, GPR#147: Allow default libraries to be marked as optional (David Allsopp, report by Romain Beauxis)
+- GPR#133, GPR#147: Allow default libraries to be marked as optional
+  (David Allsopp, report by Romain Beauxis)
 - GPR#157: Improve flexlink support on Unix (for cross-compiling contexts).
   (Antonin Décimo, review by David Allsopp)
 - GPR#158: Reuse the compilers used during the build for later operations, such
