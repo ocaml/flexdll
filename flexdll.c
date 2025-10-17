@@ -46,7 +46,7 @@ typedef unsigned long uintnat;
 typedef struct { UINT_PTR kind; char *name; UINT_PTR *addr; } reloc_entry;
 typedef struct { char *first; char *last; DWORD old; } nonwr;
 typedef struct { nonwr *nonwr; reloc_entry entries[]; } reloctbl;
-typedef struct { void *addr; char *name; } dynsymbol;
+typedef struct { void *addr; const char *name; } dynsymbol;
 typedef struct { UINT_PTR size; dynsymbol entries[]; } symtbl;
 typedef struct dlunit {
   void *handle;
@@ -171,7 +171,7 @@ static void ll_dlclose(void * handle)
   dlclose(handle);
 }
 
-static void * ll_dlsym(void * handle, char * name)
+static void * ll_dlsym(void * handle, const char * name)
 {
   return dlsym(handle, name);
 }
@@ -201,7 +201,7 @@ static void ll_dlclose(void *handle) {
   FreeLibrary((HMODULE) handle);
 }
 
-static void *ll_dlsym(void *handle, char *name) {
+static void *ll_dlsym(void *handle, const char *name) {
   return (void *) GetProcAddress((HMODULE) handle, name);
 }
 
@@ -228,8 +228,8 @@ static char *ll_dlerror(void)
 
 /** Relocation tables **/
 
-static void dump_reloctbl(reloctbl *tbl) {
-  reloc_entry *ptr;
+static void dump_reloctbl(const reloctbl *tbl) {
+  const reloc_entry *ptr;
   nonwr *wr;
 
   if (!tbl) { printf("No relocation table\n"); return; }
@@ -249,13 +249,13 @@ static void dump_reloctbl(reloctbl *tbl) {
 	   );
 }
 
-static void dump_master_reloctbl(reloctbl **ptr) {
+static void dump_master_reloctbl(reloctbl * const *ptr) {
   if (!ptr) return;
   while (*ptr) dump_reloctbl(*ptr++);
 }
 
 /* Avoid the use of snprintf */
-static void cannot_resolve_msg(char *name, err_t *err) {
+static void cannot_resolve_msg(const char *name, err_t *err) {
   static char msg[] = "Cannot resolve ";
   static size_t l = sizeof(msg) - 1;
   size_t n = strlen(name);
@@ -418,7 +418,7 @@ static void relocate_master(resolver f, void *data, reloctbl **ptr, err_t *err) 
 
 /* Symbol tables */
 
-static void dump_symtbl(symtbl *tbl)
+static void dump_symtbl(const symtbl *tbl)
 {
   unsigned i;
 
@@ -434,16 +434,16 @@ static void dump_symtbl(symtbl *tbl)
 }
 
 static int compare_dynsymbol(const void *s1, const void *s2) {
-  return strcmp(((dynsymbol*) s1) -> name, ((dynsymbol*) s2) -> name);
+  return strcmp(((const dynsymbol*) s1) -> name, ((const dynsymbol*) s2) -> name);
 }
 
-static void *find_symbol(symtbl *tbl, const char *name) {
+static void *find_symbol(const symtbl *tbl, const char *name) {
   static dynsymbol s;
   dynsymbol *sym;
 
   if (!tbl) return NULL;
 
-  s.name = (char*) name;
+  s.name = name;
   sym =
     bsearch(&s,&tbl->entries,tbl->size, sizeof(dynsymbol),&compare_dynsymbol);
 
@@ -651,8 +651,8 @@ char *flexdll_dlerror(void) {
   return NULL;
 }
 
-void flexdll_dump_exports(void *u) {
-  dlunit *unit = u;
+void flexdll_dump_exports(const void *u) {
+  const dlunit *unit = u;
   if (NULL == u) { dump_symtbl(&static_symtable); }
   else if (u == &main_unit) {
     dump_symtbl(&static_symtable);
@@ -662,7 +662,7 @@ void flexdll_dump_exports(void *u) {
   else { dump_symtbl(unit->symtbl); }
 }
 
-void flexdll_dump_relocations(void *u) {
+void flexdll_dump_relocations(const void *u) {
   if (NULL == u || u == &main_unit) return;
-  dump_master_reloctbl(ll_dlsym(((dlunit*)u) -> handle, "reloctbl"));
+  dump_master_reloctbl(ll_dlsym(((const dlunit*)u) -> handle, "reloctbl"));
 }

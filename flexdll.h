@@ -32,8 +32,8 @@ void *flexdll_dlsym(void *, const char *);
 void flexdll_dlclose(void *);
 char *flexdll_dlerror(void);
 
-void flexdll_dump_exports(void *);
-void flexdll_dump_relocations(void *);
+void flexdll_dump_exports(const void *);
+void flexdll_dump_relocations(const void *);
 
 #ifdef __cplusplus
 }
