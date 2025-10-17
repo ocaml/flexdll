@@ -27,9 +27,6 @@
 #endif
 #endif /* MSVC */
 
-typedef long intnat;
-typedef unsigned long uintnat;
-
 /* RELOC_ constants except RELOC_DONE have ordinal values based on when
    they were introduced to the code base. These ordinal values are
    persisted in .obj files so do not re-use any existing ordinals. */
@@ -244,7 +241,7 @@ static void dump_reloctbl(reloctbl *tbl) {
     printf(" %p (kind:%04lx) (now:%p)  %s\n",
 	   (void *)ptr->addr,
 	   (unsigned long)ptr->kind,
-	   (void *)((UINT_PTR)(*((uintnat*) ptr->addr))),
+	   (void *)((UINT_PTR)(*((UINT32*) ptr->addr))),
 	   ptr->name
 	   );
 }
