@@ -5,7 +5,7 @@
 # Microsoft C Compiler Environment Detection Script                                                #
 # ################################################################################################ #
 # Copyright (c) 2016, 2017, 2018, 2019, 2020, 2021 MetaStack Solutions Ltd.                        #
-# Copyright (c) 2022, 2024 David Allsopp Ltd.                                                      #
+# Copyright (c) 2022, 2024, 2025 David Allsopp Ltd.                                                #
 # ################################################################################################ #
 # Author: David Allsopp                                                                            #
 # 16-Feb-2016                                                                                      #
@@ -28,7 +28,7 @@
 # of this software, even if advised of the possibility of such damage.                             #
 # ################################################################################################ #
 
-VERSION=0.7.0
+VERSION=0.8.0
 
 set -f
 
@@ -366,7 +366,7 @@ elif [[ $OUTPUT -eq 2 && -z $TARGET_ARCH ]] ; then
   echo "$0: --output=data requires --arch">&2
   exit 2
 elif [[ -z ${MSVS_PREFERENCE+x} ]] ; then
-  MSVS_PREFERENCE='@;VS17.*;VS16.*;VS15.*;VS14.0;VS12.0;VS11.0;10.0;9.0;8.0;7.1;7.0'
+  MSVS_PREFERENCE='@;VS18.*;VS17.*;VS16.*;VS15.*;VS14.0;VS12.0;VS11.0;10.0;9.0;8.0;7.1;7.0'
 fi
 
 MSVS_PREFERENCE=${MSVS_PREFERENCE//;/ }
@@ -521,6 +521,9 @@ COMPILERS=(
     ["VSWHERE"]="1")'
   ["VS17.*"]='(
     ["NAME"]="Visual Studio 2022"
+    ["VSWHERE"]="1")'
+  ["VS18.*"]='(
+    ["NAME"]="Visual Studio 2026"
     ["VSWHERE"]="1")'
   ["SDK5.2"]='(
     ["NAME"]="Windows Server 2003 SP1 SDK"
