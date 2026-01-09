@@ -203,8 +203,11 @@ let specs = [
   "-subsystem", Arg.Set_string subsystem,
   "<id> Set the subsystem (default: console)";
 
-  "-m", Arg.Set_string subsystem,
-  "<id> Set the subsystem (alias for -subsystem)";
+  "-mwindows", Arg.Unit (fun () -> subsystem := "windows"),
+  " Alias for -subsystem windows";
+
+  "-mconsole", Arg.Unit (fun () -> subsystem := "console"),
+  " Alias for -subsystem console";
 
   "-custom-crt", Arg.Set custom_crt,
   " Use a custom CRT";
@@ -263,7 +266,7 @@ let flexlinkflags =
 let parse_cmdline () =
   (* Split -lXXX, -LXXX and -IXXX options *)
   let tosplit = function
-    | "-l" | "-L" | "-I" | "-D" | "-U" | "-m" -> true
+    | "-l" | "-L" | "-I" | "-D" | "-U" -> true
     | _ -> false
   in
 
