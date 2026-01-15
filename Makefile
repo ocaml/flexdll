@@ -252,8 +252,10 @@ demo_msvc: flexlink.exe flexdll_msvc.obj flexdll_initer_msvc.obj
 demo_cygwin64: flexlink.exe flexdll_cygwin64.o flexdll_initer_cygwin64.o
 	$(MAKE) -C test clean demo CHAIN=cygwin64 CC="$(CYG64CC)" CFLAGS="$(GCC_FLAGS)" O=o RUN="PATH=\"/cygdrive/c/cygwin64/bin:$(PATH)\""
 
+# cf. ocaml/ocaml#10046
+MINGW_DEMO_CFLAGS=-static-libgcc
 demo_mingw: flexlink.exe flexdll_mingw.o flexdll_initer_mingw.o
-	$(MAKE) -C test clean demo CHAIN=mingw CC="$(MINCC)" CFLAGS="$(GCC_FLAGS)" O=o
+	$(MAKE) -C test clean demo CHAIN=mingw CC="$(MINCC)" CFLAGS="$(GCC_FLAGS)" O=o LDFLAGS="-static-libgcc"
 
 demo_mingw64: flexlink.exe flexdll_mingw64.o flexdll_initer_mingw64.o
 	$(MAKE) -C test clean demo CHAIN=mingw64 CC="$(MIN64CC)" CFLAGS="$(GCC_FLAGS)" O=o

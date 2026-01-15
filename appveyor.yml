@@ -10,42 +10,71 @@ environment:
     CYG_CACHE: C:/cygwin64/var/cache/setup
     OCAML_PORT: msvc64
     ARTEFACTS: no
-    FLEXDLL_VERSION: 0.43
+    FLEXDLL_VERSION: 0.44
     FLEXDLL_WARN_ERROR: true
+    VCVARS64: C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\bin\amd64\vcvars64.bat
   matrix:
-    - OCAMLBRANCH: 3.11
-    - OCAMLBRANCH: 3.12
+    - job_name: OCaml 3.11 branch
+      OCAMLBRANCH: 3.11
+    - job_name: OCaml 3.12.1
+      OCAMLBRANCH: 3.12
       OCAMLREV: 1
-    - OCAMLBRANCH: 4.00
-    - OCAMLBRANCH: 4.01
-    - OCAMLBRANCH: 4.02
-    - OCAMLBRANCH: 4.03
+    - job_name: OCaml 4.00 branch
+      OCAMLBRANCH: 4.00
+    - job_name: OCaml 4.01 branch
+      OCAMLBRANCH: 4.01
+    - job_name: OCaml 4.02 branch
+      OCAMLBRANCH: 4.02
+    - job_name: OCaml 4.03 branch (including bootstrap)
+      OCAMLBRANCH: 4.03
       SKIP_OCAML_TEST: no
-    - OCAMLBRANCH: 4.04
-    - OCAMLBRANCH: 4.05
-    - OCAMLBRANCH: 4.06
-    - OCAMLBRANCH: 4.07
-    - OCAMLBRANCH: 4.08
-    - OCAMLBRANCH: 4.09
-    - OCAMLBRANCH: 4.10
-    - OCAMLBRANCH: 4.11
-    - OCAMLBRANCH: 4.12
+    - job_name: OCaml 4.04 branch
+      OCAMLBRANCH: 4.04
+    - job_name: OCaml 4.05 branch
+      OCAMLBRANCH: 4.05
+    - job_name: OCaml 4.06 branch
+      OCAMLBRANCH: 4.06
+    - job_name: OCaml 4.07 branch
+      OCAMLBRANCH: 4.07
+    - job_name: OCaml 4.08 branch
+      OCAMLBRANCH: 4.08
+    - job_name: OCaml 4.09 branch
+      OCAMLBRANCH: 4.09
+    - job_name: OCaml 4.10 branch
+      OCAMLBRANCH: 4.10
+    - job_name: OCaml 4.11 branch
+      OCAMLBRANCH: 4.11
+    - job_name: OCaml 4.12 branch (Win 7 SDK; mingw-w64 i686) + release artefacts
+      OCAMLBRANCH: 4.12
       OCAML_PORT: mingw
       ARTEFACTS: yes
       MSVS_PREFERENCE: SDK7.0
-    - OCAMLBRANCH: 4.13
-    - OCAMLBRANCH: 4.14
+    - job_name: OCaml 4.13 branch
+      OCAMLBRANCH: 4.13
+    - job_name: OCaml 4.14 branch (including bootstrap)
+      OCAMLBRANCH: 4.14
       SKIP_OCAML_TEST: no
-    - OCAMLBRANCH: 5.0
+    - job_name: OCaml 5.0 branch (mingw-w64 x86_64)
+      OCAMLBRANCH: 5.0
       OCAML_PORT: mingw64
-    - OCAMLBRANCH: 5.1
+    - job_name: OCaml 5.1 branch (mingw-w64 x86_64)
+      OCAMLBRANCH: 5.1
       OCAML_PORT: mingw64
-    - OCAMLBRANCH: 5.2
+    - job_name: OCaml 5.2 branch (mingw-w64 x86_64)
+      OCAMLBRANCH: 5.2
       OCAML_PORT: mingw64
-    - OCAMLBRANCH: 5.3
-      OCAML_PORT: mingw64
+    - job_name: OCaml 5.3 branch
+      appveyor_build_worker_image: Visual Studio 2022
+      VCVARS64: C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars64.bat
+      OCAMLBRANCH: 5.3
+    - job_name: OCaml 5.4 branch (including bootstrap)
+      appveyor_build_worker_image: Visual Studio 2022
+      VCVARS64: C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars64.bat
+      OCAMLBRANCH: 5.4
       SKIP_OCAML_TEST: no
-    - OCAMLBRANCH: trunk
+    - job_name: OCaml trunk branch (including bootstrap; mingw-w64 x86_64)
+      appveyor_build_worker_image: Visual Studio 2022
+      OCAMLBRANCH: trunk
       OCAML_PORT: mingw64
       SKIP_OCAML_TEST: no
   OCAMLROOT: C:/OCaml
@@ -57,13 +86,13 @@ install:
   # Make sure the Cygwin path comes before the Git one (otherwise
   # cygpath behaves crazily), but after the MSVC one.
   - set Path=C:\cygwin64\bin;%OCAMLROOT%\bin;C:\flexdll;%Path%
-  - '%CYG_ROOT%\bin\bash -lc "cygcheck -dc cygwin"'
+  - '%CYG_ROOT%\bin\bash -lc "cygcheck -dc cygwin make mingw64-i686-gcc-core mingw64-i686-runtime mingw64-x86_64-gcc-core mingw64-x86_64-runtime"'
   - if exist "%CYG_ROOT%\setup-x86_64.exe" del "%CYG_ROOT%\setup-x86_64.exe"
   - appveyor DownloadFile "https://cygwin.com/setup-x86_64.exe" -FileName "%CYG_ROOT%\setup-x86_64.exe"
   - '"%CYG_ROOT%\setup-x86_64.exe" --quiet-mode --no-shortcuts --no-startmenu --no-desktop --only-site --root "%CYG_ROOT%" --site "%CYG_MIRROR%" --local-package-dir "%CYG_CACHE%" --packages unzip,zip > nul'
   - '%CYG_ROOT%\bin\bash -lc "zip --version" > nul || "%CYG_ROOT%\setup-x86_64.exe" --quiet-mode --no-shortcuts --no-startmenu --no-desktop --only-site --root "%CYG_ROOT%" --site "%CYG_MIRROR%" --local-package-dir "%CYG_CACHE%" --upgrade-also > nul'
-  - '%CYG_ROOT%\bin\bash -lc "cygcheck -dc cygwin"'
-  - call "C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\bin\amd64\vcvars64.bat"
+  - '%CYG_ROOT%\bin\bash -lc "cygcheck -dc cygwin make mingw64-i686-gcc-core mingw64-i686-runtime mingw64-x86_64-gcc-core mingw64-x86_64-runtime"'
+  - call "%VCVARS64%"
   - appveyor DownloadFile "https://github.com/ocaml/flexdll/archive/%FLEXDLL_VERSION%.tar.gz" -FileName "flexdll.tar.gz"
   - appveyor DownloadFile "https://github.com/ocaml/flexdll/releases/download/%FLEXDLL_VERSION%/flexdll-bin-%FLEXDLL_VERSION%.zip" -FileName "flexdll.zip"
   - appveyor DownloadFile "https://raw.githubusercontent.com/ocaml/ocaml/trunk/tools/msvs-promote-path" -FileName "msvs-promote-path"

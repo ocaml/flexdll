@@ -30,13 +30,13 @@ plug2.$(O): plug2.c
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(PLUG2_CFLAGS) -c plug2.c
 
 plug1.dll: plug1.$(O)
-	$(FLEXLINK) -o plug1.dll plug1.$(O)
+	$(FLEXLINK) $(addprefix -link ,$(LDFLAGS)) -o plug1.dll plug1.$(O)
 
 plug2.dll: plug2.$(O)
-	$(FLEXLINK) -o plug2.dll plug2.$(O)
+	$(FLEXLINK) $(addprefix -link ,$(LDFLAGS)) -o plug2.dll plug2.$(O)
 
 plug12.dll: plug1.$(O) plug2.$(O)
-	$(FLEXLINK) -o plug12.dll plug1.$(O) plug2.$(O)
+	$(FLEXLINK) $(addprefix -link ,$(LDFLAGS)) -o plug12.dll plug1.$(O) plug2.$(O)
 
 
 clean:

@@ -47,6 +47,8 @@ function configure_ocaml {
     fi
 }
 
+git config --global --add safe.directory '*'
+
 case "$OCAML_PORT" in
   msvc) OCAML_TARGET=i686-pc-windows; OCAML_SYSTEM=win32;;
   msvc64) OCAML_TARGET=x86_64-pc-windows; OCAML_SYSTEM=win64;;
