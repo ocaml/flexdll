@@ -203,6 +203,12 @@ let specs = [
   "-subsystem", Arg.Set_string subsystem,
   "<id> Set the subsystem (default: console)";
 
+  "-mwindows", Arg.Unit (fun () -> subsystem := "windows"),
+  " Alias for -subsystem windows";
+
+  "-mconsole", Arg.Unit (fun () -> subsystem := "console"),
+  " Alias for -subsystem console";
+
   "-custom-crt", Arg.Set custom_crt,
   " Use a custom CRT";
 
