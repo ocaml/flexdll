@@ -568,6 +568,8 @@ Usage:
   -builtin            Use built-in linker to produce a dll
   -explain            Explain why library objects are linked
   -subsystem <id>     Set the subsystem (default: console)
+  -mwindows           Alias for -subsystem windows
+  -mconsole           Alias for -subsystem console
   -custom-crt         Use a custom CRT
   -stack <int>        Set the stack reserve in the resulting image
   -link <option>      Next argument is passed verbatim to the linker
