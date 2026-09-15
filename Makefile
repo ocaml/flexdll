@@ -37,6 +37,10 @@ MIN64CC = $(MINGW64_PREFIX)gcc
 CYGWIN64_PREFIX = x86_64-pc-cygwin-
 CYG64CC = $(CYGWIN64_PREFIX)gcc
 
+# A C compiler with a Unix-style CLI targeting the MSVC ABI/CRT
+# (e.g. clang --target=x86_64-pc-windows-msvc, zig cc)
+CLANG64CC = clang --target=x86_64-pc-windows-msvc
+
 version.ml: Makefile flexdll.opam
 	echo 'let version = "$(VERSION)"' > $@
 	echo 'let mingw_prefix = "$(MINGW_PREFIX)"' >> $@
@@ -47,6 +51,7 @@ version.ml: Makefile flexdll.opam
 	echo 'let mingw = "$(notdir $(MINCC))"' >> $@
 	echo 'let mingw64 = "$(notdir $(MIN64CC))"' >> $@
 	echo 'let gnat = "gcc"' >> $@
+	echo 'let clang64 = "$(CLANG64CC)"' >> $@
 
 # Supported tool-chains
 
@@ -151,6 +156,7 @@ support: $(addprefix build_, $(CHAINS))
 build_gnat: flexdll_gnat.o flexdll_initer_gnat.o
 build_msvc: flexdll_msvc.obj flexdll_initer_msvc.obj
 build_msvc64: flexdll_msvc64.obj flexdll_initer_msvc64.obj
+build_clang64: flexdll_clang64.o flexdll_initer_clang64.o
 build_cygwin64: flexdll_cygwin64.o flexdll_initer_cygwin64.o
 build_mingw: flexdll_mingw.o flexdll_initer_mingw.o
 build_mingw64: flexdll_mingw64.o flexdll_initer_mingw64.o
@@ -215,6 +221,13 @@ flexdll_msvc.obj: flexdll.c flexdll.h
 flexdll_msvc64.obj: flexdll.c flexdll.h
 	$(MSVC64_PREFIX) $(MSVCC64) $(MSVC_FLAGS) /DMSVC /DMSVC64 -c /Fo"$@" $<
 
+# -fms-runtime-lib=dll matches the /MD of MSVC_FLAGS (the objects must not
+# carry a -defaultlib:libcmt directive)
+CLANG64_FLAGS = $(GCC_FLAGS) -fms-runtime-lib=dll -D_CRT_SECURE_NO_DEPRECATE
+
+flexdll_clang64.o: flexdll.c flexdll.h
+	$(CLANG64CC) $(CLANG64_FLAGS) -DMSVC -DMSVC64 -c -o $@ $<
+
 flexdll_cygwin64.o: flexdll.c flexdll.h
 	$(CYG64CC) $(GCC_FLAGS) -DCYGWIN -c -o $@ $<
 
@@ -232,6 +245,9 @@ flexdll_initer_msvc.obj: flexdll_initer.c
 
 flexdll_initer_msvc64.obj: flexdll_initer.c
 	$(MSVC64_PREFIX) $(MSVCC64) $(MSVC_FLAGS) -c /Fo"$@" $<
+
+flexdll_initer_clang64.o: flexdll_initer.c
+	$(CLANG64CC) $(CLANG64_FLAGS) -c -o $@ $<
 
 flexdll_initer_cygwin64.o: flexdll_initer.c
 	$(CYG64CC) $(GCC_FLAGS) -c -o $@ $<
@@ -262,6 +278,9 @@ demo_mingw64: flexlink.exe flexdll_mingw64.o flexdll_initer_mingw64.o
 
 demo_msvc64:  flexlink.exe flexdll_msvc64.obj flexdll_initer_msvc64.obj
 	$(MSVC64_PREFIX) $(MAKE) -C test clean demo CHAIN=msvc64 CC="$(MSVCC64)" CFLAGS="$(MSVC_FLAGS)" PLUG2_CFLAGS="/bigobj" O=obj
+
+demo_clang64: flexlink.exe flexdll_clang64.o flexdll_initer_clang64.o
+	$(MAKE) -C test clean demo CHAIN=clang64 CC="$(CLANG64CC)" CFLAGS="$(CLANG64_FLAGS)" O=o
 
 distclean: clean
 	rm -f Makefile.winsdk

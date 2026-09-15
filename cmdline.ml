@@ -20,7 +20,7 @@ let use_default_libs = ref true
 let subsystem = ref "console"
 let explain = ref false
 let builtin_linker = ref false
-let toolchain : [ `MSVC | `MSVC64 | `MINGW | `MINGW64 | `GNAT | `GNAT64 | `CYGWIN64 | `LIGHTLD ] ref = ref `MSVC
+let toolchain : [ `MSVC | `MSVC64 | `CLANG64 | `MINGW | `MINGW64 | `GNAT | `GNAT64 | `CYGWIN64 | `LIGHTLD ] ref = ref `MSVC
 let use_linker = ref None
 let use_mt = ref None
 let save_temps = ref false
@@ -103,12 +103,13 @@ let specs = [
   "-l", Arg.String (fun s -> files := ("-l" ^ s) :: !files),
   "<lib> Library file";
 
-  "-chain", Arg.Symbol (["msvc";"msvc64";"cygwin64";"mingw";"mingw64";"gnat";"gnat64";"ld"],
+  "-chain", Arg.Symbol (["msvc";"msvc64";"clang64";"cygwin64";"mingw";"mingw64";"gnat";"gnat64";"ld"],
 			(fun s ->
                           machine := `x86; underscore := true;
                           toolchain := match s with
 			  | "msvc" -> `MSVC
 			  | "msvc64" -> machine := `x64; underscore := false; `MSVC64
+			  | "clang64" -> machine := `x64; underscore := false; `CLANG64
 			  | "cygwin64" -> machine := `x64; underscore := false; `CYGWIN64
 			  | "mingw" -> `MINGW
 			  | "gnat" -> `GNAT
@@ -277,8 +278,12 @@ let parse_cmdline () =
         String.sub s 0 2 :: String.sub s 2 (String.length s - 2) :: tr rest
     | s :: rest when String.length s >= 5 && String.sub s 0 5 = "/link" ->
         "-link" :: String.sub s 5 (String.length s - 5) :: tr rest
-    (* Convert gcc linker option prefix -Wl, to flexlink linker prefix -link *)
-    | s :: rest when String.length s >= 6 && String.sub s 0 5 = "-Wl,-" ->
+    (* Convert gcc linker option prefix -Wl, to flexlink linker prefix -link.
+       Also accept MSVC-style option spellings after -Wl, (e.g. -Wl,/entry:Sym,
+       as used with the clang64 chain) which would otherwise be mangled by the
+       -opt:value splitting below. *)
+    | s :: rest when String.length s >= 5 && String.sub s 0 4 = "-Wl,"
+                     && (s.[4] = '-' || s.[4] = '/') ->
         let args =
           String.split_on_char ',' (String.sub s 4 (String.length s - 4))
         in

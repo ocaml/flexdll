@@ -106,8 +106,8 @@
 
 407:module Stdlib = Pervasives
 
-404:module String = struct
-404:  include String
+405:module String = struct
+405:  include String
 402:
 402:  let init n f =
 402:    let s = create n in
@@ -131,7 +131,13 @@
 404:      end
 404:    done;
 404:    sub s 0 !j :: !r
-404:end
+405:
+405:  let rec index_rec_opt s lim i c =
+405:    if i >= lim then None else
+405:      if unsafe_get s i = c then Some i else index_rec_opt s lim (i + 1) c
+405:
+405:  let index_opt s c = index_rec_opt s (length s) 0 c
+405:end
 
 401:module Sys = struct
 401:  include Sys
@@ -140,6 +146,34 @@
 401:  let cygwin = (Sys.os_type = "Cygwin")
 401:  let unix = (Sys.os_type = "Unix")
 401:end
+
+404:module Filename = struct
+404:  include Filename
+404:
+404:  let is_dir_sep s i =
+404:    if Sys.unix then s.[i] = '/'
+404:    else if Sys.win32 || Sys.cygwin then
+404:      let c = s.[i] in
+404:      c = '/' || c = '\\' || c = ':' && i = 1
+404:    else false
+404:
+404:  let extension_len name =
+404:    let rec check i0 i =
+404:      if i < 0 || is_dir_sep name i then 0
+404:      else if name.[i] = '.' then check i0 (i - 1)
+404:      else String.length name - i0
+404:    in
+404:    let rec search_dot i =
+404:      if i < 0 || is_dir_sep name i then 0
+404:      else if name.[i] = '.' then check i (i - 1)
+404:      else search_dot (i - 1)
+404:    in
+404:    search_dot (String.length name - 1)
+404:
+404:  let remove_extension name =
+404:    let l = extension_len name in
+404:    if l = 0 then name else String.sub name 0 (String.length name - l)
+404:end
 
 402:type bytes = string
 402:let output_bytes = output_string
